@@ -278,9 +278,12 @@ table.mini td.amt{width:auto;text-align:right}
     </div>
     <p class="hint">
       表の目標量は<b>「運動しなかった日」</b>の値です。運動した日は「③ 今日の運動」の内容に応じて、
-      この基本係数に <b>+0.10（軽運動）／+0.20（トレーニング）／+0.30（ハード）</b> が加算されます（上限 1.8 g/kg）。<br>
+      この基本係数に <b>最大 +0.30</b> が加算されます（上限 1.8 g/kg）。<br>
+      加算量は運動量スコアに比例します。スコアは
+      <b>総負荷量 ÷ 6,000kg</b> ＋ <b>ウォーキング換算距離 ÷ 10km</b>（合計100%で満点）で求めるため、
+      重量・回数・セット数・距離を変えるとそのまま結果に反映されます。<br>
       加算方式なので、基本係数を下げれば運動した日の目標もその分下がります。
-      例：基本 1.50 でハードな日は 1.80、基本 1.20 なら同じ運動でも 1.50 になります。
+      例：基本 1.50 でスコア100%の日は 1.80、基本 1.20 なら同じ運動でも 1.50 になります。
     </p>
   </section>
 
@@ -414,8 +417,10 @@ const r1 = n  => Math.round(n * 10) / 10;
 const r2 = n  => Math.round(n * 100) / 100;
 
 // 運動による係数の加算量（基本係数に上乗せする）と、その日の上限
-const BONUS_MAX = 0.30;
-const CAP_BASE  = 1.80;
+const BONUS_MAX     = 0.30;
+const CAP_BASE      = 1.80;
+const STRENGTH_FULL = 6000;   // この総負荷量(kg)で筋トレ側の加算が満点になる
+const CARDIO_FULL   = 10;     // ウォーキング換算 10km で有酸素側の加算が満点になる
 const capOf     = base => Math.max(CAP_BASE, base);   // 基本係数を 1.8 超に設定した場合はその値が上限
 const serveText = n => n === 1 ? '1回で摂取' : `${n}回に分けて摂取`;
 
@@ -501,24 +506,30 @@ function calcFactor(st){
     if(x.on){ done++; volume += x.w * x.r * x.s; }
   });
 
-  // 運動量に応じた加算値（基本係数に上乗せする。下限の上書きではないため
-  // 基本係数を 1.2 に下げれば、その分だけ目標もきちんと下がる）
-  let bonus = 0;
-  if(done >= 1)                   bonus = Math.max(bonus, 0.10);
-  if(done >= 3 || volume >= 2500) bonus = Math.max(bonus, 0.20);
-  if(done >= 5 || volume >= 4000) bonus = Math.max(bonus, 0.30); // 複数種目 or 高負荷
-  if(done > 0) reasons.push(`筋トレ ${done}種目 / 総負荷量 ${volume.toLocaleString()}kg`);
-
   // --- 有酸素：サイクリングは同距離あたりの負荷が低いため 0.35 で換算 ---
   const cardio = st.walk + st.cycle * 0.35;
-  if(cardio >= 10)     bonus = Math.max(bonus, 0.30);  // ウォーキング10km超など
-  else if(cardio >= 5) bonus = Math.max(bonus, 0.20);
-  else if(cardio > 0)  bonus = Math.max(bonus, 0.10);
+
+  // 運動量に応じた加算値（基本係数に上乗せする。下限の上書きではないため
+  // 基本係数を 1.2 に下げれば、その分だけ目標もきちんと下がる）。
+  // 段階判定ではなく連続値で評価するので、重量・回数・セット数・距離の変更が
+  // そのまま結果に反映される。
+  const strengthRatio = volume / STRENGTH_FULL;
+  const cardioRatio   = cardio / CARDIO_FULL;
+  const rawRatio      = strengthRatio + cardioRatio;
+  const loadRatio     = Math.min(1, rawRatio);
+  const loadCapped    = rawRatio > 1;
+  const bonus         = r2(BONUS_MAX * loadRatio);
+
+  if(done > 0){
+    reasons.push(`筋トレ ${done}種目 / 総負荷量 ${volume.toLocaleString()}kg` +
+                 `（運動量スコア ${Math.round(strengthRatio * 100)}%：${STRENGTH_FULL.toLocaleString()}kg で満点）`);
+  }
   if(cardio > 0){
     const p = [];
     if(st.walk  > 0) p.push(`ウォーキング ${r1(st.walk)}km`);
     if(st.cycle > 0) p.push(`サイクリング ${r1(st.cycle)}km`);
-    reasons.push(`${p.join(' / ')}（ウォーキング換算 ${r1(cardio)}km相当）`);
+    reasons.push(`${p.join(' / ')}（ウォーキング換算 ${r1(cardio)}km相当` +
+                 ` → 運動量スコア ${Math.round(cardioRatio * 100)}%：${CARDIO_FULL}km で満点）`);
   }
 
   const base   = st.baseFactor;
@@ -529,12 +540,13 @@ function calcFactor(st){
 
   if(!reasons.length) reasons.push('運動の入力なし（加算なし。基本係数をそのまま適用）');
 
-  const level = bonus >= 0.30 ? {t:'ハード日',       c:'#c2410c'}
-              : bonus >= 0.20 ? {t:'トレーニング日', c:'#1f6feb'}
-              : bonus >= 0.10 ? {t:'軽運動日',       c:'#0f9d58'}
+  const level = bonus >= 0.25 ? {t:'ハード日',       c:'#c2410c'}
+              : bonus >= 0.15 ? {t:'トレーニング日', c:'#1f6feb'}
+              : bonus >  0    ? {t:'軽運動日',       c:'#0f9d58'}
               :                 {t:'休養日',         c:'#5d6b7c'};
 
-  return {factor, base, bonus, cap, capped, volume, done, cardio, reasons, level};
+  return {factor, base, bonus, cap, capped, volume, done, cardio,
+          loadRatio, loadCapped, strengthRatio, cardioRatio, reasons, level};
 }
 
 // 不足分を「1回3杯（約19.5g）」を基準にセッション分割
@@ -688,8 +700,15 @@ function render(opts){
   $('oReason').innerHTML =
     `<b>目標の算出根拠：</b>体重 ${r1(st.weight)}kg × <b>${ex.factor.toFixed(2)} g/kg</b> = <b>${target}g</b><br>` +
     `　内訳：基本係数 <b>${ex.base.toFixed(2)}</b>` +
-    (ex.bonus > 0 ? ` ＋ 運動による加算 <b>+${ex.bonus.toFixed(2)}</b>` : `（運動による加算なし）`) +
+    (ex.bonus > 0
+      ? ` ＋ 運動による加算 <b>+${ex.bonus.toFixed(2)}</b>` +
+        `（運動量スコア ${Math.round(ex.loadRatio * 100)}% × 上限 +${BONUS_MAX.toFixed(2)}）`
+      : `（運動による加算なし）`) +
     (ex.capped ? `　※ ${(ex.base + ex.bonus).toFixed(2)} は上限 ${ex.cap.toFixed(2)} を超えるため ${ex.cap.toFixed(2)} に丸めました` : '') +
+    (ex.loadCapped
+      ? `<br>　<b>※ 運動量スコアが上限の100%に達しています。</b>` +
+        `これ以上 重量・回数・セット数・距離を増やしても目標は変わりません。`
+      : '') +
     `<br>` +
     ex.reasons.map(r => '・' + r).join('<br>') +
     `<br><b>食事の内訳：</b>` + (food.list.length ? food.list.join('、') : '入力なし') +
