@@ -421,6 +421,14 @@ const BONUS_MAX     = 0.30;
 const CAP_BASE      = 1.80;
 const STRENGTH_FULL = 6000;   // この総負荷量(kg)で筋トレ側の加算が満点になる
 const CARDIO_FULL   = 10;     // ウォーキング換算 10km で有酸素側の加算が満点になる
+
+// エネルギー消費の概算。タンパク質の必要量は運動量に比例せず頭打ちになるが、
+// エネルギー（主に糖質）の必要量は運動量に比例して増えるため、こちらは上限を設けない。
+const KCAL_PER_VOLUME = 0.04;  // 総負荷量 1kg あたりの消費 kcal
+const WALK_KCAL       = 0.5;   // 体重1kg・1km あたりの消費 kcal（ウォーキング）
+const CYCLE_KCAL      = 0.28;  // 同上（サイクリング）
+const CARB_SHARE      = 0.5;   // 消費分のうち糖質で補う割合
+const RICE_BOWL_CARB  = 55;    // ご飯茶碗1杯(150g)あたりの糖質 g
 const capOf     = base => Math.max(CAP_BASE, base);   // 基本係数を 1.8 超に設定した場合はその値が上限
 const serveText = n => n === 1 ? '1回で摂取' : `${n}回に分けて摂取`;
 
@@ -927,6 +935,19 @@ function renderSchedule(st, ex, target, sv){
   ).join('');
 }
 
+/* 運動によるエネルギー消費の概算と、補うべき糖質量 */
+function calcEnergy(st, ex){
+  const strength = ex.volume * KCAL_PER_VOLUME;
+  const cardio   = st.weight * (st.walk * WALK_KCAL + st.cycle * CYCLE_KCAL);
+  const kcal     = Math.round(strength + cardio);
+  return {
+    kcal,
+    strength: Math.round(strength),
+    cardio:   Math.round(cardio),
+    carbG:    Math.round(kcal * CARB_SHARE / 4)   // 糖質は 4kcal/g
+  };
+}
+
 /* 不足がザバス1回分より小さいとき、液体を減らして1杯で合わせる案を返す */
 function liquidCutSuggestion(st, lack){
   if(!(st.liquid.p100 > 0) || lack <= SPOON_G) return '';
@@ -995,9 +1016,31 @@ function renderTips(st, ex, target, lack, food, sv){
       `ザバスの追加摂取は不要です。運動直後にどうしても飲みたい場合は1〜2杯までに留めてください。`]);
   }
 
+  // 運動量に比例して増えるのはタンパク質ではなくエネルギー（糖質）
+  const en = calcEnergy(st, ex);
+  if(en.kcal > 0){
+    tips.push(['', `<b>⑤ 今日の運動での推定消費は 約${en.kcal} kcal です</b>` +
+      `（筋トレ ${en.strength}kcal ／ 有酸素 ${en.cardio}kcal・概算）。<br>` +
+      `タンパク質の必要量は運動量に比例せず <b>体重×1.8g で頭打ち</b>になりますが、` +
+      `<b>エネルギーは運動量に比例して増えます</b>。ここが不足すると、せっかく摂ったタンパク質が` +
+      `エネルギー源として使われ、筋肉の材料に回りません。<br>` +
+      `運動の前後に <b>糖質 約${en.carbG}g（ご飯茶碗 約${(en.carbG / RICE_BOWL_CARB).toFixed(1)}杯分）</b>` +
+      `を補ってください。糖質を摂る際は、先に千切りキャベツを食べる順番を守れば血糖値の急上昇は抑えられます。`]);
+  }
+
+  // 普段より極端に負荷が高い日の注意
+  if(ex.volume >= STRENGTH_FULL * 2){
+    tips.push(['alert', `<b>⚠ 総負荷量 ${ex.volume.toLocaleString()}kg は基準（${STRENGTH_FULL.toLocaleString()}kg）の` +
+      `${(ex.volume / STRENGTH_FULL).toFixed(1)}倍です。</b>` +
+      `筋肥大は刺激量に比例して伸び続けるわけではなく、回復が追いつかないと逆効果になります。` +
+      `55歳では関節・腱の回復に時間がかかるため、この量を行った日は<b>同じ部位を48〜72時間空ける</b>こと、` +
+      `また継続する場合は週あたりの頻度を落とすことを検討してください。` +
+      `タンパク質の摂取量を増やしても、この回復時間は短縮できません。`]);
+  }
+
   // 粉への依存が大きいときの注意
   if(sv.totalG > 0 && sv.totalG >= target * 0.45){
-    tips.push(['', `<b>⑤ 今日は目標 ${target}g のうち ${sv.totalG}g（約${Math.round(sv.totalG / target * 100)}%）をザバスで賄う計算です。</b>` +
+    tips.push(['', `<b>⑥ 今日は目標 ${target}g のうち ${sv.totalG}g（約${Math.round(sv.totalG / target * 100)}%）をザバスで賄う計算です。</b>` +
       `プロテインは不足を埋める補助であって主役ではありません。ビタミン・ミネラル・食物繊維は粉からは摂れないため、` +
       `<b>サラダチキンや納豆・豆腐を1〜2品増やして、粉の比率を4割以下に下げる</b>ほうが望ましい状態です。`]);
   }
