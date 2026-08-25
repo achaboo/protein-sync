@@ -1,0 +1,1057 @@
+<!doctype html>
+<!--
+================================================================================
+  ザバス（SAVAS）必要量 自動計算ツール  index.html
+================================================================================
+
+  【使い方】
+   1. このファイル (index.html) をダブルクリックしてブラウザで開くだけで動きます。
+      （サーバー不要・通信不要・スマホにコピーしても動作します）
+   2. 「① 基本設定」で体重を確認します（初期値 75kg）。
+   3. 「② 今日の食事」で食べたもの（食べる予定のもの）の個数を入力します。
+      リストにないものは「その他（自由入力）」にタンパク質 g を直接入力してください。
+   4. 「③ 今日の運動」で有酸素の距離を入力します。筋トレは全6種目に最初からチェックが
+      入っているので、やらなかった種目だけチェックを外します。
+      重量 / 回数 / セット数も普段の値が既定で入っているので、変えた日だけ書き換えます。
+   5. 「計算する」を押すと、
+        ・今日の目標タンパク質（運動量に応じて 体重×1.5〜1.8g で自動変動）
+        ・食事からの合計タンパク質
+        ・不足分と、それを補うザバスのスプーン杯数 / 回数
+        ・朝・昼・晩・運動後・間食/就寝前の「時間帯別スケジュール表」
+        ・食事と栄養のポイント
+      が下に表示されます。
+   6. 一度計算したあとは、①〜③のどこを変更しても<b>その場で自動的に再計算</b>されます。
+      「計算する」を押し直す必要はありません。更新されると結果が一瞬ハイライトされ、
+      「④ 計算結果」の右上に最終更新時刻が表示されます。
+   7. 入力内容はブラウザに自動保存され、次に開いたときに復元されます。
+      「入力をリセット」を押すと（確認ダイアログのあと）すべての入力が初期状態に戻り、
+      保存内容も削除されます。
+
+  【計算の前提値】
+   ・ザバス ホエイプロテイン100 リッチショコラ味
+       付属スプーン 1杯 = タンパク質 約 6.5g / 推奨 1回 3杯 = 約 19.5g
+   ・溶かす液体（①で選択）にもタンパク質があるため、飲む回数分を加算して計算します。
+       水 0g / 低脂肪乳 3.8g / 普通牛乳 3.3g / 無調整豆乳 3.6g / 調製豆乳 3.2g（いずれも 100ml あたり）
+       初期値は「低脂肪乳 250ml」（＝1回あたり 約9.5g が加算されます）。
+   ・松のや 玉子丼 20g、レトルトカレー+ご飯1合 7g、納豆 1P 8g、
+     豆腐50gミニパック 1個 3.3g、セブンプレミアム ほぐしサラダチキン80g 1P 18.7g
+   ※数値は目安です。商品リニューアル等で変わる場合は下部の FOODS / SPOON_G を修正してください。
+================================================================================
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ザバス必要量 自動計算ツール</title>
+<style>
+:root{
+  --bg:#f2f5f9; --card:#ffffff; --ink:#1c2530; --sub:#5d6b7c; --line:#e2e8f0;
+  --brand:#1f6feb; --brand-d:#0f4fb5; --accent:#f97316; --ok:#0f9d58; --warn:#d93025;
+  --shadow:0 2px 10px rgba(20,35,60,.07);
+  --radius:14px;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; padding:0 0 60px;
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",
+              "Meiryo",system-ui,sans-serif;
+  background:var(--bg); color:var(--ink); line-height:1.65; -webkit-text-size-adjust:100%;
+}
+.wrap{max-width:860px;margin:0 auto;padding:0 14px}
+header{
+  background:linear-gradient(135deg,#1f6feb,#0b3f96); color:#fff;
+  padding:22px 14px 26px; margin-bottom:18px;
+}
+header h1{margin:0;font-size:1.32rem;letter-spacing:.02em}
+header p{margin:6px 0 0;font-size:.85rem;opacity:.9}
+section{
+  background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow);
+  padding:16px 16px 18px; margin-bottom:16px;
+}
+h2{
+  font-size:1.02rem; margin:0 0 12px; padding-left:10px;
+  border-left:5px solid var(--brand); line-height:1.3;
+}
+h3{font-size:.92rem;margin:16px 0 8px;color:var(--sub)}
+label{font-size:.9rem}
+.hint{font-size:.78rem;color:var(--sub);margin:8px 0 0}
+input[type=number],input[type=text],select{
+  font:inherit; padding:7px 8px; border:1px solid var(--line); border-radius:9px;
+  background:#fbfcfe; width:100%; min-width:0;
+}
+input[type=number]:focus,input[type=text]:focus,select:focus{outline:2px solid #bfd7ff;border-color:var(--brand)}
+input[type=checkbox]{width:20px;height:20px;accent-color:var(--brand);flex:none}
+
+/* 行レイアウト */
+.row{
+  display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px dashed var(--line);
+}
+.row:last-child{border-bottom:none}
+.row .name{flex:1 1 auto;min-width:0}
+.row .name b{display:block;font-size:.93rem;font-weight:600}
+.row .name small{color:var(--sub);font-size:.76rem}
+.qty{flex:0 0 92px;display:flex;align-items:center;gap:6px}
+.qty input{text-align:center}
+.unit{font-size:.8rem;color:var(--sub);flex:none;width:2.2em}
+
+/* 筋トレカード */
+.ex{
+  border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px;
+  background:#fbfcfe;transition:.15s;
+}
+.ex.on{background:#f0f6ff;border-color:#b9d3ff}
+.ex-head{display:flex;align-items:center;gap:10px}
+.ex-head label{font-weight:600;font-size:.94rem;flex:1;cursor:pointer}
+.ex-vol{font-size:.76rem;color:var(--sub);white-space:nowrap}
+.ex-body{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:9px}
+.ex-body div{display:flex;flex-direction:column}
+.ex-body span{font-size:.72rem;color:var(--sub);margin-bottom:3px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.check{display:flex;align-items:flex-start;gap:9px;margin-top:12px;cursor:pointer;font-size:.88rem}
+.check small{color:var(--sub);font-size:.78rem}
+
+/* ボタン */
+.actions{display:flex;gap:10px;margin:4px 0 22px}
+button{font:inherit;border:none;border-radius:11px;padding:13px 18px;cursor:pointer;font-weight:700}
+#calc{flex:1;background:var(--brand);color:#fff;box-shadow:0 3px 0 var(--brand-d)}
+#calc:active{transform:translateY(2px);box-shadow:0 1px 0 var(--brand-d)}
+#reset{background:#e7ebf1;color:var(--sub)}
+
+/* 結果 */
+#result{display:none}
+.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.stat{background:#f5f8fc;border:1px solid var(--line);border-radius:12px;padding:12px 8px;text-align:center}
+.stat span{display:block;font-size:.74rem;color:var(--sub)}
+.stat strong{display:block;font-size:1.42rem;line-height:1.25;margin-top:2px}
+.stat.lack strong{color:var(--warn)}
+.stat.ok strong{color:var(--ok)}
+.savas{
+  background:linear-gradient(135deg,#fff7ed,#ffedd5); border:2px solid var(--accent);
+  border-radius:12px; padding:14px; text-align:center; margin-bottom:14px;
+}
+.savas .big{font-size:1.5rem;font-weight:800;color:#c2410c;display:block;line-height:1.4}
+.savas .sub{font-size:.83rem;color:#7c2d12}
+table{width:100%;border-collapse:collapse;font-size:.86rem}
+th,td{border:1px solid var(--line);padding:9px 8px;text-align:left;vertical-align:top}
+th{background:#eef3fa;font-weight:700;white-space:nowrap}
+td.time{white-space:nowrap;font-weight:700;background:#fafcff;width:26%}
+td.amt{white-space:nowrap;font-weight:700;color:var(--brand-d);width:20%}
+.table-wrap{overflow-x:auto}
+table.mini{font-size:.82rem}
+table.mini td.time{width:auto;white-space:nowrap}
+table.mini td.amt{width:auto;text-align:right}
+.tips{list-style:none;padding:0;margin:0}
+.tips li{
+  background:#f4fbf6;border-left:4px solid var(--ok);border-radius:8px;
+  padding:10px 12px;margin-bottom:9px;font-size:.87rem;
+}
+.tips li.alert{background:#fff5f5;border-left-color:var(--warn)}
+.tips li.done{background:#eef4ff;border-left-color:var(--brand)}
+.note{background:#f5f8fc;border-radius:10px;padding:11px 12px;font-size:.82rem;color:var(--sub)}
+.badge{
+  display:inline-block;background:var(--brand);color:#fff;border-radius:999px;
+  padding:2px 11px;font-size:.76rem;font-weight:700;margin-left:6px;vertical-align:middle;
+}
+.stamp{float:right;font-size:.72rem;color:var(--sub);font-weight:400}
+.act-note{margin:-14px 0 20px;padding:0 2px;line-height:1.7}
+/* 再計算されたことを分かるようにハイライト */
+@keyframes flashUpdate{from{background:#fff3c4}to{background:var(--card)}}
+#result.flash section{animation:flashUpdate 1.1s ease-out}
+@media(max-width:520px){
+  .summary{grid-template-columns:1fr;gap:8px}
+  .stat{display:flex;align-items:center;justify-content:space-between;text-align:left;padding:10px 14px}
+  .stat strong{font-size:1.25rem;margin:0}
+  .grid2{grid-template-columns:1fr}
+  .qty{flex-basis:80px}
+  table.mini{font-size:.78rem}
+  table.mini th,table.mini td.time,table.mini td.amt{white-space:normal}
+  table.mini th,table.mini td{padding:7px 6px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>ザバス（SAVAS）必要量 自動計算ツール</h1>
+    <p>その日の食事と運動から、不足タンパク質と飲むべきスプーン杯数を自動計算します。</p>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- ① 基本設定 -->
+  <section>
+    <h2>① 基本設定</h2>
+    <div class="grid2">
+      <div>
+        <label for="weight">体重 (kg)</label>
+        <input type="number" id="weight" value="75" step="0.1" min="30" max="200">
+      </div>
+      <div>
+        <label for="baseFactor">基本係数（運動なしの日 / g per kg）</label>
+        <input type="number" id="baseFactor" value="1.5" step="0.05" min="1" max="2.5">
+      </div>
+    </div>
+    <p class="hint" id="baseNote"></p>
+
+    <h3>ザバスを溶かす液体</h3>
+    <div class="grid2">
+      <div>
+        <label for="liquid">種類</label>
+        <select id="liquid"></select>
+      </div>
+      <div>
+        <label for="liquidMl">1回あたりの量 (ml)</label>
+        <input type="number" id="liquidMl" value="250" min="0" max="500" step="50">
+      </div>
+    </div>
+    <label class="check"><input type="checkbox" id="preferMilk" checked>
+      <span>できるだけ<b>低脂肪乳</b>で溶かす配分を優先する<br>
+      <small>オフにすると、水も使って目標にいちばん近づく配分を選びます。</small></span></label>
+    <p class="hint" id="liquidNote"></p>
+
+    <h3>基本係数の入力目安</h3>
+    <div class="table-wrap">
+      <table class="mini">
+        <thead>
+          <tr><th>入力値</th><th>どんな人・どんな時期に選ぶか</th><th id="bfHead">目標量</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="time">1.2</td>
+            <td>運動習慣がほとんどない時期。または腎機能に不安があり、医師からタンパク質制限を受けている場合。</td>
+            <td class="amt" id="bf12">-</td>
+          </tr>
+          <tr>
+            <td class="time">1.4</td>
+            <td>今の体重・筋肉量を維持できれば十分な時期。食が細く、食事量が落ちている日が続くとき。</td>
+            <td class="amt" id="bf14">-</td>
+          </tr>
+          <tr>
+            <td class="time">1.5<br><small>（初期値・推奨）</small></td>
+            <td>週数回の筋トレを続けながら、筋肉量を維持〜微増させたい標準的な設定。迷ったらこの値のままで構いません。</td>
+            <td class="amt" id="bf15">-</td>
+          </tr>
+          <tr>
+            <td class="time">1.6〜1.7</td>
+            <td>減量中で筋肉を落としたくない時期、または筋肥大を積極的に狙う時期。その分、水分を多めに摂ってください。</td>
+            <td class="amt" id="bf17">-</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="hint">
+      表の目標量は<b>「運動しなかった日」</b>の値です。運動した日は「③ 今日の運動」の内容に応じて、
+      この基本係数に <b>+0.10（軽運動）／+0.20（トレーニング）／+0.30（ハード）</b> が加算されます（上限 1.8 g/kg）。<br>
+      加算方式なので、基本係数を下げれば運動した日の目標もその分下がります。
+      例：基本 1.50 でハードな日は 1.80、基本 1.20 なら同じ運動でも 1.50 になります。
+    </p>
+  </section>
+
+  <!-- ② 食事 -->
+  <section>
+    <h2>② 今日の食事</h2>
+    <div id="foods"></div>
+    <div class="row">
+      <div class="name"><b>その他（自由入力）</b><small>上記以外で摂ったタンパク質の合計</small></div>
+      <div class="qty"><input type="number" id="otherP" value="0" min="0" step="0.1"></div>
+      <div class="unit">g</div>
+    </div>
+    <p class="hint" id="foodNote"></p>
+  </section>
+
+  <!-- ③ 運動 -->
+  <section>
+    <h2>③ 今日の運動</h2>
+
+    <h3>有酸素運動</h3>
+    <div class="row">
+      <div class="name"><b>ウォーキング</b><small>歩いた距離</small></div>
+      <div class="qty"><input type="number" id="walk" value="0" min="0" step="0.5"></div>
+      <div class="unit">km</div>
+    </div>
+    <div class="row">
+      <div class="name"><b>サイクリング</b><small>走った距離</small></div>
+      <div class="qty"><input type="number" id="cycle" value="0" min="0" step="1"></div>
+      <div class="unit">km</div>
+    </div>
+
+    <h3>筋トレ（初期状態は全種目オン。やらなかった種目はチェックを外す）</h3>
+    <div id="exercises"></div>
+    <p class="hint" id="volNote"></p>
+  </section>
+
+  <div class="actions">
+    <button id="calc">計算する</button>
+    <button id="reset">入力をリセット</button>
+  </div>
+  <p class="hint act-note">
+    <b>計算する</b>：結果を表示します。<b>一度表示したあとは、①〜③を変更するとその場で自動再計算されます</b>（ボタンを押し直す必要はありません）。<br>
+    <b>入力をリセット</b>：体重・係数・食事の数量・運動の入力・筋トレのチェックをすべて初期状態に戻し、ブラウザに保存された内容も削除します（確認あり）。
+  </p>
+
+  <!-- 結果 -->
+  <div id="result">
+
+    <section>
+      <h2>④ 計算結果<span class="badge" id="lvBadge">-</span><span class="stamp" id="stamp"></span></h2>
+      <div class="summary">
+        <div class="stat"><span>今日の目標</span><strong id="oTarget">-</strong></div>
+        <div class="stat ok"><span>食事から摂取</span><strong id="oFood">-</strong></div>
+        <div class="stat lack"><span>不足分</span><strong id="oLack">-</strong></div>
+      </div>
+      <div class="savas">
+        <span class="big" id="oSavas">-</span>
+        <span class="sub" id="oSavasSub">-</span>
+      </div>
+      <div class="note" id="oReason"></div>
+    </section>
+
+    <section>
+      <h2>⑤ 時間帯別の摂取スケジュール</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>時間帯</th><th>目安量</th><th>内容・ポイント</th></tr>
+          </thead>
+          <tbody id="schedule"></tbody>
+        </table>
+      </div>
+      <p class="hint">※ 目安量は今日の目標値から自動配分しています（1回の摂取が 30〜40g を超えないよう調整）。</p>
+    </section>
+
+    <section>
+      <h2>⑥ 食事・栄養のポイント</h2>
+      <ul class="tips" id="tips"></ul>
+    </section>
+
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   定数（商品リニューアル時はここを修正）
+   ============================================================ */
+const SPOON_G   = 6.5;                  // ザバス付属スプーン1杯あたりのタンパク質(g)
+const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
+const SERVE_G   = SPOON_G * PER_SERVE;  // 1回 = 19.5g
+
+// 食事マスタ
+//   p     : 1単位あたりのタンパク質 g
+//   short : スケジュール表での短縮表示名
+//   slots : 割り当てたい時間帯の優先順（b=朝食 / l=昼食 / d=夕食）
+//   carb  : 糖質が多く、血糖値が上がりやすい食品（先にキャベツを食べたい対象）
+//   first : 食事の最初に食べる食品（ベジファースト用。糖質メニューのある食事へ優先配分）
+//   lock  : true なら slots に挙げた時間帯「以外」には絶対に配分しない（例：玉子丼は朝食のみ）
+const FOODS = [
+  {id:'matsu',   name:'松のや 玉子丼',                          short:'玉子丼',       note:'1食 約20g',     p:20,   unit:'食', slots:['b'], carb:true, lock:true, lockNote:'朝食のみ'},
+  {id:'curry',   name:'レトルトカレー＋ご飯1合',                short:'カレー＋ご飯', note:'1食 約7g',      p:7,    unit:'食', slots:['l','d','b'], carb:true},
+  {id:'natto',   name:'納豆',                                   short:'納豆',         note:'1パック 約8g',  p:8,    unit:'P',  slots:['b','d','l']},
+  {id:'tofu',    name:'豆腐 50g ミニパック',                     short:'豆腐',         note:'1個 約3.3g',    p:3.3,  unit:'個', slots:['b','d','l']},
+  {id:'chicken', name:'セブンプレミアム ほぐしサラダチキン 80g', short:'サラダチキン', note:'1パック 18.7g', p:18.7, unit:'P',  slots:['l','d','b']},
+  {id:'cabbage', name:'千切りキャベツ（150g 1袋）',              short:'千切りキャベツ', note:'1袋 約2.0g（食物繊維 約2.7g）', p:2.0, unit:'袋', slots:['l','d','b'], first:true}
+];
+
+// ザバスを溶かす液体（p100: 100ml あたりのタンパク質 g）
+// 牛乳・豆乳にはタンパク質が含まれるため、ザバス1回ごとにこの分を加算して計算する
+const DEFAULT_LIQUID = 'lowfat';   // 初期選択（普段使うもの）
+const LIQUIDS = [
+  {id:'water',  name:'水',         p100:0},
+  {id:'lowfat', name:'低脂肪乳',   p100:3.8},
+  {id:'milk',   name:'普通牛乳',   p100:3.3},
+  {id:'soy',    name:'無調整豆乳', p100:3.6},
+  {id:'soy2',   name:'調製豆乳',   p100:3.2}
+];
+
+// 筋トレマスタ（普段の値をデフォルトとしてセット）
+const EXERCISES = [
+  {id:'lat',      name:'ラットプルダウン',     w:20, r:15, s:3},
+  {id:'row',      name:'シーテッドローイング', w:20, r:15, s:3},
+  {id:'chest',    name:'チェストプレス',       w:20, r:15, s:3},
+  {id:'shoulder', name:'ショルダープレス',     w:5,  r:15, s:3},
+  {id:'curl',     name:'バイセップスカール',   w:5,  r:15, s:3},
+  {id:'dips',     name:'ディップス',           w:30, r:15, s:3}
+];
+
+const $  = id => document.getElementById(id);
+const r1 = n  => Math.round(n * 10) / 10;
+const r2 = n  => Math.round(n * 100) / 100;
+
+// 運動による係数の加算量（基本係数に上乗せする）と、その日の上限
+const BONUS_MAX = 0.30;
+const CAP_BASE  = 1.80;
+const capOf     = base => Math.max(CAP_BASE, base);   // 基本係数を 1.8 超に設定した場合はその値が上限
+const serveText = n => n === 1 ? '1回で摂取' : `${n}回に分けて摂取`;
+
+/* ============================================================
+   UI 生成
+   ============================================================ */
+$('foods').innerHTML = FOODS.map(f => `
+  <div class="row">
+    <div class="name"><b>${f.name}</b><small>${f.note}${f.lockNote ? ` ／ <b>${f.lockNote}</b>` : ''}</small></div>
+    <div class="qty"><input type="number" id="f_${f.id}" value="0" min="0" step="1"></div>
+    <div class="unit">${f.unit}</div>
+  </div>`).join('');
+
+$('liquid').innerHTML = LIQUIDS.map(l =>
+  `<option value="${l.id}"${l.id === DEFAULT_LIQUID ? ' selected' : ''}>` +
+  `${l.name}${l.p100 > 0 ? `（${l.p100}g / 100ml）` : '（タンパク質なし）'}</option>`).join('');
+
+$('exercises').innerHTML = EXERCISES.map(e => `
+  <div class="ex" id="ex_${e.id}">
+    <div class="ex-head">
+      <input type="checkbox" id="c_${e.id}" checked>
+      <label for="c_${e.id}">${e.name}</label>
+      <span class="ex-vol" id="v_${e.id}">0 kg</span>
+    </div>
+    <div class="ex-body">
+      <div><span>重量 (kg)</span><input type="number" id="w_${e.id}" value="${e.w}" min="0" step="1"></div>
+      <div><span>回数</span><input type="number" id="r_${e.id}" value="${e.r}" min="0" step="1"></div>
+      <div><span>セット数</span><input type="number" id="s_${e.id}" value="${e.s}" min="0" step="1"></div>
+    </div>
+  </div>`).join('');
+
+/* ============================================================
+   入力値の取得
+   ============================================================ */
+const num = id => { const v = parseFloat($(id).value); return (isNaN(v) || v < 0) ? 0 : v; };
+
+function readState(){
+  const st = {
+    weight: num('weight') || 75,
+    baseFactor: num('baseFactor') || 1.5,
+    walk: num('walk'), cycle: num('cycle'), otherP: num('otherP'),
+    foods: {}, ex: {}
+  };
+  // ザバスを溶かす液体：1回あたりのタンパク質量を求めておく
+  st.liquid   = LIQUIDS.find(l => l.id === $('liquid').value) || LIQUIDS[0];
+  st.liquidMl   = Math.min(500, num('liquidMl'));   // 1回分として現実的な上限で頭打ちにする
+  st.liqP       = r1(st.liquid.p100 * st.liquidMl / 100);
+  st.preferMilk = $('preferMilk').checked;
+  FOODS.forEach(f => st.foods[f.id] = num('f_' + f.id));
+  EXERCISES.forEach(e => st.ex[e.id] = {
+    on: $('c_' + e.id).checked, w: num('w_' + e.id), r: num('r_' + e.id), s: num('s_' + e.id)
+  });
+  return st;
+}
+
+/* ============================================================
+   計算ロジック
+   ============================================================ */
+// 食事からの合計タンパク質
+function calcFood(st){
+  let total = st.otherP;
+  const list = [];
+  FOODS.forEach(f => {
+    const q = st.foods[f.id];
+    if(q > 0){
+      const g = q * f.p;
+      total += g;
+      list.push(`${f.name} ${r1(q)}${f.unit}（${r1(g)}g）`);
+    }
+  });
+  if(st.otherP > 0) list.push(`その他（${r1(st.otherP)}g）`);
+  return {total: r1(total), list};
+}
+
+// 運動量から目標係数（g/kg）を決定
+function calcFactor(st){
+  const reasons = [];
+
+  // --- 筋トレ：実施種目数と総負荷量（重量×回数×セット数）で判定 ---
+  let volume = 0, done = 0;
+  EXERCISES.forEach(e => {
+    const x = st.ex[e.id];
+    if(x.on){ done++; volume += x.w * x.r * x.s; }
+  });
+
+  // 運動量に応じた加算値（基本係数に上乗せする。下限の上書きではないため
+  // 基本係数を 1.2 に下げれば、その分だけ目標もきちんと下がる）
+  let bonus = 0;
+  if(done >= 1)                   bonus = Math.max(bonus, 0.10);
+  if(done >= 3 || volume >= 2500) bonus = Math.max(bonus, 0.20);
+  if(done >= 5 || volume >= 4000) bonus = Math.max(bonus, 0.30); // 複数種目 or 高負荷
+  if(done > 0) reasons.push(`筋トレ ${done}種目 / 総負荷量 ${volume.toLocaleString()}kg`);
+
+  // --- 有酸素：サイクリングは同距離あたりの負荷が低いため 0.35 で換算 ---
+  const cardio = st.walk + st.cycle * 0.35;
+  if(cardio >= 10)     bonus = Math.max(bonus, 0.30);  // ウォーキング10km超など
+  else if(cardio >= 5) bonus = Math.max(bonus, 0.20);
+  else if(cardio > 0)  bonus = Math.max(bonus, 0.10);
+  if(cardio > 0){
+    const p = [];
+    if(st.walk  > 0) p.push(`ウォーキング ${r1(st.walk)}km`);
+    if(st.cycle > 0) p.push(`サイクリング ${r1(st.cycle)}km`);
+    reasons.push(`${p.join(' / ')}（ウォーキング換算 ${r1(cardio)}km相当）`);
+  }
+
+  const base   = st.baseFactor;
+  const cap    = capOf(base);
+  const raw    = r2(base + bonus);
+  const factor = Math.min(raw, cap);          // 上限は 1.8（基本係数がそれ以上ならその値）
+  const capped = raw > cap;
+
+  if(!reasons.length) reasons.push('運動の入力なし（加算なし。基本係数をそのまま適用）');
+
+  const level = bonus >= 0.30 ? {t:'ハード日',       c:'#c2410c'}
+              : bonus >= 0.20 ? {t:'トレーニング日', c:'#1f6feb'}
+              : bonus >= 0.10 ? {t:'軽運動日',       c:'#0f9d58'}
+              :                 {t:'休養日',         c:'#5d6b7c'};
+
+  return {factor, base, bonus, cap, capped, volume, done, cardio, reasons, level};
+}
+
+// 不足分を「1回3杯（約19.5g）」を基準にセッション分割
+// 1回の吸収上限と胃への負担を考慮し、1回は最大3杯・1日最大3回（＝9杯/約58.5g）まで。
+// それを超える不足分は粉に頼らず食事で補う想定とし、excess として返す。
+// liqP＝1回あたりに液体（牛乳・豆乳など）から摂れるタンパク質 g。水なら 0。
+const MAX_SESSIONS  = 3;
+const MAX_PER_SERVE = 4;    // 推奨は1回3杯。回数（＝液体の量）を増やさずに済む場合だけ4杯まで許容
+const ABSORB_CAP    = 40;   // 1回の摂取上限 g
+
+const TOLERANCE     = 3;    // これ以上の摂りすぎは許容しない g
+const MIN_PER_SERVE = 2;    // 2回以上に分けるときの1回あたり最低杯数
+const MILK_SLACK    = 1.5;  // 牛乳を優先するために許容する「目標とのズレ」の上乗せ g
+
+function splitSavas(lackG, st){
+  const liqP = st.liqP;
+  // 1回に入れられる杯数。吸収上限40gを守る範囲で、牛乳の回は少なめ・水の回は多めに入る。
+  // 水の設定のときは製品推奨どおり1回3杯。
+  const capMilk  = liqP > 0 ? Math.max(0, Math.min(MAX_PER_SERVE, Math.floor((ABSORB_CAP - liqP) / SPOON_G))) : 0;
+  const capWater = liqP > 0 ? MAX_PER_SERVE : PER_SERVE;
+
+  const empty = {spoons:0, sessions:[], savasG:0, liquidG:0, totalG:0, remainG:r1(Math.max(0, lackG)), overG:0};
+  if(lackG <= 0) return {...empty, remainG:0};
+
+  // 「牛乳で溶かす回数 k」「水で溶かす回数 w」「合計杯数 s」の組み合わせを総当たりし、
+  // 不足量にいちばん近づく組み合わせを選ぶ（超過は TOLERANCE まで）。
+  // 2回以上に分ける場合は、1回あたり最低 MIN_PER_SERVE 杯（牛乳だけ飲むような配分を避ける）。
+  const cands = [];
+  for(let k = 0; k <= MAX_SESSIONS; k++){
+    if(k > 0 && (liqP <= 0 || capMilk < 1)) continue;
+    for(let w = 0; k + w <= MAX_SESSIONS; w++){
+      const n = k + w;
+      if(n < 1) continue;
+      const capacity = k * capMilk + w * capWater;
+      for(let s = (n > 1 ? n * MIN_PER_SERVE : 1); s <= capacity; s++){
+        const total = r1(s * SPOON_G + k * liqP);
+        if(total > lackG + TOLERANCE) break;          // s が増えるほど total は増える
+        cands.push({s, k, w, n, total, dev:Math.abs(lackG - total)});
+      }
+    }
+  }
+  if(!cands.length) return empty;
+
+  // 低脂肪乳を優先する設定のときは、目標とのズレが MILK_SLACK 以内の候補の中から
+  // 牛乳で溶かす回数が最も多いものを選ぶ。優先しない場合はズレが最小のものだけを対象にする。
+  const bestDev = Math.min(...cands.map(c => c.dev));
+  const slack   = st.preferMilk ? MILK_SLACK : 0.001;
+  const best = cands.filter(c => c.dev <= bestDev + slack)
+                    .sort((a, b) => (b.k - a.k) || (a.dev - b.dev) || (a.n - b.n) || (a.s - b.s))[0];
+
+  // 牛乳の回を先に置き（運動直後に飲みやすい）、各回の上限まで均等に振り分ける
+  const sessions = [];
+  for(let i = 0; i < best.k; i++) sessions.push({milk:true,  cap:capMilk,  spoons:0});
+  for(let i = 0; i < best.w; i++) sessions.push({milk:false, cap:capWater, spoons:0});
+  let rest = best.s;
+  while(rest > 0){
+    let placed = false;
+    for(const sn of sessions){
+      if(rest <= 0) break;
+      if(sn.spoons < sn.cap){ sn.spoons++; rest--; placed = true; }
+    }
+    if(!placed) break;
+  }
+
+  const savasG  = r1(best.s * SPOON_G);
+  const liquidG = r1(best.k * liqP);
+  const totalG  = r1(savasG + liquidG);
+  // 1回で摂れる最大量（1回あたりの杯数上限と吸収上限で決まる）
+  const maxSingleG = r1(Math.max(capMilk * SPOON_G + (capMilk > 0 ? liqP : 0), capWater * SPOON_G));
+
+  return {
+    spoons: best.s, sessions, savasG, liquidG, totalG, maxSingleG,
+    packed:   sessions.some(sn => sn.spoons > PER_SERVE),   // 推奨の3杯より多い回があるか
+    mixed:    liqP > 0 && sessions.some(sn => !sn.milk),    // 水で溶かす回があるか
+    remainG:  r1(Math.max(0, lackG - totalG)),
+    overG:    r1(Math.max(0, totalG - lackG))
+  };
+}
+
+/* ============================================================
+   結果描画
+   ============================================================ */
+let calculated = false;   // 一度でも計算したか（以降は入力変更で自動再計算する）
+
+function render(opts){
+  const scroll = !!(opts && opts.scroll);
+  const st   = readState();
+  const food = calcFood(st);
+  const ex   = calcFactor(st);
+
+  const target = r1(st.weight * ex.factor);
+  const lack   = r1(Math.max(0, target - food.total));
+  const over   = r1(Math.max(0, food.total - target));
+  const sv     = splitSavas(lack, st);
+
+  // ---- サマリー ----
+  $('oTarget').textContent = target + ' g';
+  $('oFood').textContent   = food.total + ' g';
+  $('oLack').textContent   = lack > 0 ? lack + ' g' : '達成 ✓';
+
+  const badge = $('lvBadge');
+  badge.textContent = ex.level.t;
+  badge.style.background = ex.level.c;
+
+  // ---- ザバス提案 ----
+  const liqName = st.liquid.name;
+  if(sv.spoons > 0){
+    $('oSavas').innerHTML =
+      `ザバス 付属スプーン <span style="font-size:2.1rem">${sv.spoons}</span> 杯` +
+      `<span style="font-size:1rem">　（合計 約 ${sv.totalG}g）</span>`;
+    const detail = sv.sessions.map(sn =>
+      `${sn.spoons}杯＋${sn.milk ? `${liqName}${st.liquidMl}ml` : '水'}` +
+      `（${r1(sn.spoons * SPOON_G + (sn.milk ? st.liqP : 0))}g）`).join('　＋　');
+    $('oSavasSub').innerHTML =
+      `＝ ${serveText(sv.sessions.length)}　${detail}` +
+      (sv.liquidG > 0
+        ? `<br>粉 ${sv.savasG}g ＋ <b>${liqName}（${sv.sessions.filter(s => s.milk).length}回分）${sv.liquidG}g</b> を合わせた量です。`
+        : `<br>すべて水で溶かすため、粉の ${sv.savasG}g のみです。`) +
+      `<br>不足 ${lack}g のうち <b>${sv.totalG}g</b> をこれで補います。` +
+      (sv.remainG > 0
+        ? `<b> 残り ${sv.remainG}g は食事で補ってください。</b>`
+        : sv.overG > 0 ? `（${sv.overG}g 多めですが誤差の範囲です）` : '（過不足なし）') +
+      // なぜこの回数・この配分になったのかを必ず説明する
+      `<br><small>※ ` +
+      (sv.sessions.length > 1
+        ? `1回で摂れるのは最大 <b>${sv.maxSingleG}g</b>（1回${MAX_PER_SERVE}杯まで／吸収上限${ABSORB_CAP}g）。` +
+          `不足 ${lack}g には1回では届かないため <b>${sv.sessions.length}回</b>に分けています。`
+        : `不足 ${lack}g は1回で収まるため、1回にまとめています。`) +
+      (sv.packed ? `1回${MAX_PER_SERVE}杯は推奨の${PER_SERVE}杯より多めですが、回数を増やすと${liqName}の分だけ超過するための配分です。` : '') +
+      (sv.mixed
+        ? `${liqName}で溶かすと1回ごとに${st.liqP}g上乗せされて目標を超えるため、` +
+          (sv.sessions.length === 1 ? 'この回は水で溶かします。' : '一部の回は水で溶かします。') +
+          (st.preferMilk ? '' : '（「できるだけ低脂肪乳で溶かす」をオンにすると牛乳を優先します）')
+        : '') +
+      `</small>`;
+  }else if(lack > 0){
+    $('oSavas').innerHTML = `ザバスは不要です<span style="font-size:1rem">（不足 ${lack}g）</span>`;
+    $('oSavasSub').innerHTML = (st.liqP > 0
+      ? `1回分（スプーン1杯＋${liqName}${st.liquidMl}ml＝約${r1(SPOON_G + st.liqP)}g）を飲むと逆に摂りすぎになります。豆腐ミニパックなど少量の食品で調整してください。`
+      : `残り ${lack}g は少量なので、豆腐ミニパックなどの食品で調整するほうが確実です。`) +
+      (liquidCutSuggestion(st, lack) ? `<br>${liquidCutSuggestion(st, lack)}` : '');
+  }else{
+    $('oSavas').innerHTML = 'ザバスの追加摂取は不要です 👍';
+    $('oSavasSub').textContent = over > 0
+      ? `食事だけで目標を ${over}g 上回っています。飲む場合は運動直後に1〜2杯に留めましょう。`
+      : '食事だけで今日の目標を達成しています。';
+  }
+
+  // ---- 算出根拠 ----
+  $('oReason').innerHTML =
+    `<b>目標の算出根拠：</b>体重 ${r1(st.weight)}kg × <b>${ex.factor.toFixed(2)} g/kg</b> = <b>${target}g</b><br>` +
+    `　内訳：基本係数 <b>${ex.base.toFixed(2)}</b>` +
+    (ex.bonus > 0 ? ` ＋ 運動による加算 <b>+${ex.bonus.toFixed(2)}</b>` : `（運動による加算なし）`) +
+    (ex.capped ? `　※ ${(ex.base + ex.bonus).toFixed(2)} は上限 ${ex.cap.toFixed(2)} を超えるため ${ex.cap.toFixed(2)} に丸めました` : '') +
+    `<br>` +
+    ex.reasons.map(r => '・' + r).join('<br>') +
+    `<br><b>食事の内訳：</b>` + (food.list.length ? food.list.join('、') : '入力なし') +
+    (sv.spoons > 0 && st.liqP > 0
+      ? `<br><b>ザバスの内訳：</b>粉 ${sv.savasG}g ＋ ${liqName} ${sv.liquidG}g = ${sv.totalG}g` +
+        `（${liqName}は ${st.liquid.p100}g/100ml で計算）`
+      : '');
+
+  renderSchedule(st, ex, target, sv);
+  renderTips(st, ex, target, lack, food, sv);
+
+  // 更新されたことが必ず分かるように、時刻を刻んでハイライトする
+  const el = $('result');
+  el.style.display = 'block';
+  $('stamp').textContent = '最終更新 ' + new Date().toLocaleTimeString('ja-JP');
+  el.classList.remove('flash');
+  void el.offsetWidth;              // アニメーションを再開させるための強制リフロー
+  el.classList.add('flash');
+
+  if(scroll) el.scrollIntoView({behavior:'smooth', block:'start'});
+  calculated = true;
+}
+
+/* ------------------------------------------------------------
+   「② 今日の食事」で入力された食品を 朝食 / 昼食 / 夕食 に自動配分する。
+   1単位ずつに分解し、タンパク質の多いものから
+   「その食品に適した時間帯」のうち最も不足している枠へ入れていく。
+   ------------------------------------------------------------ */
+function distributeFoods(st, mealTargets){
+  const units = [];
+
+  const firstUnits  = [];  // 千切りキャベツなど「最初に食べる」もの。他の配分が済んでから割り当てる
+  const lockedUnits = [];  // 玉子丼など時間帯が固定された食品。最初に枠を確保する
+
+  FOODS.forEach(f => {
+    const q = Math.round(st.foods[f.id]);
+    for(let i = 0; i < q; i++){
+      const u = {key:f.id, short:f.short, unit:f.unit, g:f.p,
+                 slots:f.slots, carb:f.carb, first:f.first, lock:f.lock};
+      (f.first ? firstUnits : f.lock ? lockedUnits : units).push(u);
+    }
+  });
+
+  // 「その他」は塊が大きいと1食に偏るため 10g 単位に分割して配分する
+  if(st.otherP > 0){
+    let rest = st.otherP;
+    while(rest > 0.05){
+      const g = Math.min(10, rest);
+      units.push({key:'other', short:'その他', unit:'g', g:r1(g), slots:['b','l','d'], isOther:true});
+      rest = r1(rest - g);
+    }
+  }
+
+  units.sort((a, b) => b.g - a.g);
+
+  const bins = {b:{items:[], total:0}, l:{items:[], total:0}, d:{items:[], total:0}};
+  const gap  = s => mealTargets[s] - bins[s].total;
+  const put  = (s, u) => { bins[s].items.push(u); bins[s].total = r1(bins[s].total + u.g); };
+
+  // 時間帯が固定された食品を先に配置する（指定枠以外へは絶対に回さない）
+  lockedUnits.forEach(u => {
+    put(u.slots.reduce((a, s) => gap(s) > gap(a) ? s : a, u.slots[0]), u);
+  });
+
+  units.forEach(u => {
+    // 優先順位が下がるごとに 5g のペナルティ。ただし不足が大きい枠が優先される
+    let best = u.slots[0], bestScore = -Infinity;
+    u.slots.forEach((s, idx) => {
+      const score = gap(s) - idx * 5;
+      if(score > bestScore){ bestScore = score; best = s; }
+    });
+    // 適した時間帯がすべて埋まっていれば、全体で最も余裕のある枠へ
+    if(gap(best) <= 0){
+      ['b','l','d'].forEach(s => { if(gap(s) > gap(best)) best = s; });
+    }
+    put(best, u);
+  });
+
+  // 各枠に糖質メニューがあるかを判定
+  const ORDER = ['b','l','d'];
+  const hasCarb = s => bins[s].items.some(u => u.carb);
+
+  // 千切りキャベツは「糖質メニューがあってまだキャベツが無い枠」を最優先で埋める
+  firstUnits.forEach(u => {
+    const hasFirst = s => bins[s].items.some(x => x.first);
+    let best = ORDER.filter(s => hasCarb(s) && !hasFirst(s))[0]
+            || ORDER.filter(s => !hasFirst(s) && bins[s].items.length)[0]
+            || ORDER.filter(s => hasCarb(s))[0]
+            || 'l';
+    put(best, u);
+  });
+
+  // 同じ食品をまとめて「納豆 1P（8g）」の形に整形（最初に食べるものを先頭に並べる）
+  Object.values(bins).forEach(bin => {
+    const map = new Map();
+    bin.items.forEach(u => {
+      const cur = map.get(u.key) || {short:u.short, unit:u.unit, n:0, g:0, isOther:u.isOther, first:u.first};
+      cur.n += 1; cur.g = r1(cur.g + u.g);
+      map.set(u.key, cur);
+    });
+    bin.label = [...map.values()]
+      .sort((a, b) => (b.first ? 1 : 0) - (a.first ? 1 : 0))
+      .map(v => v.isOther ? `その他（${v.g}g）`
+                : v.first ? `<u>${v.short} ${v.n}${v.unit}</u>（${v.g}g）`
+                : `${v.short} ${v.n}${v.unit}（${v.g}g）`)
+      .join(' ＋ ');
+  });
+
+  ORDER.forEach(s => {
+    bins[s].carb   = hasCarb(s);
+    bins[s].first  = bins[s].items.some(u => u.first);
+    bins[s].locked = [...new Set(bins[s].items.filter(u => u.lock).map(u => u.short))];
+  });
+
+  return bins;
+}
+
+/* 各食事の過不足に応じた一言 ＋ 食べる順番の注意 */
+function mealAdvice(bin, target){
+  const d = r1(target - bin.total);
+  let msg;
+  if(d >= 5){
+    msg = `<b>目安まで あと約${d}g。</b>` +
+          (d >= 15 ? 'ほぐしサラダチキン1P（18.7g）' : d >= 7 ? '納豆1P（8g）' : '豆腐ミニパック1〜2個（3.3〜6.6g）') +
+          'を足すと届きます。';
+  }else if(d <= -5){
+    msg = (bin.locked && bin.locked.length)
+      ? `目安より約${r1(-d)}g多めですが、<b>${bin.locked.join('・')}</b>はこの時間帯にしか摂れないため、そのままで構いません。その分、他の時間帯を軽めに調整してください。`
+      : `目安より約${r1(-d)}g多めです。他の時間帯に回すと1回30〜40gの範囲に収まります。`;
+  }else{
+    msg = '目安どおりのバランスです。';
+  }
+
+  if(bin.first)      msg += '<br><b>下線の千切りキャベツを最初に</b>食べてから他へ進んでください。';
+  else if(bin.carb)  msg += '<br><b>糖質メニューがあります。</b>千切りキャベツ1袋を先に食べると血糖値の急上昇を抑えられます。';
+
+  return msg;
+}
+
+/* 時間帯別スケジュール */
+function renderSchedule(st, ex, target, sv){
+  const trained = ex.done > 0 || ex.cardio > 0;
+
+  // 食事で摂るべき量 = 目標 − ザバスで補う量（粉＋液体）を 朝30% / 昼35% / 晩35% に配分（1回40g上限）
+  const byMeal  = Math.max(0, target - sv.totalG);
+  const cap     = g => Math.min(40, Math.round(g));
+  const mBreak  = cap(byMeal * 0.30);
+  const mLunch  = cap(byMeal * 0.35);
+  const mDinner = cap(byMeal * 0.35);
+
+  const s = sv.sessions;
+  const sMorning = s[0];   // 運動直後 or 起床後
+  const sSnack   = s[1];   // 15時頃の間食
+  const sNight   = s[2];   // 就寝1時間前
+  // 1回分の表示。その回に使う液体（牛乳か水か）とタンパク質量を示す
+  const liqOf = sn => sn.milk ? `${st.liquid.name}${st.liquidMl}ml` : '水';
+  const cup = sn => {
+    if(!sn || sn.spoons <= 0) return '—';
+    const g = r1(sn.spoons * SPOON_G + (sn.milk ? st.liqP : 0));
+    return `スプーン ${sn.spoons}杯<br><small>（${liqOf(sn)}で溶かす<br>約${g}g）</small>`;
+  };
+  const liqText = sMorning ? liqOf(sMorning) : `${st.liquid.name} ${st.liquidMl}ml`;
+
+  // 「② 今日の食事」の入力を朝・昼・晩へ自動配分
+  const bins  = distributeFoods(st, {b:mBreak, l:mLunch, d:mDinner});
+  const empty = !bins.b.items.length && !bins.l.items.length && !bins.d.items.length;
+
+  // 各食事行の「内容・ポイント」：入力があればその配分、なければ入力を促す
+  const meal = (bin, targetG, tail) => empty
+    ? `<b>「② 今日の食事」が未入力です。</b>食べたもの（納豆・豆腐・サラダチキンなど）を入力すると、ここに ${targetG}g 分の配分が自動表示されます。`
+    : (bin.items.length
+        ? `<b>${bin.label}</b> ＝ 合計 <b>${bin.total}g</b><br>${mealAdvice(bin, targetG)}${tail}`
+        : `今日の入力分はすべて他の時間帯に配分されました。ここで摂るなら ${targetG}g 前後を目安に。${tail}`);
+
+  const rows = [
+    [
+      trained ? '運動直後<br><small>（〜30分以内）</small>' : '起床後<br><small>（朝食前）</small>',
+      cup(sMorning),
+      trained
+        ? `トレーニング後30分以内の「ゴールデンタイム」。<b>${liqText}</b>に溶かして飲み、筋肉の修復材料を最優先で入れます。`
+        : '休養日でも睡眠中に筋肉の分解は進んでいます。不足があれば朝一番で補給を。'
+    ],
+    [
+      '朝食',
+      `約 ${mBreak} g`,
+      meal(bins.b, mBreak, '<br>朝は最も不足しやすい時間帯です。')
+    ],
+    [
+      '昼食',
+      `約 ${mLunch} g`,
+      meal(bins.l, mLunch, '')
+    ],
+    [
+      '間食<br><small>（15時頃）</small>',
+      cup(sSnack),
+      sSnack
+        ? '昼食から夕食まで時間が空くタイミング。血中アミノ酸濃度を切らさないためにザバス2回目を入れます。'
+        : '不足がなければ不要。摂るならナッツや無糖ヨーグルトで軽めに。'
+    ],
+    [
+      '夕食',
+      `約 ${mDinner} g`,
+      meal(bins.d, mDinner, '<br>就寝の3時間前までに済ませると消化と睡眠の質の面で有利です。')
+    ],
+    [
+      '就寝前<br><small>（1時間前）</small>',
+      cup(sNight),
+      sNight
+        ? '睡眠中の成長ホルモン分泌に合わせた補給。就寝直前は胃に負担がかかるため1時間前までに飲み切ります。'
+        : '1日の目標を達成できていれば不要。物足りない日はスプーン1〜2杯で調整を。'
+    ]
+  ];
+
+  $('schedule').innerHTML = rows.map(r =>
+    `<tr><td class="time">${r[0]}</td><td class="amt">${r[1]}</td><td>${r[2]}</td></tr>`
+  ).join('');
+}
+
+/* 不足がザバス1回分より小さいとき、液体を減らして1杯で合わせる案を返す */
+function liquidCutSuggestion(st, lack){
+  if(!(st.liquid.p100 > 0) || lack <= SPOON_G) return '';
+  const ml = Math.round((lack - SPOON_G) * 100 / st.liquid.p100 / 50) * 50;
+  if(ml < 50 || ml >= st.liquidMl) return '';
+  return `どうしても飲みたい場合は、${st.liquid.name}を <b>${ml}ml</b> に減らせば` +
+         `スプーン1杯で約${r1(SPOON_G + st.liquid.p100 * ml / 100)}g になります。`;
+}
+
+/* 指定した g 数を満たす食品の組み合わせを提案する */
+function suggestFoods(g){
+  const picks = [];
+  let rest = g;
+  const c = Math.floor(rest / 18.7);
+  if(c > 0){ picks.push(`ほぐしサラダチキン ${c}P（${r1(c * 18.7)}g）`); rest = r1(rest - c * 18.7); }
+  const n = Math.floor(rest / 8);
+  if(n > 0){ picks.push(`納豆 ${n}P（${r1(n * 8)}g）`); rest = r1(rest - n * 8); }
+  const t = Math.ceil(rest / 3.3);
+  if(t > 0){ picks.push(`豆腐ミニパック ${t}個（${r1(t * 3.3)}g）`); }
+  return picks.join(' ＋ ');
+}
+
+/* 食事・栄養のポイント */
+function renderTips(st, ex, target, lack, food, sv){
+  const tips = [];
+
+  tips.push(['', `<b>① 1回の摂取は30〜40gまで。</b>1度に吸収・利用できるタンパク質は 30〜40g 程度が上限です。今日の目標 ${target}g は一気に摂らず、<b>朝・昼・晩＋補食</b>に均等分散してください。まとめ摂りした余剰分は筋肉に回らず、エネルギーや脂肪として処理されるだけになります。`]);
+
+  tips.push(['', `<b>② 食べる順番を守る（ベジ／ソイファースト）。</b>ご飯・カレー・丼ものなど糖質を摂るときは、必ず先に<b>千切りキャベツ・サラダ・冷奴・納豆などの大豆製品</b>を食べてから。血糖値の急上昇（血糖値スパイク）を抑え、内臓脂肪の蓄積を防げます。特に「レトルトカレー＋ご飯1合」は糖質量が多いので、キャベツと大豆製品の先食べを徹底しましょう。`]);
+
+  tips.push(['', `<b>③ 水分補給を十分に。</b>タンパク質の代謝では老廃物（尿素窒素）の排出に水が必要で、腎臓の負担軽減にもつながります。<b>1日 1.5〜2L</b>を目安に、運動中・運動後はこまめに。` +
+    (st.liqP > 0
+      ? `${st.liquid.name}で溶かす場合、それ自体は水分補給になりますが、別に水も摂ってください。`
+      : `ザバスも水 ${st.liquidMl}ml でしっかり溶かして飲んでください。`)]);
+
+  if(ex.done > 0){
+    tips.push(['', `<b>④ 今日は筋トレ ${ex.done}種目 / 総負荷量 ${ex.volume.toLocaleString()}kg。</b>筋線維の修復は48時間程度続くため、<b>翌日もタンパク質量を落とさない</b>ことが重要です。負荷を上げるときは、重量を増やすより先に「セット数を1つ増やす」「回数を15→20回にする」ほうが関節への負担が少なく安全です。`]);
+  }else{
+    tips.push(['', `<b>④ 今日は筋トレなし。</b>休養日こそ筋肉が作られる日です。最低でも 体重×1.5g（${r1(st.weight * 1.5)}g）は確保し、タンパク質を切らさないようにしましょう。`]);
+  }
+
+  // --- 不足の状態表示：追加すべき量を明示し、満たせば「解消」に切り替わる ---
+  if(sv.remainG >= 5){
+    const more = sv.remainG;
+    tips.push(['alert',
+      `<b>⚠ あと ${more}g を食事で追加してください。</b>` +
+      (sv.spoons > 0
+        ? `ザバス ${sv.spoons}杯（合計 ${sv.totalG}g）では、不足 ${lack}g のうち ${more}g が残ります。`
+        : `不足 ${lack}g に対しザバス1回分（スプーン1杯＋${st.liquid.name}で約${r1(SPOON_G + st.liqP)}g）は多すぎるため、食品で補うほうが正確です。`) +
+      `<br>例：<b>${suggestFoods(more)}</b> を「② 今日の食事」に追加すると、この指摘は消えます。` +
+      (sv.spoons === 0 && liquidCutSuggestion(st, lack) ? `<br>${liquidCutSuggestion(st, lack)}` : '')]);
+  }else if(lack > 0 && sv.spoons > 0){
+    tips.push(['done',
+      `<b>✅ 食事の追加は不要です。</b>不足している ${lack}g は、ザバス ${sv.spoons}杯` +
+      (st.liqP > 0 ? `＋${st.liquid.name}（合計 ${sv.totalG}g）` : '') +
+      `（${serveText(sv.sessions.length)}）で補えます。` +
+      (sv.remainG > 0 ? `差分 ${sv.remainG}g は誤差の範囲です。`
+                      : sv.overG > 0 ? `${sv.overG}g 多めですが誤差の範囲です。` : '')]);
+  }else if(lack > 0){
+    tips.push(['done',
+      `<b>✅ 不足は ${lack}g だけです。</b>ザバスを1回飲むと摂りすぎになるため、` +
+      `そのままか、豆腐ミニパック1個（3.3g）程度で調整してください。`]);
+  }else{
+    tips.push(['done',
+      `<b>✅ 今日の目標 ${target}g を食事だけで達成しています。</b>` +
+      `ザバスの追加摂取は不要です。運動直後にどうしても飲みたい場合は1〜2杯までに留めてください。`]);
+  }
+
+  // 粉への依存が大きいときの注意
+  if(sv.totalG > 0 && sv.totalG >= target * 0.45){
+    tips.push(['', `<b>⑤ 今日は目標 ${target}g のうち ${sv.totalG}g（約${Math.round(sv.totalG / target * 100)}%）をザバスで賄う計算です。</b>` +
+      `プロテインは不足を埋める補助であって主役ではありません。ビタミン・ミネラル・食物繊維は粉からは摂れないため、` +
+      `<b>サラダチキンや納豆・豆腐を1〜2品増やして、粉の比率を4割以下に下げる</b>ほうが望ましい状態です。`]);
+  }
+
+  if(lack === 0 && food.total > target + 30){
+    tips.push(['alert', `<b>⚠ 目標を大きく超えています（${r1(food.total - target)}g オーバー）。</b>タンパク質も摂りすぎれば余剰カロリーになります。明日は食事量かザバスの杯数で調整しましょう。`]);
+  }
+
+  $('tips').innerHTML = tips.map(t => `<li class="${t[0]}">${t[1]}</li>`).join('');
+}
+
+/* ============================================================
+   入力中のライブ表示（総負荷量・食事合計・目標レンジ）
+   ============================================================ */
+function updateLive(){
+  // 筋トレ総負荷量
+  let total = 0;
+  EXERCISES.forEach(e => {
+    const on = $('c_' + e.id).checked;
+    const v  = num('w_' + e.id) * num('r_' + e.id) * num('s_' + e.id);
+    $('ex_' + e.id).classList.toggle('on', on);
+    $('v_' + e.id).textContent = (on ? v.toLocaleString() : 0) + ' kg';
+    if(on) total += v;
+  });
+  $('volNote').innerHTML =
+    `本日の総負荷量：<b>${total.toLocaleString()} kg</b>（重量×回数×セット数の合計）`;
+
+  const st = readState();
+
+  // 溶かす液体から摂れるタンパク質
+  $('liquidNote').innerHTML = st.liqP > 0
+    ? `<b>${st.liquid.name} ${st.liquidMl}ml あたり タンパク質 約${st.liqP}g</b>。` +
+      `ザバスを飲む回数分だけ加算して計算します（例：3回なら ${r1(st.liqP * 3)}g）。`
+    : `水にはタンパク質が含まれないため、加算はありません。牛乳や豆乳で溶かす場合は種類を変更してください。`;
+
+  // 食事合計
+  $('foodNote').innerHTML = `現在の食事合計：<b>${calcFood(st).total} g</b>`;
+
+  // 基本係数の目安表（体重に合わせて目標gを再計算）
+  const w = st.weight;
+  $('bfHead').textContent = `${r1(w)}kgでの目標`;
+  $('bf12').textContent = r1(w * 1.2) + ' g';
+  $('bf14').textContent = r1(w * 1.4) + ' g';
+  $('bf15').textContent = r1(w * 1.5) + ' g';
+  $('bf17').textContent = `${r1(w * 1.6)}〜${r1(w * 1.7)} g`;
+
+  // 現在の設定で「運動なしの日」「運動した日」がそれぞれ何gになるかを表示
+  const bf   = st.baseFactor;
+  const capF = capOf(bf);
+  const maxF = Math.min(r2(bf + BONUS_MAX), capF);
+  $('baseNote').innerHTML =
+    `現在の設定 → 運動しなかった日：${r1(w)}kg × ${bf.toFixed(2)} = <b>${r1(w * bf)}g</b>　／　` +
+    `運動した日：最大 ${maxF.toFixed(2)} = <b>${r1(w * maxF)}g</b>` +
+    `（運動内容に応じて <b>+0.10〜+${BONUS_MAX.toFixed(2)}</b> を加算。上限 ${capF.toFixed(2)}）`;
+}
+
+/* ============================================================
+   保存 / 復元 / リセット
+   ============================================================ */
+const KEY = 'savas-calc-v1';
+const ALL_IDS = () => ['weight','baseFactor','liquid','liquidMl','walk','cycle','otherP']
+  .concat(FOODS.map(f => 'f_' + f.id))
+  .concat(EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]));
+
+function save(){
+  const d = {v:{}, c:{}};
+  ALL_IDS().forEach(id => d.v[id] = $(id).value);
+  EXERCISES.forEach(e => d.c[e.id] = $('c_' + e.id).checked);
+  d.preferMilk = $('preferMilk').checked;
+  try{ localStorage.setItem(KEY, JSON.stringify(d)); }catch(err){}
+}
+
+function load(){
+  try{
+    const d = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if(!d) return;
+    ALL_IDS().forEach(id => { if(d.v[id] !== undefined && $(id)) $(id).value = d.v[id]; });
+    EXERCISES.forEach(e => { if($('c_' + e.id)) $('c_' + e.id).checked = !!d.c[e.id]; });
+    if(d.preferMilk !== undefined) $('preferMilk').checked = !!d.preferMilk;
+  }catch(err){}
+}
+
+// 入力が変わったら即座に保存し、計算済みならその場で再計算する
+function onInputChanged(){
+  updateLive();
+  save();
+  if(calculated) render();          // scroll しない＝編集中に画面が飛ばない
+}
+document.addEventListener('input',  onInputChanged);
+document.addEventListener('change', onInputChanged);
+
+$('calc').addEventListener('click', () => render({scroll:true}));
+
+$('reset').addEventListener('click', () => {
+  const msg =
+    '入力内容をすべて初期状態に戻します。\n\n' +
+    '・体重 75kg / 基本係数 1.5 / 低脂肪乳 250ml\n' +
+    '・「今日の食事」の数量とその他入力 → すべて 0\n' +
+    '・ウォーキング / サイクリングの距離 → 0\n' +
+    '・筋トレのチェック → 全種目オン（重量・回数・セット数も既定値に戻ります）\n' +
+    '・ブラウザに保存された前回の入力内容も削除されます\n\n' +
+    'よろしいですか？';
+  if(!confirm(msg)) return;
+  try{ localStorage.removeItem(KEY); }catch(err){}
+  location.reload();
+});
+
+load();
+updateLive();
+</script>
+</body>
+</html>
