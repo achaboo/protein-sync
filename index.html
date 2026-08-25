@@ -23,7 +23,10 @@
    6. 一度計算したあとは、①〜③のどこを変更しても<b>その場で自動的に再計算</b>されます。
       「計算する」を押し直す必要はありません。更新されると結果が一瞬ハイライトされ、
       「④ 計算結果」の右上に最終更新時刻が表示されます。
-   7. 入力内容はブラウザに自動保存され、次に開いたときに復元されます。
+   7. 入力内容はブラウザに自動保存され、次に開いたときに復元されます。ただし
+      「② 今日の食事」はその日限りの入力なので、日付が変わると 0 に戻ります
+      （同じ日のうちに開き直した場合は復元されます）。②の見出しにある
+      「すべて 0 に戻す」を押せば、設定はそのままで食事だけをクリアできます。
       「入力をリセット」を押すと（確認ダイアログのあと）すべての入力が初期状態に戻り、
       保存内容も削除されます。
 
@@ -143,6 +146,11 @@ button{font:inherit;border:none;border-radius:11px;padding:13px 18px;cursor:poin
 #calc{flex:1;background:var(--brand);color:#fff;box-shadow:0 3px 0 var(--brand-d)}
 #calc:active{transform:translateY(2px);box-shadow:0 1px 0 var(--brand-d)}
 #reset{background:#e7ebf1;color:var(--sub)}
+.mini-btn{
+  margin-left:auto;background:#eef3fa;color:var(--brand-d);border:1px solid #cddffb;
+  border-radius:999px;padding:4px 12px;font-size:.74rem;font-weight:700;
+}
+.mini-btn:active{background:#dce9fb}
 
 /* 結果 */
 #result{display:none}
@@ -278,7 +286,7 @@ table.mini td.amt{width:auto;text-align:right}
 
   <!-- ② 食事 -->
   <section>
-    <h2>② 今日の食事</h2>
+    <h2>② 今日の食事<button type="button" id="clearFoods" class="mini-btn">すべて 0 に戻す</button></h2>
     <div id="foods"></div>
     <div class="row">
       <div class="name"><b>その他（自由入力）</b><small>上記以外で摂ったタンパク質の合計</small></div>
@@ -1035,8 +1043,13 @@ const ALL_IDS = () => ['weight','baseFactor','liquid','liquidMl','walk','cycle',
   .concat(FOODS.map(f => 'f_' + f.id))
   .concat(EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]));
 
+// 「② 今日の食事」はその日限りの入力。日付が変わったら復元せず 0 から始める。
+// （同じ日のうちに開き直した場合は、入力し直さずに済むよう復元する）
+const DAILY_IDS = () => FOODS.map(f => 'f_' + f.id).concat(['otherP']);
+const todayKey  = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
+
 function save(){
-  const d = {v:{}, c:{}};
+  const d = {v:{}, c:{}, date:todayKey()};
   ALL_IDS().forEach(id => d.v[id] = $(id).value);
   EXERCISES.forEach(e => d.c[e.id] = $('c_' + e.id).checked);
   d.preferMilk = $('preferMilk').checked;
@@ -1044,13 +1057,31 @@ function save(){
 }
 
 function load(){
+  let d = null;
+  try{ d = JSON.parse(localStorage.getItem(KEY) || 'null'); }catch(err){}
+
+  const sameDay = !!d && d.date === todayKey();
+  const daily   = DAILY_IDS();
+
+  // 当日の入力でなければ食事欄を明示的に 0 に戻す。
+  // ブラウザ側のフォーム値復元（リロードや「戻る」操作）で前日の値が残るのを防ぐため。
+  if(!sameDay) daily.forEach(id => { if($(id)) $(id).value = 0; });
+  if(!d) return;
+
   try{
-    const d = JSON.parse(localStorage.getItem(KEY) || 'null');
-    if(!d) return;
-    ALL_IDS().forEach(id => { if(d.v[id] !== undefined && $(id)) $(id).value = d.v[id]; });
+    ALL_IDS().forEach(id => {
+      if(!sameDay && daily.includes(id)) return;      // 日付が変わっていれば食事は復元しない
+      if(d.v[id] !== undefined && $(id)) $(id).value = d.v[id];
+    });
     EXERCISES.forEach(e => { if($('c_' + e.id)) $('c_' + e.id).checked = !!d.c[e.id]; });
     if(d.preferMilk !== undefined) $('preferMilk').checked = !!d.preferMilk;
   }catch(err){}
+}
+
+/* 「② 今日の食事」だけを 0 に戻す（設定はそのまま） */
+function clearFoods(){
+  DAILY_IDS().forEach(id => { if($(id)) $(id).value = 0; });
+  onInputChanged();
 }
 
 // 入力が変わったら即座に保存し、計算済みならその場で再計算する
@@ -1063,6 +1094,7 @@ document.addEventListener('input',  onInputChanged);
 document.addEventListener('change', onInputChanged);
 
 $('calc').addEventListener('click', () => render({scroll:true}));
+$('clearFoods').addEventListener('click', clearFoods);
 
 $('reset').addEventListener('click', () => {
   const msg =
