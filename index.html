@@ -428,7 +428,7 @@ const SERVE_G   = SPOON_G * PER_SERVE;  // 1回 = 19.5g
 //   first : 食事の最初に食べる食品（ベジファースト用。糖質メニューのある食事へ優先配分）
 //   lock  : true なら slots に挙げた時間帯「以外」には絶対に配分しない（例：玉子丼は朝食のみ）
 const FOODS = [
-  {id:'matsu',   name:'松のや 玉子丼',                          short:'玉子丼',       note:'1食 約20g',     p:20,   unit:'食', slots:['b'], carb:true, lock:true, lockNote:'朝食のみ'},
+  {id:'matsu',   name:'松のや 玉子丼',                          short:'玉子丼',       note:'1食 約20g',     p:20,   unit:'食', slots:['l'], carb:true, lock:true, lockNote:'昼食のみ'},
   {id:'curry',   name:'レトルトカレー＋ご飯1合',                short:'カレー＋ご飯', note:'1食 約11g',     p:11,   unit:'食', slots:['l','d','b'], carb:true},
   {id:'natto',   name:'納豆',                                   short:'納豆',         note:'1パック 約8.3g', p:8.3,  unit:'P',  slots:['b','d','l']},
   {id:'tofu',    name:'豆腐',                                   short:'豆腐',         note:'1パック（150g） 約7.2g', p:7.2, unit:'P', slots:['b','d','l']},
@@ -440,8 +440,8 @@ const FOODS = [
   {id:'milk',    name:'低脂肪乳（コップ1杯 200ml）',             short:'低脂肪乳',     note:'1杯 約5.7g ／ ザバスに使う分は除く', p:5.7, unit:'杯', slots:['b','l','d']},
   {id:'chikuwa', name:'ちくわ',                                 short:'ちくわ',       note:'1本 約2.2g',    p:2.2,  unit:'本', slots:['l','d','b']},
   {id:'cheese',  name:'プロセスチーズ',                          short:'チーズ',       note:'1個 約3.1g',    p:3.1,  unit:'個', slots:['b','l','d']},
-  {id:'miso',    name:'みそ汁',                                 short:'みそ汁',       note:'1杯 約1.4g',    p:1.4,  unit:'杯', slots:['b','d','l']},
-  {id:'korokke', name:'コロッケ',                               short:'コロッケ',     note:'1個 約2.2g',    p:2.2,  unit:'個', slots:['l','d','b'], carb:true},
+  {id:'miso',    name:'みそ汁',                                 short:'みそ汁',       note:'1杯 約1.4g',    p:1.4,  unit:'杯', slots:['l'], lock:true, lockNote:'昼食のみ'},
+  {id:'korokke', name:'コロッケ',                               short:'コロッケ',     note:'1個 約2.2g',    p:2.2,  unit:'個', slots:['l'], carb:true, lock:true, lockNote:'昼食のみ'},
   {id:'cabbage', name:'千切りキャベツ（150g 1袋）',              short:'千切りキャベツ', note:'1袋 約2.0g（食物繊維 約2.7g）', p:2.0, unit:'袋', slots:['l','d','b'], first:true}
 ];
 
