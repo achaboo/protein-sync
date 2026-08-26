@@ -159,7 +159,8 @@ button{font:inherit;border:none;border-radius:11px;padding:13px 18px;cursor:poin
 
 /* 結果 */
 #result{display:none}
-.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.stat.floor strong{color:#7c5a00}
 .stat{background:#f5f8fc;border:1px solid var(--line);border-radius:12px;padding:12px 8px;text-align:center}
 .stat span{display:block;font-size:.74rem;color:var(--sub)}
 .stat strong{display:block;font-size:1.42rem;line-height:1.25;margin-top:2px}
@@ -236,8 +237,15 @@ table.mini td.amt{width:auto;text-align:right}
         <input type="number" inputmode="decimal" id="weight" value="75" step="0.1" min="30" max="200">
       </div>
       <div>
+        <label for="meals">1日の食事回数</label>
+        <select id="meals">
+          <option value="2" selected>2食（朝食を抜く）</option>
+          <option value="3">3食</option>
+        </select>
+      </div>
+      <div>
         <label for="baseFactor">基本係数（運動なしの日 / g per kg）</label>
-        <input type="number" inputmode="decimal" id="baseFactor" value="1.5" step="0.05" min="1" max="2.5">
+        <input type="number" inputmode="decimal" id="baseFactor" value="1.4" step="0.05" min="1" max="2.5">
       </div>
     </div>
     <p class="hint" id="baseNote"></p>
@@ -282,12 +290,12 @@ table.mini td.amt{width:auto;text-align:right}
             <td class="amt" id="bf12">-</td>
           </tr>
           <tr>
-            <td class="time">1.4</td>
+            <td class="time">1.4<br><small>（初期値）</small></td>
             <td>今の体重・筋肉量を維持できれば十分な時期。食が細く、食事量が落ちている日が続くとき。</td>
             <td class="amt" id="bf14">-</td>
           </tr>
           <tr>
-            <td class="time">1.5<br><small>（初期値・推奨）</small></td>
+            <td class="time">1.5</td>
             <td>週数回の筋トレを続けながら、筋肉量を維持〜微増させたい標準的な設定。迷ったらこの値のままで構いません。</td>
             <td class="amt" id="bf15">-</td>
           </tr>
@@ -371,6 +379,7 @@ table.mini td.amt{width:auto;text-align:right}
       <h2>④ 計算結果<span class="badge" id="lvBadge">-</span><span class="stamp" id="stamp"></span></h2>
       <div class="summary">
         <div class="stat"><span>今日の目標</span><strong id="oTarget">-</strong></div>
+        <div class="stat floor"><span>最低ライン</span><strong id="oFloor">-</strong></div>
         <div class="stat ok"><span>食事から摂取</span><strong id="oFood">-</strong></div>
         <div class="stat lack"><span>不足分</span><strong id="oLack">-</strong></div>
       </div>
@@ -464,6 +473,7 @@ const r2 = n  => Math.round(n * 100) / 100;
 // 運動による係数の加算量（基本係数に上乗せする）と、その日の上限
 const BONUS_MAX     = 0.30;
 const CAP_BASE      = 1.80;
+const FLOOR_FACTOR  = 1.2;    // 最低ライン（これを超えていればその日は十分とみなす）g/kg
 const STRENGTH_FULL = 6000;   // この総負荷量(kg)で筋トレ側の加算が満点になる
 const CARDIO_FULL   = 10;     // ウォーキング換算 10km で有酸素側の加算が満点になる
 
@@ -522,6 +532,8 @@ function readState(){
   st.liquidMl   = Math.min(500, num('liquidMl'));   // 1回分として現実的な上限で頭打ちにする
   st.liqP       = r1(st.liquid.p100 * st.liquidMl / 100);
   st.preferMilk  = $('preferMilk').checked;
+  st.meals       = parseInt($('meals').value, 10) === 3 ? 3 : 2;
+  st.skipB       = st.meals === 2;                    // 朝食を摂らない
   st.savasShare  = Math.min(100, num('savasShare')) / 100;   // ザバスで賄う上限（目標比）
   FOODS.forEach(f => st.foods[f.id] = num('f_' + f.id));
   EXERCISES.forEach(e => st.ex[e.id] = {
@@ -704,6 +716,9 @@ function render(opts){
   const toFoodG   = r1(Math.max(0, lack - sv.totalG));   // 食事で補うべき残り
 
   // ---- サマリー ----
+  const floor   = r1(st.weight * FLOOR_FACTOR);       // ここを超えていればその日は十分
+  const planned = r1(food.total + sv.totalG);         // 食事＋ザバスの合計見込み
+  $('oFloor').textContent  = floor + ' g';
   $('oTarget').textContent = target + ' g';
   $('oFood').textContent   = food.total + ' g';
   $('oLack').textContent   = lack > 0 ? lack + ' g' : '達成 ✓';
@@ -790,7 +805,7 @@ function render(opts){
 
   renderAltFoods(toFoodG, sv, st);
   renderSchedule(st, ex, target, sv);
-  renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds);
+  renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, planned);
 
   // 更新されたことが必ず分かるように、時刻を刻んでハイライトする
   const el = $('result');
@@ -810,6 +825,8 @@ function render(opts){
    「その食品に適した時間帯」のうち最も不足している枠へ入れていく。
    ------------------------------------------------------------ */
 function distributeFoods(st, mealTargets){
+  // 朝食を摂らない設定のときは、朝食枠に割り当てようとする食品を昼食に回す
+  const mapSlots = s => [...new Set(s.map(x => (st.skipB && x === 'b') ? 'l' : x))];
   const units = [];
 
   const firstUnits  = [];  // 千切りキャベツなど「最初に食べる」もの。他の配分が済んでから割り当てる
@@ -819,7 +836,7 @@ function distributeFoods(st, mealTargets){
     const q = Math.round(st.foods[f.id]);
     for(let i = 0; i < q; i++){
       const u = {key:f.id, short:f.short, unit:f.unit, g:f.p,
-                 slots:f.slots, carb:f.carb, first:f.first, lock:f.lock};
+                 slots:mapSlots(f.slots), carb:f.carb, first:f.first, lock:f.lock};
       (f.first ? firstUnits : f.lock ? lockedUnits : units).push(u);
     }
   });
@@ -829,7 +846,7 @@ function distributeFoods(st, mealTargets){
     let rest = st.otherP;
     while(rest > 0.05){
       const g = Math.min(10, rest);
-      units.push({key:'other', short:'その他', unit:'g', g:r1(g), slots:['b','l','d'], isOther:true});
+      units.push({key:'other', short:'その他', unit:'g', g:r1(g), slots:mapSlots(['b','l','d']), isOther:true});
       rest = r1(rest - g);
     }
   }
@@ -860,7 +877,7 @@ function distributeFoods(st, mealTargets){
   });
 
   // 各枠に糖質メニューがあるかを判定
-  const ORDER = ['b','l','d'];
+  const ORDER = st.skipB ? ['l','d'] : ['b','l','d'];
   const hasCarb = s => bins[s].items.some(u => u.carb);
 
   // 千切りキャベツは「糖質メニューがあってまだキャベツが無い枠」を最優先で埋める
@@ -926,9 +943,11 @@ function renderSchedule(st, ex, target, sv){
   // 食事で摂るべき量 = 目標 − ザバスで補う量（粉＋液体）を 朝30% / 昼35% / 晩35% に配分（1回40g上限）
   const byMeal  = Math.max(0, target - sv.totalG);
   const cap     = g => Math.min(40, Math.round(g));
-  const mBreak  = cap(byMeal * 0.30);
-  const mLunch  = cap(byMeal * 0.35);
-  const mDinner = cap(byMeal * 0.35);
+  // 朝食を抜く場合は昼・夕で半分ずつ
+  const share   = st.skipB ? {b:0, l:0.5, d:0.5} : {b:0.30, l:0.35, d:0.35};
+  const mBreak  = cap(byMeal * share.b);
+  const mLunch  = cap(byMeal * share.l);
+  const mDinner = cap(byMeal * share.d);
 
   const s = sv.sessions;
   const sMorning = s[0];   // 運動直後 or 起床後
@@ -962,11 +981,19 @@ function renderSchedule(st, ex, target, sv){
         ? `トレーニング後30分以内の「ゴールデンタイム」。<b>${liqText}</b>に溶かして飲み、筋肉の修復材料を最優先で入れます。`
         : '休養日でも睡眠中に筋肉の分解は進んでいます。不足があれば朝一番で補給を。'
     ],
-    [
-      '朝食',
-      `約&nbsp;${mBreak}&nbsp;g`,
-      meal(bins.b, mBreak, '<br>朝は最も不足しやすい時間帯です。')
-    ],
+    st.skipB
+      ? [
+          '朝食<br><small>（抜く）</small>',
+          '—',
+          `朝食を摂らない設定のため、この枠には配分していません。` +
+          `前夜の夕食から昼食まで長時間タンパク質が入らないので、` +
+          `<b>${trained ? '運動直後' : '起床後'}のザバスが実質的な朝の補給</b>になります。ここは抜かないでください。`
+        ]
+      : [
+          '朝食',
+          `約&nbsp;${mBreak}&nbsp;g`,
+          meal(bins.b, mBreak, '<br>朝は最も不足しやすい時間帯です。')
+        ],
     [
       '昼食',
       `約&nbsp;${mLunch}&nbsp;g`,
@@ -1105,10 +1132,26 @@ function suggestFoods(g, st){
 }
 
 /* 食事・栄養のポイント */
-function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds){
+function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, planned){
   const tips = [];
 
-  tips.push(['', `<b>① 1回の摂取は30〜40gまで。</b>1度に吸収・利用できるタンパク質は 30〜40g 程度が上限です。今日の目標 ${target}g は一気に摂らず、<b>朝・昼・晩＋補食</b>に均等分散してください。まとめ摂りした余剰分は筋肉に回らず、エネルギーや脂肪として処理されるだけになります。`]);
+  // 目標に届かない日でも「ここまでで十分」が分かるようにする
+  if(planned >= floor){
+    tips.push(['done', `<b>✅ 最低ライン ${floor}g（体重×${FLOOR_FACTOR}）は超えています。</b>` +
+      `目標 ${target}g に届かなくても、この水準を保てていれば筋肉の維持には足ります。` +
+      `目標は「ここまで摂れれば理想」という上限であって、下回ったら失敗という線ではありません。` +
+      `評価は1日単位ではなく1週間の平均で見てください。`]);
+  }else{
+    tips.push(['alert', `<b>⚠ まず最低ライン ${floor}g を目指してください（現在の見込み ${planned}g）。</b>` +
+      `あと ${r1(floor - planned)}g です。目標 ${target}g が難しい日でも、` +
+      `この水準を下回る日が続くと筋肉が落ちやすくなります。` +
+      `<br>例：<b>${suggestFoods(r1(floor - planned), st)}</b> で届きます。`]);
+  }
+
+  tips.push(['', `<b>① 1回の摂取は30〜40gまで。</b>1度に吸収・利用できるタンパク質は 30〜40g 程度が上限です。今日の目標 ${target}g は一気に摂らず、` +
+    (st.skipB ? `<b>昼・夕の2食＋ザバス</b>` : `<b>朝・昼・晩＋補食</b>`) +
+    `に分散してください。まとめ摂りした余剰分は筋肉に回らず、エネルギーや脂肪として処理されるだけになります。` +
+    (st.skipB ? `2食だと1食あたりが増えやすいので、超えた分はザバスの回に回すほうが無駄になりません。` : '')]);
 
   tips.push(['', `<b>② 食べる順番を守る（ベジ／ソイファースト）。</b>ご飯・カレー・丼ものなど糖質を摂るときは、必ず先に<b>千切りキャベツ・サラダ・冷奴・納豆などの大豆製品</b>を食べてから。血糖値の急上昇（血糖値スパイク）を抑え、内臓脂肪の蓄積を防げます。特に「レトルトカレー＋ご飯1合」は糖質量が多いので、キャベツと大豆製品の先食べを徹底しましょう。`]);
 
@@ -1253,8 +1296,8 @@ function updateLive(){
    保存 / 復元 / リセット
    ============================================================ */
 // v2：筋トレの初期重量を変更したため、旧データは読み込まずに新しい既定値から始める
-const KEY = 'savas-calc-v2';
-const ALL_IDS = () => ['weight','baseFactor','liquid','liquidMl','savasShare','walk','cycle','otherP']
+const KEY = 'savas-calc-v3';
+const ALL_IDS = () => ['weight','baseFactor','meals','liquid','liquidMl','savasShare','walk','cycle','otherP']
   .concat(FOODS.map(f => 'f_' + f.id))
   .concat(EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]));
 
@@ -1297,7 +1340,7 @@ function load(){
    設定の持ち運び：端末をまたいで使えるよう、設定だけを URL に埋め込む。
    当日の入力（食事・距離・実施した種目）は日ごとに変わるため含めない。
    ------------------------------------------------------------ */
-const SETTING_IDS = () => ['weight','baseFactor','liquid','liquidMl','savasShare']
+const SETTING_IDS = () => ['weight','baseFactor','meals','liquid','liquidMl','savasShare']
   .concat(EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]));
 
 function buildSettingsLink(){
