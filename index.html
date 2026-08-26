@@ -757,7 +757,7 @@ function render(opts){
         `（${liqName}は ${st.liquid.p100}g/100ml で計算）`
       : '');
 
-  renderAltFoods(lack, st);
+  renderAltFoods(toFoodG, sv, st);
   renderSchedule(st, ex, target, sv);
   renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds);
 
@@ -968,14 +968,14 @@ function renderSchedule(st, ex, target, sv){
   ).join('');
 }
 
-/* ザバスを使わず食事だけで不足を補う場合、各食品が何個必要かを表示する */
-function renderAltFoods(lack, st){
+/* 上の計算結果どおりザバスを摂ったうえで、残りを食事で補う場合の早見表 */
+function renderAltFoods(toFoodG, sv, st){
   const box = $('altFoods');
-  if(lack <= 0){ box.innerHTML = ''; return; }
+  if(toFoodG <= 0){ box.innerHTML = ''; return; }
 
   // 千切りキャベツは血糖値対策の位置づけでタンパク質源ではないため除外する
   const rows = FOODS.filter(f => !f.first).map(f => {
-    const n = Math.ceil(lack / f.p);
+    const n = Math.ceil(toFoodG / f.p);
     return `<tr>
       <td class="food">${f.name}${f.lockNote ? `<br><small>（${f.lockNote}）</small>` : ''}</td>
       <td class="num">${n} ${f.unit}<br><small>${r1(n * f.p)}g</small></td>
@@ -984,11 +984,12 @@ function renderAltFoods(lack, st){
 
   box.innerHTML =
     `<div class="alt">
-      <h4>ザバスを使わない場合：不足 ${lack}g を食事だけで補うなら</h4>
+      <h4>残り ${toFoodG}g を食事で補うなら
+        <small>（上のザバス ${sv.spoons}杯・${sv.totalG}g を摂った前提）</small></h4>
       <div class="table-wrap"><table><tbody>${rows}</tbody></table></div>
-      <div class="combo"><b>組み合わせる場合の例：</b>${suggestFoods(lack)}</div>
+      <div class="combo"><b>組み合わせる場合の例：</b>${suggestFoods(toFoodG)}</div>
       <p class="hint" style="margin-bottom:10px">
-        ※ 各行は<b>その食品だけで補う場合</b>の数量です（不足量を満たすよう切り上げ）。
+        ※ 各行は<b>その食品だけで残りを補う場合</b>の数量です（残量を満たすよう切り上げ）。
         レトルトカレー＋ご飯は1食あたりのタンパク質が少なく糖質が大きいため、単品で補うのは現実的ではありません。
         タンパク質あたりの効率はサラダチキンと納豆が高く、豆腐は量が必要になります。
       </p>
