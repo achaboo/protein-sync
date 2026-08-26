@@ -426,7 +426,7 @@ table.mini td.amt{width:auto;text-align:right}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-08-26.13';
+const APP_VERSION = '2026-08-26.14';
 
 const SPOON_G   = 6.5;                  // ザバス付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -438,10 +438,11 @@ const SERVE_G   = SPOON_G * PER_SERVE;  // 1回 = 19.5g
 //   slots : 割り当てたい時間帯の優先順（b=朝食 / l=昼食 / d=夕食）
 //   carb  : 糖質が多く、血糖値が上がりやすい食品（先にキャベツを食べたい対象）
 //   first : 食事の最初に食べる食品（ベジファースト用。糖質メニューのある食事へ優先配分）
-//   lock  : true なら slots に挙げた時間帯「以外」には絶対に配分しない（例：玉子丼は朝食のみ）
+//   lock  : true なら slots に挙げた時間帯「以外」には絶対に配分しない（例：玉子丼は昼食のみ）
+//   staple: ご飯もの（主食）。種類の違う主食が同じ時間帯に重ならないようにする
 const FOODS = [
-  {id:'matsu',   name:'松のや 玉子丼',                          short:'玉子丼',       note:'1食 約20g',     p:20,   unit:'食', slots:['l'], carb:true, lock:true, lockNote:'昼食のみ'},
-  {id:'curry',   name:'レトルトカレー＋ご飯1合',                short:'カレー＋ご飯', note:'1食 約11g',     p:11,   unit:'食', slots:['l','d','b'], carb:true},
+  {id:'matsu',   name:'松のや 玉子丼',                          short:'玉子丼',       note:'1食 約20g',     p:20,   unit:'食', slots:['l'], carb:true, lock:true, lockNote:'昼食のみ', staple:true},
+  {id:'curry',   name:'レトルトカレー＋ご飯1合',                short:'カレー＋ご飯', note:'1食 約11g',     p:11,   unit:'食', slots:['l','d','b'], carb:true, staple:true},
   {id:'natto',   name:'納豆',                                   short:'納豆',         note:'1パック 約8.3g', p:8.3,  unit:'P',  slots:['b','d','l']},
   {id:'tofu',    name:'豆腐',                                   short:'豆腐',         note:'1パック（150g） 約7.2g', p:7.2, unit:'P', slots:['b','d','l']},
   {id:'chicken', name:'ほぐしサラダチキン',                      short:'サラダチキン', note:'1パック 約30.3g', p:30.3, unit:'P',  slots:['l','d','b']},
@@ -853,7 +854,7 @@ function distributeFoods(st, mealTargets, planIds){
     const q = Math.round(st.foods[f.id]);
     for(let i = 0; i < q; i++){
       const u = {key:f.id, short:f.short, unit:f.unit, g:f.p,
-                 slots:mapSlots(f.slots), carb:f.carb, first:f.first, lock:f.lock};
+                 slots:mapSlots(f.slots), carb:f.carb, first:f.first, lock:f.lock, staple:f.staple};
       (f.first ? firstUnits : f.lock ? lockedUnits : units).push(u);
     }
   });
@@ -875,21 +876,31 @@ function distributeFoods(st, mealTargets, planIds){
   const gap  = s => mealTargets[s] - bins[s].total - bins[s].addTotal;
   const put  = (s, u) => { bins[s].items.push(u); bins[s].total = r1(bins[s].total + u.g); };
 
+  // 種類の違うご飯もの（玉子丼とカレー＋ご飯など）が同じ時間帯に重ならないようにする。
+  // 同じ品を2つ入力した場合は同じ枠に置いてよい（同一メニューの数量なので）。
+  const stapleOk = (s, u) =>
+    !u.staple || bins[s].items.every(x => !x.staple || x.key === u.key);
+
   // 時間帯が固定された食品を先に配置する（指定枠以外へは絶対に回さない）
   lockedUnits.forEach(u => {
-    put(u.slots.reduce((a, s) => gap(s) > gap(a) ? s : a, u.slots[0]), u);
+    const list = u.slots.filter(s => stapleOk(s, u));
+    const from = list.length ? list : u.slots;      // 固定枠しかない場合はやむを得ずそこへ
+    put(from.reduce((a, s) => gap(s) > gap(a) ? s : a, from[0]), u);
   });
 
   units.forEach(u => {
+    const list = u.slots.filter(s => stapleOk(s, u));
+    const from = list.length ? list : u.slots;
     // 優先順位が下がるごとに 5g のペナルティ。ただし不足が大きい枠が優先される
-    let best = u.slots[0], bestScore = -Infinity;
-    u.slots.forEach((s, idx) => {
+    let best = from[0], bestScore = -Infinity;
+    from.forEach((s, idx) => {
       const score = gap(s) - idx * 5;
       if(score > bestScore){ bestScore = score; best = s; }
     });
-    // 適した時間帯がすべて埋まっていれば、全体で最も余裕のある枠へ
+    // 適した時間帯がすべて埋まっていれば、全体で最も余裕のある枠へ（主食の重複は避ける）
     if(gap(best) <= 0){
-      ['b','l','d'].forEach(s => { if(gap(s) > gap(best)) best = s; });
+      const all = ['b','l','d'].filter(s => stapleOk(s, u));
+      (all.length ? all : ['b','l','d']).forEach(s => { if(gap(s) > gap(best)) best = s; });
     }
     put(best, u);
   });
