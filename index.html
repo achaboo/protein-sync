@@ -175,6 +175,13 @@ td.amt{font-weight:700;color:var(--brand-d);width:20%}   /* 液体名を含む�
 table.mini{font-size:.82rem}
 table.mini td.time{width:auto;white-space:nowrap}
 table.mini td.amt{width:auto;text-align:right}
+/* ザバスを使わずに食事で補う場合の早見表 */
+.alt{border:1px solid var(--line);border-radius:12px;padding:12px 12px 4px;margin-bottom:14px;background:#fbfcfe}
+.alt h4{margin:0 0 8px;font-size:.9rem}
+.alt table{font-size:.84rem}
+.alt td.food{width:auto;white-space:normal}
+.alt td.num{white-space:nowrap;text-align:right;font-weight:700;color:var(--brand-d);width:30%}
+.alt .combo{background:#eef4ff;border-radius:8px;padding:9px 10px;margin:10px 0 8px;font-size:.85rem}
 .tips{list-style:none;padding:0;margin:0}
 .tips li{
   background:#f4fbf6;border-left:4px solid var(--ok);border-radius:8px;
@@ -343,6 +350,7 @@ table.mini td.amt{width:auto;text-align:right}
         <span class="big" id="oSavas">-</span>
         <span class="sub" id="oSavasSub">-</span>
       </div>
+      <div id="altFoods"></div>
       <div class="note" id="oReason"></div>
     </section>
 
@@ -725,6 +733,7 @@ function render(opts){
         `（${liqName}は ${st.liquid.p100}g/100ml で計算）`
       : '');
 
+  renderAltFoods(lack, st);
   renderSchedule(st, ex, target, sv);
   renderTips(st, ex, target, lack, food, sv);
 
@@ -933,6 +942,33 @@ function renderSchedule(st, ex, target, sv){
   $('schedule').innerHTML = rows.map(r =>
     `<tr><td class="time">${r[0]}</td><td class="amt">${r[1]}</td><td>${r[2]}</td></tr>`
   ).join('');
+}
+
+/* ザバスを使わず食事だけで不足を補う場合、各食品が何個必要かを表示する */
+function renderAltFoods(lack, st){
+  const box = $('altFoods');
+  if(lack <= 0){ box.innerHTML = ''; return; }
+
+  // 千切りキャベツは血糖値対策の位置づけでタンパク質源ではないため除外する
+  const rows = FOODS.filter(f => !f.first).map(f => {
+    const n = Math.ceil(lack / f.p);
+    return `<tr>
+      <td class="food">${f.name}${f.lockNote ? `<br><small>（${f.lockNote}）</small>` : ''}</td>
+      <td class="num">${n} ${f.unit}<br><small>${r1(n * f.p)}g</small></td>
+    </tr>`;
+  }).join('');
+
+  box.innerHTML =
+    `<div class="alt">
+      <h4>ザバスを使わない場合：不足 ${lack}g を食事だけで補うなら</h4>
+      <div class="table-wrap"><table><tbody>${rows}</tbody></table></div>
+      <div class="combo"><b>組み合わせる場合の例：</b>${suggestFoods(lack)}</div>
+      <p class="hint" style="margin-bottom:10px">
+        ※ 各行は<b>その食品だけで補う場合</b>の数量です（不足量を満たすよう切り上げ）。
+        レトルトカレー＋ご飯は1食あたりのタンパク質が少なく糖質が大きいため、単品で補うのは現実的ではありません。
+        タンパク質あたりの効率はサラダチキンと納豆が高く、豆腐は量が必要になります。
+      </p>
+    </div>`;
 }
 
 /* 運動によるエネルギー消費の概算と、補うべき糖質量 */
