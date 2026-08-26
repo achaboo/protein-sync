@@ -151,6 +151,9 @@ button{font:inherit;border:none;border-radius:11px;padding:13px 18px;cursor:poin
   border-radius:999px;padding:4px 12px;font-size:.74rem;font-weight:700;
 }
 .mini-btn:active{background:#dce9fb}
+.sub-btn{background:#eef3fa;color:var(--brand-d);border:1px solid #cddffb;padding:10px 16px;font-size:.86rem}
+.sub-btn:active{background:#dce9fb}
+#linkBox{margin-top:6px;font-size:.75rem;color:var(--sub)}
 
 /* 結果 */
 #result{display:none}
@@ -303,6 +306,18 @@ table.mini td.amt{width:auto;text-align:right}
       加算方式なので、基本係数を下げれば運動した日の目標もその分下がります。
       例：基本 1.50 でスコア100%の日は 1.80、基本 1.20 なら同じ運動でも 1.50 になります。
     </p>
+
+    <h3>設定の持ち運び（別の端末で同じ設定を使う）</h3>
+    <p class="hint" style="margin-top:0">
+      体重・基本係数・液体の種類と量・ザバスで賄う上限・筋トレの重量／回数／セット数を URL に埋め込みます。
+      できたリンクを別の端末で開くと同じ設定で立ち上がり、その端末にも保存されます。
+      <b>食事や運動など当日の入力は含みません。</b>
+    </p>
+    <div class="actions" style="margin:0 0 8px">
+      <button type="button" id="copyLink" class="sub-btn">設定リンクをコピー</button>
+    </div>
+    <p class="hint" id="linkNote" style="margin-top:0"></p>
+    <input type="text" id="linkBox" readonly hidden>
   </section>
 
   <!-- ② 食事 -->
@@ -423,11 +438,11 @@ const LIQUIDS = [
 
 // 筋トレマスタ（普段の値をデフォルトとしてセット）
 const EXERCISES = [
-  {id:'lat',      name:'ラットプルダウン',     w:20, r:15, s:3},
+  {id:'lat',      name:'ラットプルダウン',     w:25, r:15, s:3},
   {id:'row',      name:'シーテッドローイング', w:20, r:15, s:3},
   {id:'chest',    name:'チェストプレス',       w:20, r:15, s:3},
-  {id:'shoulder', name:'ショルダープレス',     w:5,  r:15, s:3},
-  {id:'curl',     name:'バイセップスカール',   w:5,  r:15, s:3},
+  {id:'shoulder', name:'ショルダープレス',     w:10, r:15, s:3},
+  {id:'curl',     name:'バイセップスカール',   w:10, r:15, s:3},
   {id:'dips',     name:'ディップス',           w:30, r:15, s:3}
 ];
 
@@ -1179,7 +1194,8 @@ function updateLive(){
 /* ============================================================
    保存 / 復元 / リセット
    ============================================================ */
-const KEY = 'savas-calc-v1';
+// v2：筋トレの初期重量を変更したため、旧データは読み込まずに新しい既定値から始める
+const KEY = 'savas-calc-v2';
 const ALL_IDS = () => ['weight','baseFactor','liquid','liquidMl','savasShare','walk','cycle','otherP']
   .concat(FOODS.map(f => 'f_' + f.id))
   .concat(EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]));
@@ -1219,6 +1235,50 @@ function load(){
   }catch(err){}
 }
 
+/* ------------------------------------------------------------
+   設定の持ち運び：端末をまたいで使えるよう、設定だけを URL に埋め込む。
+   当日の入力（食事・距離・実施した種目）は日ごとに変わるため含めない。
+   ------------------------------------------------------------ */
+const SETTING_IDS = () => ['weight','baseFactor','liquid','liquidMl','savasShare']
+  .concat(EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]));
+
+function buildSettingsLink(){
+  const d = {v:{}, pm:$('preferMilk').checked};
+  SETTING_IDS().forEach(id => d.v[id] = $(id).value);
+  return location.href.split('#')[0] + '#s=' + btoa(JSON.stringify(d));
+}
+
+function applySettingsFromHash(){
+  const m = location.hash.match(/[#&]s=([^&]+)/);
+  if(!m) return false;
+  try{
+    const d = JSON.parse(atob(m[1]));
+    SETTING_IDS().forEach(id => { if(d.v && d.v[id] !== undefined && $(id)) $(id).value = d.v[id]; });
+    if(d.pm !== undefined) $('preferMilk').checked = !!d.pm;
+    return true;
+  }catch(err){ return false; }
+}
+
+function copySettingsLink(){
+  const url  = buildSettingsLink();
+  const note = $('linkNote');
+  const box  = $('linkBox');
+  const show = msg => { note.innerHTML = msg; box.value = url; box.hidden = false; };
+
+  if(location.protocol === 'file:'){
+    show('<b>このファイルはローカルで開かれています。</b>下のリンクは別端末では開けません。' +
+         '公開ページ（https://achaboo.github.io/protein-sync/）で同じ操作をしてください。');
+    return;
+  }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url)
+      .then(() => show('<b>コピーしました。</b>このリンクを別の端末で開くと同じ設定になります。'))
+      .catch(() => show('<b>自動コピーできませんでした。</b>下の欄を選択してコピーしてください。'));
+  }else{
+    show('<b>下の欄を選択してコピーしてください。</b>');
+  }
+}
+
 /* 「② 今日の食事」だけを 0 に戻す（設定はそのまま） */
 function clearFoods(){
   DAILY_IDS().forEach(id => { if($(id)) $(id).value = 0; });
@@ -1236,6 +1296,7 @@ document.addEventListener('change', onInputChanged);
 
 $('calc').addEventListener('click', () => render({scroll:true}));
 $('clearFoods').addEventListener('click', clearFoods);
+$('copyLink').addEventListener('click', copySettingsLink);
 
 $('reset').addEventListener('click', () => {
   const msg =
@@ -1252,6 +1313,11 @@ $('reset').addEventListener('click', () => {
 });
 
 load();
+// URL に設定が埋め込まれていれば、保存内容より優先して適用しこの端末にも保存する
+if(applySettingsFromHash()){
+  save();
+  $('linkNote').innerHTML = '<b>リンクの設定を読み込みました。</b>この端末にも保存したので、次回からは通常のURLで開いて構いません。';
+}
 updateLive();
 </script>
 </body>
