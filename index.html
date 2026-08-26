@@ -431,7 +431,7 @@ table.mini td.amt{width:auto;text-align:right}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-08-26.16';
+const APP_VERSION = '2026-08-26.17';
 
 const SPOON_G   = 6.5;                  // ザバス付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -446,9 +446,10 @@ const SERVE_G   = SPOON_G * PER_SERVE;  // 1回 = 19.5g
 //   lock  : true なら slots に挙げた時間帯「以外」には絶対に配分しない（例：玉子丼は昼食のみ）
 //   staple: ご飯もの（主食）。1食につき1つまでしか配分しない
 //   max   : 1日に入力できる上限（超える値は入力欄側で切り詰める）
+//   limitNote: 入力欄と早見表に添える制限の注記（時間帯の固定・1日の上限など）
 const FOODS = [
-  {id:'matsu',   name:'松のや 玉子丼',                          short:'玉子丼',       note:'1食 約20g',     p:20,   unit:'食', slots:['l'], carb:true, lock:true, lockNote:'昼食のみ・1日1食まで', staple:true, max:1},
-  {id:'curry',   name:'レトルトカレー＋ご飯1合',                short:'カレー＋ご飯', note:'1食 約11g',     p:11,   unit:'食', slots:['l','d','b'], carb:true, staple:true},
+  {id:'matsu',   name:'松のや 玉子丼',                          short:'玉子丼',       note:'1食 約20g',     p:20,   unit:'食', slots:['l'], carb:true, lock:true, limitNote:'昼食のみ・1日1食まで', staple:true, max:1},
+  {id:'curry',   name:'レトルトカレー＋ご飯1合',                short:'カレー＋ご飯', note:'1食 約11g',     p:11,   unit:'食', slots:['l','d','b'], carb:true, staple:true, max:3, limitNote:'1日3食まで'},
   {id:'natto',   name:'納豆',                                   short:'納豆',         note:'1パック 約8.3g', p:8.3,  unit:'P',  slots:['b','d','l']},
   {id:'tofu',    name:'豆腐',                                   short:'豆腐',         note:'1パック（150g） 約7.2g', p:7.2, unit:'P', slots:['b','d','l']},
   {id:'chicken', name:'ほぐしサラダチキン',                      short:'サラダチキン', note:'1パック 約30.3g', p:30.3, unit:'P',  slots:['l','d','b']},
@@ -459,8 +460,8 @@ const FOODS = [
   {id:'milk',    name:'低脂肪乳（コップ1杯 200ml）',             short:'低脂肪乳',     note:'1杯 約5.7g ／ ザバスに使う分は除く', p:5.7, unit:'杯', slots:['b','l','d']},
   {id:'chikuwa', name:'ちくわ',                                 short:'ちくわ',       note:'1本 約2.2g',    p:2.2,  unit:'本', slots:['l','d','b']},
   {id:'cheese',  name:'プロセスチーズ',                          short:'チーズ',       note:'1個 約3.1g',    p:3.1,  unit:'個', slots:['b','l','d']},
-  {id:'miso',    name:'みそ汁',                                 short:'みそ汁',       note:'1杯 約1.4g',    p:1.4,  unit:'杯', slots:['l'], lock:true, lockNote:'昼食のみ'},
-  {id:'korokke', name:'コロッケ',                               short:'コロッケ',     note:'1個 約2.2g',    p:2.2,  unit:'個', slots:['l'], carb:true, lock:true, lockNote:'昼食のみ'},
+  {id:'miso',    name:'みそ汁',                                 short:'みそ汁',       note:'1杯 約1.4g',    p:1.4,  unit:'杯', slots:['l'], lock:true, limitNote:'昼食のみ'},
+  {id:'korokke', name:'コロッケ',                               short:'コロッケ',     note:'1個 約2.2g',    p:2.2,  unit:'個', slots:['l'], carb:true, lock:true, limitNote:'昼食のみ'},
   {id:'cabbage', name:'千切りキャベツ（150g 1袋）',              short:'千切りキャベツ', note:'1袋 約2.0g（食物繊維 約2.7g）', p:2.0, unit:'袋', slots:['l','d','b'], first:true}
 ];
 
@@ -511,7 +512,7 @@ const serveText = n => n === 1 ? '1回で摂取' : `${n}回に分けて摂取`;
    ============================================================ */
 $('foods').innerHTML = FOODS.map(f => `
   <div class="row">
-    <div class="name"><b>${f.name}</b><small>${f.note}${f.lockNote ? ` ／ <b>${f.lockNote}</b>` : ''}</small></div>
+    <div class="name"><b>${f.name}</b><small>${f.note}${f.limitNote ? ` ／ <b>${f.limitNote}</b>` : ''}</small></div>
     <div class="qty"><input type="number" inputmode="numeric" id="f_${f.id}" value="0" min="0" step="1"${f.max ? ` max="${f.max}"` : ''}></div>
     <div class="unit">${f.unit}</div>
   </div>`).join('');
@@ -1131,7 +1132,7 @@ function renderAltFoods(toFoodG, sv, st, plan){
   const rows = shown.map(f => {
     const n = Math.ceil(toFoodG / f.p);
     return `<tr>
-      <td class="food">${f.name}${f.lockNote ? `<br><small>（${f.lockNote}）</small>` : ''}</td>
+      <td class="food">${f.name}${f.limitNote ? `<br><small>（${f.limitNote}）</small>` : ''}</td>
       <td class="num">${n} ${f.unit}<br><small>${r1(n * f.p)}g</small></td>
     </tr>`;
   }).join('');
