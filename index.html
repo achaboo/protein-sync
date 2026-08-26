@@ -1245,7 +1245,8 @@ const SETTING_IDS = () => ['weight','baseFactor','liquid','liquidMl','savasShare
 function buildSettingsLink(){
   const d = {v:{}, pm:$('preferMilk').checked};
   SETTING_IDS().forEach(id => d.v[id] = $(id).value);
-  return location.href.split('#')[0] + '#s=' + btoa(JSON.stringify(d));
+  // クエリ（キャッシュ回避用の ?v= など）は引き継がず、素のURLに設定だけを付ける
+  return location.href.split(/[?#]/)[0] + '#s=' + btoa(JSON.stringify(d));
 }
 
 function applySettingsFromHash(){
