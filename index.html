@@ -36,9 +36,11 @@
    ・溶かす液体（①で選択）にもタンパク質があるため、飲む回数分を加算して計算します。
        水 0g / 低脂肪乳 3.8g / 普通牛乳 3.3g / 無調整豆乳 3.6g / 調製豆乳 3.2g（いずれも 100ml あたり）
        初期値は「低脂肪乳 250ml」（＝1回あたり 約9.5g が加算されます）。
-   ・松のや 玉子丼 20g、レトルトカレー+ご飯1合 11g、納豆 1P 8g、
-     豆腐50gミニパック 1個 3.3g、セブンプレミアム ほぐしサラダチキン80g 1P 18.7g
-   ※数値は目安です。商品リニューアル等で変わる場合は下部の FOODS / SPOON_G を修正してください。
+   ・食品のタンパク質量はスクリプト内の FOODS で一元管理しています（玉子丼20g、
+     カレー+ご飯11g、サラダチキン30.3g、ギリシャヨーグルト25g、サバ缶16.7g、ツナ缶12.7g、
+     納豆8.3g、豆腐7.2g、ゆで卵6g、低脂肪乳1杯5.7g など）。
+   ※数値は目安です。商品リニューアル等で変わる場合は FOODS の p の値を修正すれば、
+     入力欄・計算・スケジュール・早見表のすべてに反映されます。
 ================================================================================
 -->
 <html lang="ja">
@@ -419,9 +421,18 @@ const SERVE_G   = SPOON_G * PER_SERVE;  // 1回 = 19.5g
 const FOODS = [
   {id:'matsu',   name:'松のや 玉子丼',                          short:'玉子丼',       note:'1食 約20g',     p:20,   unit:'食', slots:['b'], carb:true, lock:true, lockNote:'朝食のみ'},
   {id:'curry',   name:'レトルトカレー＋ご飯1合',                short:'カレー＋ご飯', note:'1食 約11g',     p:11,   unit:'食', slots:['l','d','b'], carb:true},
-  {id:'natto',   name:'納豆',                                   short:'納豆',         note:'1パック 約8g',  p:8,    unit:'P',  slots:['b','d','l']},
-  {id:'tofu',    name:'豆腐 50g ミニパック',                     short:'豆腐',         note:'1個 約3.3g',    p:3.3,  unit:'個', slots:['b','d','l']},
-  {id:'chicken', name:'セブンプレミアム ほぐしサラダチキン 80g', short:'サラダチキン', note:'1パック 18.7g', p:18.7, unit:'P',  slots:['l','d','b']},
+  {id:'natto',   name:'納豆',                                   short:'納豆',         note:'1パック 約8.3g', p:8.3,  unit:'P',  slots:['b','d','l']},
+  {id:'tofu',    name:'豆腐 ミニパック',                         short:'豆腐',         note:'1個 約7.2g',    p:7.2,  unit:'個', slots:['b','d','l']},
+  {id:'chicken', name:'ほぐしサラダチキン',                      short:'サラダチキン', note:'1パック 約30.3g', p:30.3, unit:'P',  slots:['l','d','b']},
+  {id:'tuna',    name:'ツナ缶',                                 short:'ツナ缶',       note:'1缶 約12.7g',   p:12.7, unit:'缶', slots:['l','d','b']},
+  {id:'saba',    name:'サバ缶',                                 short:'サバ缶',       note:'1缶 約16.7g',   p:16.7, unit:'缶', slots:['d','l','b']},
+  {id:'yogurt',  name:'ギリシャヨーグルト',                      short:'ヨーグルト',   note:'1個 約25g',     p:25,   unit:'個', slots:['b','d','l']},
+  {id:'egg',     name:'ゆで卵',                                 short:'ゆで卵',       note:'1個 約6g',      p:6,    unit:'個', slots:['b','l','d']},
+  {id:'milk',    name:'低脂肪乳（コップ1杯 200ml）',             short:'低脂肪乳',     note:'1杯 約5.7g ／ ザバスに使う分は除く', p:5.7, unit:'杯', slots:['b','l','d']},
+  {id:'chikuwa', name:'ちくわ',                                 short:'ちくわ',       note:'1本 約2.2g',    p:2.2,  unit:'本', slots:['l','d','b']},
+  {id:'cheese',  name:'プロセスチーズ',                          short:'チーズ',       note:'1個 約3.1g',    p:3.1,  unit:'個', slots:['b','l','d']},
+  {id:'miso',    name:'みそ汁',                                 short:'みそ汁',       note:'1杯 約1.4g',    p:1.4,  unit:'杯', slots:['b','d','l']},
+  {id:'korokke', name:'コロッケ',                               short:'コロッケ',     note:'1個 約2.2g',    p:2.2,  unit:'個', slots:['l','d','b'], carb:true},
   {id:'cabbage', name:'千切りキャベツ（150g 1袋）',              short:'千切りキャベツ', note:'1袋 約2.0g（食物繊維 約2.7g）', p:2.0, unit:'袋', slots:['l','d','b'], first:true}
 ];
 
@@ -888,8 +899,7 @@ function mealAdvice(bin, target){
   let msg;
   if(d >= 5){
     msg = `<b>目安まで あと約${d}g。</b>` +
-          (d >= 15 ? 'ほぐしサラダチキン1P（18.7g）' : d >= 7 ? '納豆1P（8g）' : '豆腐ミニパック1〜2個（3.3〜6.6g）') +
-          'を足すと届きます。';
+          `${suggestFoods(d)} を足すと届きます。`;
   }else if(d <= -5){
     msg = (bin.locked && bin.locked.length)
       ? `目安より約${r1(-d)}g多めですが、<b>${bin.locked.join('・')}</b>はこの時間帯にしか摂れないため、そのままで構いません。その分、他の時間帯を軽めに調整してください。`
@@ -988,8 +998,11 @@ function renderAltFoods(toFoodG, sv, st){
   const box = $('altFoods');
   if(toFoodG <= 0){ box.innerHTML = ''; return; }
 
-  // 千切りキャベツは血糖値対策の位置づけでタンパク質源ではないため除外する
-  const rows = FOODS.filter(f => !f.first).map(f => {
+  // 千切りキャベツ（血糖値対策の位置づけ）と、単品では非現実的な低密度の食品は除外する
+  const ALT_MIN_P = 5;
+  const shown = FOODS.filter(f => !f.first && f.p >= ALT_MIN_P);
+  const hidden = FOODS.filter(f => !f.first && f.p < ALT_MIN_P);
+  const rows = shown.map(f => {
     const n = Math.ceil(toFoodG / f.p);
     return `<tr>
       <td class="food">${f.name}${f.lockNote ? `<br><small>（${f.lockNote}）</small>` : ''}</td>
@@ -1005,8 +1018,8 @@ function renderAltFoods(toFoodG, sv, st){
       <div class="combo"><b>組み合わせる場合の例：</b>${suggestFoods(toFoodG)}</div>
       <p class="hint" style="margin-bottom:10px">
         ※ 各行は<b>その食品だけで残りを補う場合</b>の数量です（残量を満たすよう切り上げ）。
-        レトルトカレー＋ご飯は1食あたりのタンパク質が少なく糖質が大きいため、単品で補うのは現実的ではありません。
-        タンパク質あたりの効率はサラダチキンと納豆が高く、豆腐は量が必要になります。
+        1単位あたり ${ALT_MIN_P}g 未満の食品（${hidden.map(f => f.short).join('・')}）は、
+        単品で補うと非現実的な数量になるため表から除いています。組み合わせに加えるのは有効です。
       </p>
     </div>`;
 }
@@ -1033,17 +1046,27 @@ function liquidCutSuggestion(st, lack){
          `スプーン1杯で約${r1(SPOON_G + st.liquid.p100 * ml / 100)}g になります。`;
 }
 
-/* 指定した g 数を満たす食品の組み合わせを提案する */
+/* 食品マスタの参照ヘルパー（タンパク質量を1箇所で管理し、表示のズレを防ぐ） */
+const foodById = id => FOODS.find(f => f.id === id);
+const pOf      = id => foodById(id).p;
+const label    = (id, n) => { const f = foodById(id); return `${f.short} ${n}${f.unit}（${r1(n * f.p)}g）`; };
+
+/* 指定した g 数を満たす食品の組み合わせを提案する（密度の高いものから使う） */
+const SUGGEST_ORDER = ['chicken','yogurt','saba','tuna','natto','tofu','egg'];
 function suggestFoods(g){
   const picks = [];
   let rest = g;
-  const c = Math.floor(rest / 18.7);
-  if(c > 0){ picks.push(`ほぐしサラダチキン ${c}P（${r1(c * 18.7)}g）`); rest = r1(rest - c * 18.7); }
-  const n = Math.floor(rest / 8);
-  if(n > 0){ picks.push(`納豆 ${n}P（${r1(n * 8)}g）`); rest = r1(rest - n * 8); }
-  const t = Math.ceil(rest / 3.3);
-  if(t > 0){ picks.push(`豆腐ミニパック ${t}個（${r1(t * 3.3)}g）`); }
-  return picks.join(' ＋ ');
+  SUGGEST_ORDER.forEach(id => {
+    const f = foodById(id);
+    if(!f) return;
+    const n = Math.floor(rest / f.p);
+    if(n > 0){ picks.push(label(id, n)); rest = r1(rest - n * f.p); }
+  });
+  if(rest > 0.05){                       // 端数は最も小さい単位で切り上げて必ず届かせる
+    const id = 'egg';
+    picks.push(label(id, Math.ceil(rest / pOf(id))));
+  }
+  return picks.join(' ＋ ') || '—';
 }
 
 /* 食事・栄養のポイント */
@@ -1088,7 +1111,7 @@ function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds){
   }else if(lack > 0){
     tips.push(['done',
       `<b>✅ 不足は ${lack}g だけです。</b>ザバスを1回飲むと摂りすぎになるため、` +
-      `そのままか、豆腐ミニパック1個（3.3g）程度で調整してください。`]);
+      `そのままか、${label('egg', 1)}程度で調整してください。`]);
   }else{
     tips.push(['done',
       `<b>✅ 今日の目標 ${target}g を食事だけで達成しています。</b>` +
