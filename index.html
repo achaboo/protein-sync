@@ -178,6 +178,11 @@ th{background:#eef3fa;font-weight:700;white-space:nowrap}
 td.time{white-space:nowrap;font-weight:700;background:#fafcff;width:26%}
 td.amt{font-weight:700;color:var(--brand-d);width:20%}   /* 液体名を含む長文が折り返せるよう nowrap にしない */
 .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+/* 食べる順番の注意（内容欄の先頭に置く） */
+.order{
+  display:block;background:#fff7ed;border-left:3px solid var(--accent);
+  border-radius:6px;padding:5px 8px;margin-bottom:7px;
+}
 table.mini{font-size:.82rem}
 table.mini td.time{width:auto;white-space:nowrap}
 table.mini td.amt{width:auto;text-align:right}
@@ -942,7 +947,20 @@ function distributeFoods(st, mealTargets, planIds){
   return bins;
 }
 
-/* 各食事の過不足に応じた一言 ＋ 食べる順番の注意 */
+/* 食べる順番の注意。実際に最初に食べるものなので、内容欄の先頭に置く */
+function orderNote(bin){
+  if(bin.first){
+    return `<span class="order"><b>まず、下線の千切りキャベツから。</b>` +
+           `食べ終えてから他のものへ進んでください。</span>`;
+  }
+  if(bin.carb){
+    return `<span class="order"><b>まず、千切りキャベツ1袋から。</b>` +
+           `この食事には糖質メニューがあります。先に食べることで血糖値の急上昇を抑えられます。</span>`;
+  }
+  return '';
+}
+
+/* 各食事の過不足に応じた一言 */
 function mealAdvice(bin, target, st, dayCovered){
   // ④で決めた品目がこの食事に割り当てられていれば、それを提示する
   const after = r1(bin.total + bin.addTotal);
@@ -966,8 +984,6 @@ function mealAdvice(bin, target, st, dayCovered){
     msg += '目安どおりのバランスです。';
   }
 
-  if(bin.first)      msg += '<br><b>下線の千切りキャベツを最初に</b>食べてから他へ進んでください。';
-  else if(bin.carb)  msg += '<br><b>糖質メニューがあります。</b>千切りキャベツ1袋を先に食べると血糖値の急上昇を抑えられます。';
 
   return msg;
 }
@@ -1008,10 +1024,10 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
       return `<b>「② 今日の食事」が未入力です。</b>食べたもの（納豆・豆腐・サラダチキンなど）を入力すると、ここに ${targetG}g 分の配分が自動表示されます。`;
     }
     if(bin.items.length){
-      return `<b>${bin.label}</b> ＝ 合計 <b>${bin.total}g</b><br>${mealAdvice(bin, targetG, st, dayCovered)}${tail}`;
+      return `${orderNote(bin)}<b>${bin.label}</b> ＝ 合計 <b>${bin.total}g</b><br>${mealAdvice(bin, targetG, st, dayCovered)}${tail}`;
     }
     if(bin.addTotal){
-      return `入力済みの食事はこの時間帯に配分されていません。<br>${mealAdvice(bin, targetG, st, dayCovered)}${tail}`;
+      return `${orderNote(bin)}入力済みの食事はこの時間帯に配分されていません。<br>${mealAdvice(bin, targetG, st, dayCovered)}${tail}`;
     }
     return `今日の入力分はすべて他の時間帯に配分されました。ここで摂るなら ${targetG}g 前後を目安に。${tail}`;
   };
