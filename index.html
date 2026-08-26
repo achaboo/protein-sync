@@ -714,6 +714,8 @@ function render(opts){
   const sv        = splitSavas(coverG, st);
   const capBinds  = lack > savasCap && st.savasShare < 1;
   const toFoodG   = r1(Math.max(0, lack - sv.totalG));   // 食事で補うべき残り
+  // 残りを補う組み合わせは1回だけ決め、④の早見表と⑤のスケジュールで同じ品目を使う
+  const plan      = toFoodG > 0 ? suggestPlan(toFoodG, st) : [];
 
   // ---- サマリー ----
   const floor   = r1(st.weight * FLOOR_FACTOR);       // ここを超えていればその日は十分
@@ -803,8 +805,8 @@ function render(opts){
         `（${liqName}は ${st.liquid.p100}g/100ml で計算）`
       : '');
 
-  renderAltFoods(toFoodG, sv, st);
-  renderSchedule(st, ex, target, sv);
+  renderAltFoods(toFoodG, sv, st, plan);
+  renderSchedule(st, ex, target, sv, plan);
   renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, planned);
 
   // 更新されたことが必ず分かるように、時刻を刻んでハイライトする
@@ -824,7 +826,7 @@ function render(opts){
    1単位ずつに分解し、タンパク質の多いものから
    「その食品に適した時間帯」のうち最も不足している枠へ入れていく。
    ------------------------------------------------------------ */
-function distributeFoods(st, mealTargets){
+function distributeFoods(st, mealTargets, planIds){
   // 朝食を摂らない設定のときは、朝食枠に割り当てようとする食品を昼食に回す
   const mapSlots = s => [...new Set(s.map(x => (st.skipB && x === 'b') ? 'l' : x))];
   const units = [];
@@ -853,8 +855,9 @@ function distributeFoods(st, mealTargets){
 
   units.sort((a, b) => b.g - a.g);
 
-  const bins = {b:{items:[], total:0}, l:{items:[], total:0}, d:{items:[], total:0}};
-  const gap  = s => mealTargets[s] - bins[s].total;
+  const mk   = () => ({items:[], total:0, adds:[], addTotal:0});
+  const bins = {b:mk(), l:mk(), d:mk()};
+  const gap  = s => mealTargets[s] - bins[s].total - bins[s].addTotal;
   const put  = (s, u) => { bins[s].items.push(u); bins[s].total = r1(bins[s].total + u.g); };
 
   // 時間帯が固定された食品を先に配置する（指定枠以外へは絶対に回さない）
@@ -890,6 +893,27 @@ function distributeFoods(st, mealTargets){
     put(best, u);
   });
 
+  // ④で提示した組み合わせを、同じ品目のまま不足の大きい食事へ割り振る。
+  // ⑤で独立に提案すると④と品目が食い違い、買い物しづらくなるため。
+  (planIds || []).map(id => {
+    const f = foodById(id);
+    return {key:f.id, short:f.short, unit:f.unit, g:f.p, slots:mapSlots(f.slots)};
+  }).sort((a, b) => b.g - a.g).forEach(u => {
+    let best = u.slots[0], bestScore = -Infinity;
+    u.slots.forEach((s, idx) => {
+      if(!ORDER.includes(s)) return;
+      const score = gap(s) - idx * 5;
+      if(score > bestScore){ bestScore = score; best = s; }
+    });
+    if(!ORDER.includes(best) || gap(best) <= 0){
+      ORDER.forEach(s => { if(gap(s) > gap(best) || !ORDER.includes(best)) best = s; });
+    }
+    bins[best].adds.push(u);
+    bins[best].addTotal = r1(bins[best].addTotal + u.g);
+  });
+
+  ORDER.forEach(s => { bins[s].addLabel = formatPlan(bins[s].adds.map(u => u.key)); });
+
   // 同じ食品をまとめて「納豆 1P（8g）」の形に整形（最初に食べるものを先頭に並べる）
   Object.values(bins).forEach(bin => {
     const map = new Map();
@@ -917,17 +941,22 @@ function distributeFoods(st, mealTargets){
 
 /* 各食事の過不足に応じた一言 ＋ 食べる順番の注意 */
 function mealAdvice(bin, target, st){
-  const d = r1(target - bin.total);
-  let msg;
+  // ④で決めた品目がこの食事に割り当てられていれば、それを提示する
+  const after = r1(bin.total + bin.addTotal);
+  const d = r1(target - after);
+  let msg = '';
+  if(bin.addTotal > 0){
+    msg = `<b>ここで追加：${bin.addLabel}</b>（+${bin.addTotal}g → 合計 ${after}g）。` +
+          `④で提示した組み合わせをこの食事に割り振ったものです。<br>`;
+  }
   if(d >= 5){
-    msg = `<b>目安まで あと約${d}g。</b>` +
-          `${suggestFoods(d, st)} を足すと届きます。`;
+    msg += `<b>それでも目安まで あと約${d}g。</b>他の食事で調整するか、少量足してください。`;
   }else if(d <= -5){
-    msg = (bin.locked && bin.locked.length)
+    msg += (bin.locked && bin.locked.length)
       ? `目安より約${r1(-d)}g多めですが、<b>${bin.locked.join('・')}</b>はこの時間帯にしか摂れないため、そのままで構いません。その分、他の時間帯を軽めに調整してください。`
       : `目安より約${r1(-d)}g多めです。他の時間帯に回すと1回30〜40gの範囲に収まります。`;
   }else{
-    msg = '目安どおりのバランスです。';
+    msg += '目安どおりのバランスです。';
   }
 
   if(bin.first)      msg += '<br><b>下線の千切りキャベツを最初に</b>食べてから他へ進んでください。';
@@ -937,7 +966,7 @@ function mealAdvice(bin, target, st){
 }
 
 /* 時間帯別スケジュール */
-function renderSchedule(st, ex, target, sv){
+function renderSchedule(st, ex, target, sv, plan){
   const trained = ex.done > 0 || ex.cardio > 0;
 
   // 食事で摂るべき量 = 目標 − ザバスで補う量（粉＋液体）を 朝30% / 昼35% / 晩35% に配分（1回40g上限）
@@ -963,15 +992,22 @@ function renderSchedule(st, ex, target, sv){
   const liqText = sMorning ? liqOf(sMorning) : `${st.liquid.name} ${st.liquidMl}ml`;
 
   // 「② 今日の食事」の入力を朝・昼・晩へ自動配分
-  const bins  = distributeFoods(st, {b:mBreak, l:mLunch, d:mDinner});
+  const bins  = distributeFoods(st, {b:mBreak, l:mLunch, d:mDinner}, plan);
   const empty = !bins.b.items.length && !bins.l.items.length && !bins.d.items.length;
 
-  // 各食事行の「内容・ポイント」：入力があればその配分、なければ入力を促す
-  const meal = (bin, targetG, tail) => empty
-    ? `<b>「② 今日の食事」が未入力です。</b>食べたもの（納豆・豆腐・サラダチキンなど）を入力すると、ここに ${targetG}g 分の配分が自動表示されます。`
-    : (bin.items.length
-        ? `<b>${bin.label}</b> ＝ 合計 <b>${bin.total}g</b><br>${mealAdvice(bin, targetG, st)}${tail}`
-        : `今日の入力分はすべて他の時間帯に配分されました。ここで摂るなら ${targetG}g 前後を目安に。${tail}`);
+  // 各食事行の「内容・ポイント」：入力の配分と、④で決めた追加分を示す
+  const meal = (bin, targetG, tail) => {
+    if(empty && !bin.addTotal){
+      return `<b>「② 今日の食事」が未入力です。</b>食べたもの（納豆・豆腐・サラダチキンなど）を入力すると、ここに ${targetG}g 分の配分が自動表示されます。`;
+    }
+    if(bin.items.length){
+      return `<b>${bin.label}</b> ＝ 合計 <b>${bin.total}g</b><br>${mealAdvice(bin, targetG, st)}${tail}`;
+    }
+    if(bin.addTotal){
+      return `入力済みの食事はこの時間帯に配分されていません。<br>${mealAdvice(bin, targetG, st)}${tail}`;
+    }
+    return `今日の入力分はすべて他の時間帯に配分されました。ここで摂るなら ${targetG}g 前後を目安に。${tail}`;
+  };
 
   const rows = [
     [
@@ -1026,7 +1062,7 @@ function renderSchedule(st, ex, target, sv){
 }
 
 /* 上の計算結果どおりザバスを摂ったうえで、残りを食事で補う場合の早見表 */
-function renderAltFoods(toFoodG, sv, st){
+function renderAltFoods(toFoodG, sv, st, plan){
   const box = $('altFoods');
   if(toFoodG <= 0){ box.innerHTML = ''; return; }
 
@@ -1048,7 +1084,8 @@ function renderAltFoods(toFoodG, sv, st){
         <small>（上のザバス ${sv.spoons}杯・${sv.totalG}g を摂った前提）</small></h4>
       <div class="table-wrap"><table><tbody>${rows}</tbody></table></div>
       <div class="combo">
-        <b>組み合わせる場合の例：</b>${suggestFoods(toFoodG, st)}
+        <b>組み合わせる場合の例：</b>${formatPlan(plan)}
+        <br><small>この組み合わせは「⑤ 時間帯別の摂取スケジュール」の各食事に割り振って表示しています。</small>
         <br><small>${(() => {
           const used = [...usedCategories(st)];
           return used.length
@@ -1109,7 +1146,7 @@ function usedCategories(st){
 
 /* 指定した g 数を満たす食品の組み合わせを提案する。
    1単位ずつ選び、まだ使っていないカテゴリを優先（同条件ならタンパク質密度が高い順）。 */
-function suggestFoods(g, st){
+function suggestPlan(g, st){
   const pool = SUGGEST_ORDER.map(foodById).filter(Boolean);
   const cats = usedCategories(st);
   const picks = [];
@@ -1125,11 +1162,17 @@ function suggestFoods(g, st){
     rest = r1(rest - f.p);
   }
   if(rest > 0.05) picks.push('egg');      // 端数は最小単位で切り上げ、必ず不足を満たす
+  return picks;                            // 食品idの配列（1単位ごと）
+}
 
+/* 品目idの配列を「サラダチキン 1P（30.3g） ＋ …」の表示に整形する */
+function formatPlan(ids){
   const map = new Map();
-  picks.forEach(id => map.set(id, (map.get(id) || 0) + 1));
+  (ids || []).forEach(id => map.set(id, (map.get(id) || 0) + 1));
   return [...map].map(([id, n]) => label(id, n)).join(' ＋ ') || '—';
 }
+
+function suggestFoods(g, st){ return formatPlan(suggestPlan(g, st)); }
 
 /* 食事・栄養のポイント */
 function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, planned){
