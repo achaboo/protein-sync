@@ -184,6 +184,10 @@ td.amt{font-weight:700;color:var(--brand-d);width:20%}   /* 液体名を含む�
   border-radius:6px;padding:5px 8px;margin-bottom:7px;
 }
 .ver{text-align:center;font-size:.72rem;color:var(--sub);margin:18px 0 0}
+.warnbox{
+  display:block;background:#fff5f5;border-left:4px solid var(--warn);
+  border-radius:8px;padding:10px 12px;margin:12px 0 0;font-size:.85rem;
+}
 table.mini{font-size:.82rem}
 table.mini td.time{width:auto;white-space:nowrap}
 table.mini td.amt{width:auto;text-align:right}
@@ -407,6 +411,7 @@ table.mini td.amt{width:auto;text-align:right}
           <tbody id="schedule"></tbody>
         </table>
       </div>
+      <p id="schedNote"></p>
       <p class="hint">※ 目安量は今日の目標値から自動配分しています（1回の摂取が 30〜40g を超えないよう調整）。</p>
     </section>
 
@@ -426,7 +431,7 @@ table.mini td.amt{width:auto;text-align:right}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-08-26.14';
+const APP_VERSION = '2026-08-26.15';
 
 const SPOON_G   = 6.5;                  // ザバス付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -876,20 +881,21 @@ function distributeFoods(st, mealTargets, planIds){
   const gap  = s => mealTargets[s] - bins[s].total - bins[s].addTotal;
   const put  = (s, u) => { bins[s].items.push(u); bins[s].total = r1(bins[s].total + u.g); };
 
-  // 種類の違うご飯もの（玉子丼とカレー＋ご飯など）が同じ時間帯に重ならないようにする。
-  // 同じ品を2つ入力した場合は同じ枠に置いてよい（同一メニューの数量なので）。
-  const stapleOk = (s, u) =>
-    !u.staple || bins[s].items.every(x => !x.staple || x.key === u.key);
+  // ご飯もの（玉子丼・カレー＋ご飯）は1食につき1つまで。
+  // 2つ一度には食べられないため、置けない分は配分せず注意として表示する。
+  const unplaced  = [];
+  const stapleOk  = (s, u) => !u.staple || !bins[s].items.some(x => x.staple);
 
   // 時間帯が固定された食品を先に配置する（指定枠以外へは絶対に回さない）
   lockedUnits.forEach(u => {
     const list = u.slots.filter(s => stapleOk(s, u));
-    const from = list.length ? list : u.slots;      // 固定枠しかない場合はやむを得ずそこへ
-    put(from.reduce((a, s) => gap(s) > gap(a) ? s : a, from[0]), u);
+    if(!list.length){ unplaced.push(u); return; }
+    put(list.reduce((a, s) => gap(s) > gap(a) ? s : a, list[0]), u);
   });
 
   units.forEach(u => {
     const list = u.slots.filter(s => stapleOk(s, u));
+    if(u.staple && !list.length){ unplaced.push(u); return; }
     const from = list.length ? list : u.slots;
     // 優先順位が下がるごとに 5g のペナルティ。ただし不足が大きい枠が優先される
     let best = from[0], bestScore = -Infinity;
@@ -962,6 +968,7 @@ function distributeFoods(st, mealTargets, planIds){
     bins[s].locked = [...new Set(bins[s].items.filter(u => u.lock).map(u => u.short))];
   });
 
+  bins.unplaced = unplaced;
   return bins;
 }
 
@@ -1100,6 +1107,15 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   $('schedule').innerHTML = rows.map(r =>
     `<tr><td class="time">${r[0]}</td><td class="amt">${r[1]}</td><td>${r[2]}</td></tr>`
   ).join('');
+
+  // ご飯ものが1食1つの制限に収まらなかった場合の注意
+  const un = bins.unplaced || [];
+  $('schedNote').innerHTML = un.length
+    ? `<span class="warnbox"><b>⚠ ${formatPlan(un.map(u => u.key))} は配分できませんでした。</b>` +
+      `ご飯ものは<b>1食につき1つまで</b>としているため、入力した数を収める時間帯がありません。` +
+      `「② 今日の食事」の数量を見直すか、この分は別の日に回してください。` +
+      `（この分も「食事から摂取」の合計には含まれています）</span>`
+    : '';
 }
 
 /* 上の計算結果どおりザバスを摂ったうえで、残りを食事で補う場合の早見表 */
