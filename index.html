@@ -183,6 +183,7 @@ td.amt{font-weight:700;color:var(--brand-d);width:20%}   /* 液体名を含む�
   display:block;background:#fff7ed;border-left:3px solid var(--accent);
   border-radius:6px;padding:5px 8px;margin-bottom:7px;
 }
+.ver{text-align:center;font-size:.72rem;color:var(--sub);margin:18px 0 0}
 table.mini{font-size:.82rem}
 table.mini td.time{width:auto;white-space:nowrap}
 table.mini td.amt{width:auto;text-align:right}
@@ -415,12 +416,18 @@ table.mini td.amt{width:auto;text-align:right}
     </section>
 
   </div>
+
+  <p class="ver" id="ver"></p>
 </div>
 
 <script>
 /* ============================================================
    定数（商品リニューアル時はここを修正）
    ============================================================ */
+// 画面下部に表示するバージョン。内容を変えたらここを更新する。
+// 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
+const APP_VERSION = '2026-08-26.13';
+
 const SPOON_G   = 6.5;                  // ザバス付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
 const SERVE_G   = SPOON_G * PER_SERVE;  // 1回 = 19.5g
@@ -1479,6 +1486,8 @@ $('reset').addEventListener('click', () => {
   try{ localStorage.removeItem(KEY); }catch(err){}
   location.reload();
 });
+
+$('ver').textContent = `バージョン ${APP_VERSION}　（表示が古い場合はページを再読み込みしてください）`;
 
 load();
 // URL に設定が埋め込まれていれば、保存内容より優先して適用しこの端末にも保存する
