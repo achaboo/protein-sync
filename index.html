@@ -716,6 +716,9 @@ function render(opts){
   const toFoodG   = r1(Math.max(0, lack - sv.totalG));   // 食事で補うべき残り
   // 残りを補う組み合わせは1回だけ決め、④の早見表と⑤のスケジュールで同じ品目を使う
   const plan      = toFoodG > 0 ? suggestPlan(toFoodG, st) : [];
+  // 提案どおり摂った場合に1日の目標へ届くか（届くなら食事ごとのズレは配分の問題）
+  const planTotal  = r1(plan.reduce((a, id) => a + pOf(id), 0));
+  const dayCovered = r1(food.total + sv.totalG + planTotal) >= target - 0.05;
 
   // ---- サマリー ----
   const floor   = r1(st.weight * FLOOR_FACTOR);       // ここを超えていればその日は十分
@@ -806,7 +809,7 @@ function render(opts){
       : '');
 
   renderAltFoods(toFoodG, sv, st, plan);
-  renderSchedule(st, ex, target, sv, plan);
+  renderSchedule(st, ex, target, sv, plan, dayCovered);
   renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, planned);
 
   // 更新されたことが必ず分かるように、時刻を刻んでハイライトする
@@ -940,7 +943,7 @@ function distributeFoods(st, mealTargets, planIds){
 }
 
 /* 各食事の過不足に応じた一言 ＋ 食べる順番の注意 */
-function mealAdvice(bin, target, st){
+function mealAdvice(bin, target, st, dayCovered){
   // ④で決めた品目がこの食事に割り当てられていれば、それを提示する
   const after = r1(bin.total + bin.addTotal);
   const d = r1(target - after);
@@ -950,7 +953,11 @@ function mealAdvice(bin, target, st){
           `④で提示した組み合わせをこの食事に割り振ったものです。<br>`;
   }
   if(d >= 5){
-    msg += `<b>それでも目安まで あと約${d}g。</b>他の食事で調整するか、少量足してください。`;
+    // 1日の合計が足りているなら、食事ごとのズレは配分の問題であって不足ではない
+    msg += dayCovered
+      ? `この食事は目安より約${d}g少なめですが、<b>1日の合計では足りています</b>。` +
+        `提案した品目は分割できないため配分に偏りが出ているだけなので、無理に足す必要はありません。`
+      : `<b>それでも目安まで あと約${d}g。</b>他の食事で調整するか、少量足してください。`;
   }else if(d <= -5){
     msg += (bin.locked && bin.locked.length)
       ? `目安より約${r1(-d)}g多めですが、<b>${bin.locked.join('・')}</b>はこの時間帯にしか摂れないため、そのままで構いません。その分、他の時間帯を軽めに調整してください。`
@@ -966,7 +973,7 @@ function mealAdvice(bin, target, st){
 }
 
 /* 時間帯別スケジュール */
-function renderSchedule(st, ex, target, sv, plan){
+function renderSchedule(st, ex, target, sv, plan, dayCovered){
   const trained = ex.done > 0 || ex.cardio > 0;
 
   // 食事で摂るべき量 = 目標 − ザバスで補う量（粉＋液体）を 朝30% / 昼35% / 晩35% に配分（1回40g上限）
@@ -1001,10 +1008,10 @@ function renderSchedule(st, ex, target, sv, plan){
       return `<b>「② 今日の食事」が未入力です。</b>食べたもの（納豆・豆腐・サラダチキンなど）を入力すると、ここに ${targetG}g 分の配分が自動表示されます。`;
     }
     if(bin.items.length){
-      return `<b>${bin.label}</b> ＝ 合計 <b>${bin.total}g</b><br>${mealAdvice(bin, targetG, st)}${tail}`;
+      return `<b>${bin.label}</b> ＝ 合計 <b>${bin.total}g</b><br>${mealAdvice(bin, targetG, st, dayCovered)}${tail}`;
     }
     if(bin.addTotal){
-      return `入力済みの食事はこの時間帯に配分されていません。<br>${mealAdvice(bin, targetG, st)}${tail}`;
+      return `入力済みの食事はこの時間帯に配分されていません。<br>${mealAdvice(bin, targetG, st, dayCovered)}${tail}`;
     }
     return `今日の入力分はすべて他の時間帯に配分されました。ここで摂るなら ${targetG}g 前後を目安に。${tail}`;
   };
