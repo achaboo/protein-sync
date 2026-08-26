@@ -422,7 +422,7 @@ const FOODS = [
   {id:'matsu',   name:'松のや 玉子丼',                          short:'玉子丼',       note:'1食 約20g',     p:20,   unit:'食', slots:['b'], carb:true, lock:true, lockNote:'朝食のみ'},
   {id:'curry',   name:'レトルトカレー＋ご飯1合',                short:'カレー＋ご飯', note:'1食 約11g',     p:11,   unit:'食', slots:['l','d','b'], carb:true},
   {id:'natto',   name:'納豆',                                   short:'納豆',         note:'1パック 約8.3g', p:8.3,  unit:'P',  slots:['b','d','l']},
-  {id:'tofu',    name:'豆腐 ミニパック',                         short:'豆腐',         note:'1個 約7.2g',    p:7.2,  unit:'個', slots:['b','d','l']},
+  {id:'tofu',    name:'豆腐',                                   short:'豆腐',         note:'1パック（150g） 約7.2g', p:7.2, unit:'P', slots:['b','d','l']},
   {id:'chicken', name:'ほぐしサラダチキン',                      short:'サラダチキン', note:'1パック 約30.3g', p:30.3, unit:'P',  slots:['l','d','b']},
   {id:'tuna',    name:'ツナ缶',                                 short:'ツナ缶',       note:'1缶 約12.7g',   p:12.7, unit:'缶', slots:['l','d','b']},
   {id:'saba',    name:'サバ缶',                                 short:'サバ缶',       note:'1缶 約16.7g',   p:16.7, unit:'缶', slots:['d','l','b']},
@@ -752,8 +752,8 @@ function render(opts){
   }else if(lack > 0){
     $('oSavas').innerHTML = `ザバスは不要です<span style="font-size:1rem">（不足 ${lack}g）</span>`;
     $('oSavasSub').innerHTML = (st.liqP > 0
-      ? `1回分（スプーン1杯＋${liqName}${st.liquidMl}ml＝約${r1(SPOON_G + st.liqP)}g）を飲むと逆に摂りすぎになります。豆腐ミニパックなど少量の食品で調整してください。`
-      : `残り ${lack}g は少量なので、豆腐ミニパックなどの食品で調整するほうが確実です。`) +
+      ? `1回分（スプーン1杯＋${liqName}${st.liquidMl}ml＝約${r1(SPOON_G + st.liqP)}g）を飲むと逆に摂りすぎになります。${label('egg', 1)}など少量の食品で調整してください。`
+      : `残り ${lack}g は少量なので、${label('egg', 1)}などの食品で調整するほうが確実です。`) +
       (liquidCutSuggestion(st, lack) ? `<br>${liquidCutSuggestion(st, lack)}` : '');
   }else{
     $('oSavas').innerHTML = 'ザバスの追加摂取は不要です 👍';
