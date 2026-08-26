@@ -731,12 +731,17 @@ function render(opts){
       (toFoodG > 0
         ? `<b> 残り ${toFoodG}g は食事で補ってください。</b>`
         : sv.overG > 0 ? `（${sv.overG}g 多めですが誤差の範囲です）` : '（過不足なし）') +
+      // 上限に張り付いている間は杯数が動かないため、その理由を目立つ位置に出す
+      (capBinds
+        ? `<br><b>この杯数は上限（目標の${Math.round(st.savasShare * 100)}% ＝ ${savasCap}g）に張り付いています。</b>` +
+          `食事を増やしてもすぐには減らず、まず上の「残り」が減っていきます。` +
+          `不足が ${savasCap}g を下回ると杯数も減ります。`
+        : '') +
       // なぜこの量・この回数になったのかを必ず説明する
       `<br><small>※ ` +
       (capBinds
-        ? `ザバスで賄うのは1日の目標の${Math.round(st.savasShare * 100)}%（${savasCap}g）までとしています。` +
-          `不足 ${lack}g の全量を粉で摂ると食事からのビタミン・ミネラル・食物繊維が不足するためです。` +
-          `この上限は「① 基本設定」で変更できます。`
+        ? `不足 ${lack}g の全量を粉で摂ると食事からのビタミン・ミネラル・食物繊維が不足するため、上限を設けています。` +
+          `上限は「① 基本設定」で変更できます（100%にすると不足の全量をザバスで補います）。`
         : '') +
       (sv.sessions.length > 1
         ? `1回で摂れるのは最大 <b>${sv.maxSingleG}g</b>（1回${MAX_PER_SERVE}杯まで／吸収上限${ABSORB_CAP}g）。` +
@@ -894,12 +899,12 @@ function distributeFoods(st, mealTargets){
 }
 
 /* 各食事の過不足に応じた一言 ＋ 食べる順番の注意 */
-function mealAdvice(bin, target){
+function mealAdvice(bin, target, st){
   const d = r1(target - bin.total);
   let msg;
   if(d >= 5){
     msg = `<b>目安まで あと約${d}g。</b>` +
-          `${suggestFoods(d)} を足すと届きます。`;
+          `${suggestFoods(d, st)} を足すと届きます。`;
   }else if(d <= -5){
     msg = (bin.locked && bin.locked.length)
       ? `目安より約${r1(-d)}g多めですが、<b>${bin.locked.join('・')}</b>はこの時間帯にしか摂れないため、そのままで構いません。その分、他の時間帯を軽めに調整してください。`
@@ -946,7 +951,7 @@ function renderSchedule(st, ex, target, sv){
   const meal = (bin, targetG, tail) => empty
     ? `<b>「② 今日の食事」が未入力です。</b>食べたもの（納豆・豆腐・サラダチキンなど）を入力すると、ここに ${targetG}g 分の配分が自動表示されます。`
     : (bin.items.length
-        ? `<b>${bin.label}</b> ＝ 合計 <b>${bin.total}g</b><br>${mealAdvice(bin, targetG)}${tail}`
+        ? `<b>${bin.label}</b> ＝ 合計 <b>${bin.total}g</b><br>${mealAdvice(bin, targetG, st)}${tail}`
         : `今日の入力分はすべて他の時間帯に配分されました。ここで摂るなら ${targetG}g 前後を目安に。${tail}`);
 
   const rows = [
@@ -1015,7 +1020,15 @@ function renderAltFoods(toFoodG, sv, st){
       <h4>残り ${toFoodG}g を食事で補うなら
         <small>（上のザバス ${sv.spoons}杯・${sv.totalG}g を摂った前提）</small></h4>
       <div class="table-wrap"><table><tbody>${rows}</tbody></table></div>
-      <div class="combo"><b>組み合わせる場合の例：</b>${suggestFoods(toFoodG)}</div>
+      <div class="combo">
+        <b>組み合わせる場合の例：</b>${suggestFoods(toFoodG, st)}
+        <br><small>${(() => {
+          const used = [...usedCategories(st)];
+          return used.length
+            ? `今日すでに摂っている <b>${used.join('・')}</b> を避け、まだ摂っていないタンパク源から優先して選んでいます。`
+            : `まだタンパク源の入力がないため、肉・魚・大豆・卵・乳製品にばらして選んでいます。`;
+        })()}</small>
+      </div>
       <p class="hint" style="margin-bottom:10px">
         ※ 各行は<b>その食品だけで残りを補う場合</b>の数量です（残量を満たすよう切り上げ）。
         1単位あたり ${ALT_MIN_P}g 未満の食品（${hidden.map(f => f.short).join('・')}）は、
@@ -1051,22 +1064,44 @@ const foodById = id => FOODS.find(f => f.id === id);
 const pOf      = id => foodById(id).p;
 const label    = (id, n) => { const f = foodById(id); return `${f.short} ${n}${f.unit}（${r1(n * f.p)}g）`; };
 
-/* 指定した g 数を満たす食品の組み合わせを提案する（密度の高いものから使う） */
+/* 提案に使う食品と、そのタンパク源のカテゴリ。
+   同じ供給源に偏るとアミノ酸組成やビタミン・ミネラルが偏るため、
+   その日まだ摂っていないカテゴリを優先して提案する。 */
 const SUGGEST_ORDER = ['chicken','yogurt','saba','tuna','natto','tofu','egg'];
-function suggestFoods(g){
+const FOOD_CAT = {
+  chicken:'肉', saba:'魚', tuna:'魚', natto:'大豆', tofu:'大豆',
+  egg:'卵', yogurt:'乳製品', cheese:'乳製品', milk:'乳製品', chikuwa:'練り物'
+};
+
+/* その日すでに摂っているタンパク源のカテゴリ */
+function usedCategories(st){
+  const s = new Set();
+  if(st && st.foods) FOODS.forEach(f => { if(st.foods[f.id] > 0 && FOOD_CAT[f.id]) s.add(FOOD_CAT[f.id]); });
+  return s;
+}
+
+/* 指定した g 数を満たす食品の組み合わせを提案する。
+   1単位ずつ選び、まだ使っていないカテゴリを優先（同条件ならタンパク質密度が高い順）。 */
+function suggestFoods(g, st){
+  const pool = SUGGEST_ORDER.map(foodById).filter(Boolean);
+  const cats = usedCategories(st);
   const picks = [];
-  let rest = g;
-  SUGGEST_ORDER.forEach(id => {
-    const f = foodById(id);
-    if(!f) return;
-    const n = Math.floor(rest / f.p);
-    if(n > 0){ picks.push(label(id, n)); rest = r1(rest - n * f.p); }
-  });
-  if(rest > 0.05){                       // 端数は最も小さい単位で切り上げて必ず届かせる
-    const id = 'egg';
-    picks.push(label(id, Math.ceil(rest / pOf(id))));
+  let rest = g, guard = 0;
+
+  while(rest >= 0.05 && guard++ < 30){
+    const fit = pool.filter(f => f.p <= rest + 0.05);
+    if(!fit.length) break;
+    fit.sort((a, b) => (cats.has(FOOD_CAT[a.id]) - cats.has(FOOD_CAT[b.id])) || (b.p - a.p));
+    const f = fit[0];
+    picks.push(f.id);
+    cats.add(FOOD_CAT[f.id]);
+    rest = r1(rest - f.p);
   }
-  return picks.join(' ＋ ') || '—';
+  if(rest > 0.05) picks.push('egg');      // 端数は最小単位で切り上げ、必ず不足を満たす
+
+  const map = new Map();
+  picks.forEach(id => map.set(id, (map.get(id) || 0) + 1));
+  return [...map].map(([id, n]) => label(id, n)).join(' ＋ ') || '—';
 }
 
 /* 食事・栄養のポイント */
@@ -1099,7 +1134,7 @@ function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds){
         : sv.spoons > 0
           ? `ザバス ${sv.spoons}杯（合計 ${sv.totalG}g）では、不足 ${lack}g のうち ${more}g が残ります。`
           : `不足 ${lack}g に対しザバス1回分（スプーン1杯＋${st.liquid.name}で約${r1(SPOON_G + st.liqP)}g）は多すぎるため、食品で補うほうが正確です。`) +
-      `<br>例：<b>${suggestFoods(more)}</b> を「② 今日の食事」に追加すると、この指摘は消えます。` +
+      `<br>例：<b>${suggestFoods(more, st)}</b> を「② 今日の食事」に追加すると、この指摘は消えます。` +
       (sv.spoons === 0 && liquidCutSuggestion(st, lack) ? `<br>${liquidCutSuggestion(st, lack)}` : '')]);
   }else if(lack > 0 && sv.spoons > 0){
     tips.push(['done',
