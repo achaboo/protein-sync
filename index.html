@@ -431,7 +431,7 @@ table.mini td.amt{width:auto;text-align:right}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-08-26.17';
+const APP_VERSION = '2026-08-26.18';
 
 const SPOON_G   = 6.5;                  // ザバス付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -483,7 +483,7 @@ const EXERCISES = [
   {id:'chest',    name:'チェストプレス',       w:20, r:15, s:3},
   {id:'shoulder', name:'ショルダープレス',     w:10, r:15, s:3},
   {id:'curl',     name:'バイセップスカール',   w:10, r:15, s:3},
-  {id:'dips',     name:'ディップス',           w:30, r:15, s:3}
+  {id:'dips',     name:'ディップス',           w:35, r:15, s:3}
 ];
 
 const $  = id => document.getElementById(id);
@@ -1406,6 +1406,9 @@ function updateLive(){
    ============================================================ */
 // v2：筋トレの初期重量を変更したため、旧データは読み込まずに新しい既定値から始める
 const KEY = 'savas-calc-v3';
+// EXERCISES の既定値（重量・回数・セット数）を変更したら上げる。
+// 保存済みの値が古い既定値のままにならないよう、番号が違えば筋トレの数値だけ復元せず既定値を使う。
+const DEFAULTS_VER = 2;
 const ALL_IDS = () => ['weight','baseFactor','meals','liquid','liquidMl','savasShare','walk','cycle','otherP']
   .concat(FOODS.map(f => 'f_' + f.id))
   .concat(EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]));
@@ -1416,7 +1419,7 @@ const DAILY_IDS = () => FOODS.map(f => 'f_' + f.id).concat(['otherP']);
 const todayKey  = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
 
 function save(){
-  const d = {v:{}, c:{}, date:todayKey()};
+  const d = {v:{}, c:{}, date:todayKey(), dv:DEFAULTS_VER};
   ALL_IDS().forEach(id => d.v[id] = $(id).value);
   EXERCISES.forEach(e => d.c[e.id] = $('c_' + e.id).checked);
   d.preferMilk = $('preferMilk').checked;
@@ -1435,9 +1438,18 @@ function load(){
   if(!sameDay) daily.forEach(id => { if($(id)) $(id).value = 0; });
   if(!d) return;
 
+  // 筋トレの既定値を更新した場合は、保存済みの重量・回数・セット数を復元せず新しい既定値を使う
+  const staleEx = d.dv !== DEFAULTS_VER;
+  const exIds   = EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]);
+  // ブラウザ側のフォーム値復元も打ち消すため、既定値を明示的に書き戻す
+  if(staleEx) EXERCISES.forEach(e => {
+    $('w_' + e.id).value = e.w; $('r_' + e.id).value = e.r; $('s_' + e.id).value = e.s;
+  });
+
   try{
     ALL_IDS().forEach(id => {
       if(!sameDay && daily.includes(id)) return;      // 日付が変わっていれば食事は復元しない
+      if(staleEx && exIds.includes(id)) return;       // 既定値が変わった筋トレの数値は復元しない
       if(d.v[id] !== undefined && $(id)) $(id).value = d.v[id];
     });
     EXERCISES.forEach(e => { if($('c_' + e.id)) $('c_' + e.id).checked = !!d.c[e.id]; });
