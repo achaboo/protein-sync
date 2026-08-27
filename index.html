@@ -255,7 +255,7 @@ table.mini td.amt{width:auto;text-align:right}
       </div>
       <div>
         <label for="baseFactor">基本係数（運動なしの日 / g per kg）</label>
-        <input type="number" inputmode="decimal" id="baseFactor" value="1.4" step="0.05" min="1" max="2.5">
+        <input type="number" inputmode="decimal" id="baseFactor" value="1.5" step="0.05" min="1" max="2.5">
       </div>
     </div>
     <p class="hint" id="baseNote"></p>
@@ -300,12 +300,12 @@ table.mini td.amt{width:auto;text-align:right}
             <td class="amt" id="bf12">-</td>
           </tr>
           <tr>
-            <td class="time">1.4<br><small>（初期値）</small></td>
+            <td class="time">1.4</td>
             <td>今の体重・筋肉量を維持できれば十分な時期。食が細く、食事量が落ちている日が続くとき。</td>
             <td class="amt" id="bf14">-</td>
           </tr>
           <tr>
-            <td class="time">1.5</td>
+            <td class="time">1.5<br><small>（初期値）</small></td>
             <td>週数回の筋トレを続けながら、筋肉量を維持〜微増させたい標準的な設定。迷ったらこの値のままで構いません。</td>
             <td class="amt" id="bf15">-</td>
           </tr>
@@ -431,7 +431,7 @@ table.mini td.amt{width:auto;text-align:right}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-08-26.18';
+const APP_VERSION = '2026-08-26.19';
 
 const SPOON_G   = 6.5;                  // ザバス付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -1406,9 +1406,11 @@ function updateLive(){
    ============================================================ */
 // v2：筋トレの初期重量を変更したため、旧データは読み込まずに新しい既定値から始める
 const KEY = 'savas-calc-v3';
-// EXERCISES の既定値（重量・回数・セット数）を変更したら上げる。
-// 保存済みの値が古い既定値のままにならないよう、番号が違えば筋トレの数値だけ復元せず既定値を使う。
-const DEFAULTS_VER = 2;
+// 入力欄の既定値を変更したら上げる。番号が違う保存データでは、
+// 下記の欄だけ復元せず新しい既定値に戻す（体重や食事回数などの他の設定は保持）。
+const DEFAULTS_VER = 3;
+const RESET_IDS = () =>
+  EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]).concat(['baseFactor']);
 const ALL_IDS = () => ['weight','baseFactor','meals','liquid','liquidMl','savasShare','walk','cycle','otherP']
   .concat(FOODS.map(f => 'f_' + f.id))
   .concat(EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]));
@@ -1438,18 +1440,16 @@ function load(){
   if(!sameDay) daily.forEach(id => { if($(id)) $(id).value = 0; });
   if(!d) return;
 
-  // 筋トレの既定値を更新した場合は、保存済みの重量・回数・セット数を復元せず新しい既定値を使う
+  // 既定値を更新した欄は、保存済みの値を復元せず新しい既定値を使う
   const staleEx = d.dv !== DEFAULTS_VER;
-  const exIds   = EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]);
+  const exIds   = RESET_IDS();
   // ブラウザ側のフォーム値復元も打ち消すため、既定値を明示的に書き戻す
-  if(staleEx) EXERCISES.forEach(e => {
-    $('w_' + e.id).value = e.w; $('r_' + e.id).value = e.r; $('s_' + e.id).value = e.s;
-  });
+  if(staleEx) exIds.forEach(id => { const el = $(id); if(el) el.value = el.defaultValue; });
 
   try{
     ALL_IDS().forEach(id => {
       if(!sameDay && daily.includes(id)) return;      // 日付が変わっていれば食事は復元しない
-      if(staleEx && exIds.includes(id)) return;       // 既定値が変わった筋トレの数値は復元しない
+      if(staleEx && exIds.includes(id)) return;       // 既定値が変わった欄は復元しない
       if(d.v[id] !== undefined && $(id)) $(id).value = d.v[id];
     });
     EXERCISES.forEach(e => { if($('c_' + e.id)) $('c_' + e.id).checked = !!d.c[e.id]; });
