@@ -36,9 +36,9 @@
    ・溶かす液体（①で選択）にもタンパク質があるため、飲む回数分を加算して計算します。
        水 0g / 低脂肪乳 3.8g / 普通牛乳 3.3g / 無調整豆乳 3.6g / 調製豆乳 3.2g（いずれも 100ml あたり）
        初期値は「低脂肪乳 250ml」（＝1回あたり 約9.5g が加算されます）。
-   ・食品のタンパク質量はスクリプト内の FOODS で一元管理しています（玉子丼20g、
-     カレー+ご飯11g、サラダチキン30.3g、ギリシャヨーグルト25g、サバ缶16.7g、ツナ缶12.7g、
-     納豆8.3g、豆腐7.2g、ゆで卵6g、低脂肪乳1杯5.7g など）。
+   ・食品のタンパク質量はスクリプト内の FOODS で一元管理しています（サラダチキン30.3g、
+     サバ缶16.7g、ツナ缶12.7g、ご飯1合9g、納豆8.3g、豆腐7.2g、卵6g、チーズ3.1g、
+     ちくわ2.2g、ミックスサラダ2g、バナナ1g）。
    ※数値は目安です。商品リニューアル等で変わる場合は FOODS の p の値を修正すれば、
      入力欄・計算・スケジュール・早見表のすべてに反映されます。
 ================================================================================
@@ -431,7 +431,7 @@ table.mini td.amt{width:auto;text-align:right}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-08-26.20';
+const APP_VERSION = '2026-08-26.21';
 
 const SPOON_G   = 6.5;                  // ザバス付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -441,28 +441,24 @@ const SERVE_G   = SPOON_G * PER_SERVE;  // 1回 = 19.5g
 //   p     : 1単位あたりのタンパク質 g
 //   short : スケジュール表での短縮表示名
 //   slots : 割り当てたい時間帯の優先順（b=朝食 / l=昼食 / d=夕食）
-//   carb  : 糖質が多く、血糖値が上がりやすい食品（先にキャベツを食べたい対象）
+//   carb  : 糖質が多く、血糖値が上がりやすい食品（先に野菜を食べたい対象）
 //   first : 食事の最初に食べる食品（ベジファースト用。糖質メニューのある食事へ優先配分）
-//   lock  : true なら slots に挙げた時間帯「以外」には絶対に配分しない（例：玉子丼は昼食のみ）
+//   lock  : true なら slots に挙げた時間帯「以外」には絶対に配分しない
 //   staple: ご飯もの（主食）。1食につき1つまでしか配分しない
 //   max   : 1日に入力できる上限（超える値は入力欄側で切り詰める）
 //   limitNote: 入力欄と早見表に添える制限の注記（時間帯の固定・1日の上限など）
 const FOODS = [
-  {id:'matsu',   name:'松のや 玉子丼',                          short:'玉子丼',       note:'1食 約20g',     p:20,   unit:'食', slots:['l'], carb:true, lock:true, limitNote:'昼食のみ・1日1食まで', staple:true, max:1},
-  {id:'curry',   name:'レトルトカレー＋ご飯1合',                short:'カレー＋ご飯', note:'1食 約11g',     p:11,   unit:'食', slots:['l','d','b'], carb:true, staple:true, max:3, limitNote:'1日3食まで'},
-  {id:'natto',   name:'納豆',                                   short:'納豆',         note:'1パック 約8.3g', p:8.3,  unit:'P',  slots:['b','d','l']},
-  {id:'tofu',    name:'豆腐',                                   short:'豆腐',         note:'1パック（150g） 約7.2g', p:7.2, unit:'P', slots:['b','d','l']},
-  {id:'chicken', name:'ほぐしサラダチキン',                      short:'サラダチキン', note:'1パック 約30.3g', p:30.3, unit:'P',  slots:['l','d','b']},
-  {id:'tuna',    name:'ツナ缶',                                 short:'ツナ缶',       note:'1缶 約12.7g',   p:12.7, unit:'缶', slots:['l','d','b']},
-  {id:'saba',    name:'サバ缶',                                 short:'サバ缶',       note:'1缶 約16.7g',   p:16.7, unit:'缶', slots:['d','l','b']},
-  {id:'yogurt',  name:'ギリシャヨーグルト',                      short:'ヨーグルト',   note:'1個 約25g',     p:25,   unit:'個', slots:['b','d','l']},
-  {id:'egg',     name:'ゆで卵',                                 short:'ゆで卵',       note:'1個 約6g',      p:6,    unit:'個', slots:['b','l','d']},
-  {id:'milk',    name:'低脂肪乳（コップ1杯 200ml）',             short:'低脂肪乳',     note:'1杯 約5.7g ／ ザバスに使う分は除く', p:5.7, unit:'杯', slots:['b','l','d']},
-  {id:'chikuwa', name:'ちくわ',                                 short:'ちくわ',       note:'1本 約2.2g',    p:2.2,  unit:'本', slots:['l','d','b']},
-  {id:'cheese',  name:'プロセスチーズ',                          short:'チーズ',       note:'1個 約3.1g',    p:3.1,  unit:'個', slots:['b','l','d']},
-  {id:'miso',    name:'みそ汁',                                 short:'みそ汁',       note:'1杯 約1.4g',    p:1.4,  unit:'杯', slots:['l'], lock:true, limitNote:'昼食のみ'},
-  {id:'korokke', name:'コロッケ',                               short:'コロッケ',     note:'1個 約2.2g',    p:2.2,  unit:'個', slots:['l'], carb:true, lock:true, limitNote:'昼食のみ'},
-  {id:'cabbage', name:'千切りキャベツ（150g 1袋）',              short:'千切りキャベツ', note:'1袋 約2.0g（食物繊維 約2.7g）', p:2.0, unit:'袋', slots:['l','d','b'], first:true}
+  {id:'rice',    name:'ご飯（1合）',        short:'ご飯',         note:'1合 約9g',      p:9,    unit:'合', slots:['l','d','b'], carb:true, staple:true},
+  {id:'natto',   name:'納豆',               short:'納豆',         note:'1パック 約8.3g', p:8.3,  unit:'P',  slots:['b','d','l']},
+  {id:'tofu',    name:'豆腐',               short:'豆腐',         note:'1パック（150g） 約7.2g', p:7.2, unit:'P', slots:['b','d','l']},
+  {id:'chicken', name:'サラダチキン',       short:'サラダチキン', note:'1パック 約30.3g', p:30.3, unit:'P',  slots:['l','d','b']},
+  {id:'tuna',    name:'ツナ缶',             short:'ツナ缶',       note:'1缶 約12.7g',   p:12.7, unit:'缶', slots:['l','d','b']},
+  {id:'saba',    name:'サバ缶',             short:'サバ缶',       note:'1缶 約16.7g',   p:16.7, unit:'缶', slots:['d','l','b']},
+  {id:'egg',     name:'卵',                 short:'卵',           note:'1個 約6g',      p:6,    unit:'個', slots:['b','l','d']},
+  {id:'chikuwa', name:'ちくわ',             short:'ちくわ',       note:'1本 約2.2g',    p:2.2,  unit:'本', slots:['l','d','b']},
+  {id:'cheese',  name:'プロセスチーズ',      short:'チーズ',       note:'1個 約3.1g',    p:3.1,  unit:'個', slots:['b','l','d']},
+  {id:'banana',  name:'バナナ',             short:'バナナ',       note:'1本 約1g',      p:1,    unit:'本', slots:['b','l','d']},
+  {id:'salad',   name:'ミックスサラダ',      short:'ミックスサラダ', note:'1袋 約2g',    p:2,    unit:'袋', slots:['l','d','b'], first:true}
 ];
 
 // ザバスを溶かす液体（p100: 100ml あたりのタンパク質 g）
@@ -861,8 +857,8 @@ function distributeFoods(st, mealTargets, planIds){
   const mapSlots = s => [...new Set(s.map(x => (st.skipB && x === 'b') ? 'l' : x))];
   const units = [];
 
-  const firstUnits  = [];  // 千切りキャベツなど「最初に食べる」もの。他の配分が済んでから割り当てる
-  const lockedUnits = [];  // 玉子丼など時間帯が固定された食品。最初に枠を確保する
+  const firstUnits  = [];  // ミックスサラダなど「最初に食べる」もの。他の配分が済んでから割り当てる
+  const lockedUnits = [];  // 時間帯が固定された食品。最初に枠を確保する
 
   FOODS.forEach(f => {
     const q = Math.round(st.foods[f.id]);
@@ -890,7 +886,7 @@ function distributeFoods(st, mealTargets, planIds){
   const gap  = s => mealTargets[s] - bins[s].total - bins[s].addTotal;
   const put  = (s, u) => { bins[s].items.push(u); bins[s].total = r1(bins[s].total + u.g); };
 
-  // ご飯もの（玉子丼・カレー＋ご飯）は1食につき1つまで。
+  // ご飯もの（主食）は1食につき1つまで。
   // 2つ一度には食べられないため、置けない分は配分せず注意として表示する。
   const unplaced  = [];
   const stapleOk  = (s, u) => !u.staple || !bins[s].items.some(x => x.staple);
@@ -924,7 +920,7 @@ function distributeFoods(st, mealTargets, planIds){
   const ORDER = st.skipB ? ['l','d'] : ['b','l','d'];
   const hasCarb = s => bins[s].items.some(u => u.carb);
 
-  // 千切りキャベツは「糖質メニューがあってまだキャベツが無い枠」を最優先で埋める
+  // 最初に食べる野菜は「糖質メニューがあってまだ野菜が無い枠」を最優先で埋める
   firstUnits.forEach(u => {
     const hasFirst = s => bins[s].items.some(x => x.first);
     let best = ORDER.filter(s => hasCarb(s) && !hasFirst(s))[0]
@@ -983,12 +979,14 @@ function distributeFoods(st, mealTargets, planIds){
 
 /* 食べる順番の注意。実際に最初に食べるものなので、内容欄の先頭に置く */
 function orderNote(bin){
+  const veg = FOODS.find(f => f.first);
+  if(!veg) return '';
   if(bin.first){
-    return `<span class="order"><b>まず、下線の千切りキャベツから。</b>` +
+    return `<span class="order"><b>まず、下線の${veg.short}から。</b>` +
            `食べ終えてから他のものへ進んでください。</span>`;
   }
   if(bin.carb){
-    return `<span class="order"><b>まず、千切りキャベツ1袋から。</b>` +
+    return `<span class="order"><b>まず、${veg.short}1${veg.unit}から。</b>` +
            `この食事には糖質メニューがあります。先に食べることで血糖値の急上昇を抑えられます。</span>`;
   }
   return '';
@@ -1101,7 +1099,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
       cup(sSnack),
       sSnack
         ? '昼食から夕食まで時間が空くタイミング。血中アミノ酸濃度を切らさないためにザバス2回目を入れます。'
-        : '不足がなければ不要。摂るならナッツや無糖ヨーグルトで軽めに。'
+        : '不足がなければ不要。摂るならナッツやチーズで軽めに。'
     ],
     [
       '夕食',
@@ -1136,7 +1134,7 @@ function renderAltFoods(toFoodG, sv, st, plan){
   const box = $('altFoods');
   if(toFoodG <= 0){ box.innerHTML = ''; return; }
 
-  // 千切りキャベツ（血糖値対策の位置づけ）と、単品では非現実的な低密度の食品は除外する
+  // 最初に食べる野菜（血糖値対策の位置づけ）と、単品では非現実的な低密度の食品は除外する
   const ALT_MIN_P = 5;
   const shown = FOODS.filter(f => !f.first && f.p >= ALT_MIN_P);
   const hidden = FOODS.filter(f => !f.first && f.p < ALT_MIN_P);
@@ -1201,10 +1199,10 @@ const label    = (id, n) => { const f = foodById(id); return `${f.short} ${n}${f
 /* 提案に使う食品と、そのタンパク源のカテゴリ。
    同じ供給源に偏るとアミノ酸組成やビタミン・ミネラルが偏るため、
    その日まだ摂っていないカテゴリを優先して提案する。 */
-const SUGGEST_ORDER = ['chicken','yogurt','saba','tuna','natto','tofu','egg'];
+const SUGGEST_ORDER = ['chicken','saba','tuna','natto','tofu','egg'];
 const FOOD_CAT = {
   chicken:'肉', saba:'魚', tuna:'魚', natto:'大豆', tofu:'大豆',
-  egg:'卵', yogurt:'乳製品', cheese:'乳製品', milk:'乳製品', chikuwa:'練り物'
+  egg:'卵', cheese:'乳製品', chikuwa:'練り物'
 };
 
 /* その日すでに摂っているタンパク源のカテゴリ */
@@ -1266,7 +1264,7 @@ function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, pl
     `に分散してください。まとめ摂りした余剰分は筋肉に回らず、エネルギーや脂肪として処理されるだけになります。` +
     (st.skipB ? `2食だと1食あたりが増えやすいので、超えた分はザバスの回に回すほうが無駄になりません。` : '')]);
 
-  tips.push(['', `<b>② 食べる順番を守る（ベジ／ソイファースト）。</b>ご飯・カレー・丼ものなど糖質を摂るときは、必ず先に<b>千切りキャベツ・サラダ・冷奴・納豆などの大豆製品</b>を食べてから。血糖値の急上昇（血糖値スパイク）を抑え、内臓脂肪の蓄積を防げます。特に「レトルトカレー＋ご飯1合」は糖質量が多いので、キャベツと大豆製品の先食べを徹底しましょう。`]);
+  tips.push(['', `<b>② 食べる順番を守る（ベジ／ソイファースト）。</b>ご飯など糖質を摂るときは、必ず先に<b>ミックスサラダ・冷奴・納豆などの大豆製品</b>を食べてから。血糖値の急上昇（血糖値スパイク）を抑え、内臓脂肪の蓄積を防げます。特に<b>ご飯1合</b>は糖質量が大きいので、サラダと大豆製品の先食べを徹底しましょう。`]);
 
   tips.push(['', `<b>③ 水分補給を十分に。</b>タンパク質の代謝では老廃物（尿素窒素）の排出に水が必要で、腎臓の負担軽減にもつながります。<b>1日 1.5〜2L</b>を目安に、運動中・運動後はこまめに。` +
     (st.liqP > 0
@@ -1328,7 +1326,7 @@ function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, pl
       `<b>エネルギーは運動量に比例して増えます</b>。ここが不足すると、せっかく摂ったタンパク質が` +
       `エネルギー源として使われ、筋肉の材料に回りません。<br>` +
       `運動の前後に <b>糖質 約${en.carbG}g（ご飯茶碗 約${(en.carbG / RICE_BOWL_CARB).toFixed(1)}杯分）</b>` +
-      `を補ってください。糖質を摂る際は、先に千切りキャベツを食べる順番を守れば血糖値の急上昇は抑えられます。`]);
+      `を補ってください。糖質を摂る際は、先にミックスサラダを食べる順番を守れば血糖値の急上昇は抑えられます。`]);
   }
 
   // 普段より極端に負荷が高い日の注意
