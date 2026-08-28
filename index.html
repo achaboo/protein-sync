@@ -26,7 +26,7 @@
    7. 入力内容はブラウザに自動保存され、次に開いたときに復元されます。ただし
       「② 今日の食事」はその日限りの入力なので、日付が変わると 0 に戻ります
       （同じ日のうちに開き直した場合は復元されます）。②の見出しにある
-      「すべて 0 に戻す」を押せば、設定はそのままで食事だけをクリアできます。
+      「食事をリセット」を押せば、設定はそのままで食事の入力だけを初期状態に戻せます。
       「入力をリセット」を押すと（確認ダイアログのあと）すべての入力が初期状態に戻り、
       保存内容も削除されます。
 
@@ -342,7 +342,7 @@ table.mini td.amt{width:auto;text-align:right}
 
   <!-- ② 食事 -->
   <section>
-    <h2>② 今日の食事<button type="button" id="clearFoods" class="mini-btn">すべて 0 に戻す</button></h2>
+    <h2>② 今日の食事<button type="button" id="clearFoods" class="mini-btn">食事をリセット</button></h2>
     <div id="foods"></div>
     <div class="row">
       <div class="name"><b>その他（自由入力）</b><small>上記以外で摂ったタンパク質の合計</small></div>
@@ -431,7 +431,7 @@ table.mini td.amt{width:auto;text-align:right}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-08-26.21';
+const APP_VERSION = '2026-08-26.22';
 
 const SPOON_G   = 6.5;                  // ザバス付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -444,20 +444,23 @@ const SERVE_G   = SPOON_G * PER_SERVE;  // 1回 = 19.5g
 //   carb  : 糖質が多く、血糖値が上がりやすい食品（先に野菜を食べたい対象）
 //   first : 食事の最初に食べる食品（ベジファースト用。糖質メニューのある食事へ優先配分）
 //   lock  : true なら slots に挙げた時間帯「以外」には絶対に配分しない
-//   staple: ご飯もの（主食）。1食につき1つまでしか配分しない
+//   group : 同じグループの「別の品目」は同じ時間帯に配分しない（例：サラダチキンとサバ缶）
+//   onePerSlot: 同じ品目でも1つの時間帯に1つまで（例：ご飯は1食1合）
+//   post  : 運動した日は「運動直後」の枠にだけ配分する（例：バナナ）
+//   autoPerMeal: 食事回数と同じ数を毎日の初期値にする（例：昼食と夕食で毎回ご飯1合）
 //   max   : 1日に入力できる上限（超える値は入力欄側で切り詰める）
 //   limitNote: 入力欄と早見表に添える制限の注記（時間帯の固定・1日の上限など）
 const FOODS = [
-  {id:'rice',    name:'ご飯（1合）',        short:'ご飯',         note:'1合 約9g',      p:9,    unit:'合', slots:['l','d','b'], carb:true, staple:true},
+  {id:'rice',    name:'ご飯（1合）',        short:'ご飯',         note:'1合 約9g ／ 昼食・夕食に毎回1合', p:9, unit:'合', slots:['l','d','b'], carb:true, group:'staple', onePerSlot:true, autoPerMeal:true},
   {id:'natto',   name:'納豆',               short:'納豆',         note:'1パック 約8.3g', p:8.3,  unit:'P',  slots:['b','d','l']},
   {id:'tofu',    name:'豆腐',               short:'豆腐',         note:'1パック（150g） 約7.2g', p:7.2, unit:'P', slots:['b','d','l']},
-  {id:'chicken', name:'サラダチキン',       short:'サラダチキン', note:'1パック 約30.3g', p:30.3, unit:'P',  slots:['l','d','b']},
+  {id:'chicken', name:'サラダチキン',       short:'サラダチキン', note:'1パック 約30.3g ／ サバ缶と同じ時間帯にしない', p:30.3, unit:'P', slots:['l','d','b'], group:'main'},
   {id:'tuna',    name:'ツナ缶',             short:'ツナ缶',       note:'1缶 約12.7g',   p:12.7, unit:'缶', slots:['l','d','b']},
-  {id:'saba',    name:'サバ缶',             short:'サバ缶',       note:'1缶 約16.7g',   p:16.7, unit:'缶', slots:['d','l','b']},
+  {id:'saba',    name:'サバ缶',             short:'サバ缶',       note:'1缶 約16.7g ／ サラダチキンと同じ時間帯にしない', p:16.7, unit:'缶', slots:['d','l','b'], group:'main'},
   {id:'egg',     name:'卵',                 short:'卵',           note:'1個 約6g',      p:6,    unit:'個', slots:['b','l','d']},
   {id:'chikuwa', name:'ちくわ',             short:'ちくわ',       note:'1本 約2.2g',    p:2.2,  unit:'本', slots:['l','d','b']},
   {id:'cheese',  name:'プロセスチーズ',      short:'チーズ',       note:'1個 約3.1g',    p:3.1,  unit:'個', slots:['b','l','d']},
-  {id:'banana',  name:'バナナ',             short:'バナナ',       note:'1本 約1g',      p:1,    unit:'本', slots:['b','l','d']},
+  {id:'banana',  name:'バナナ',             short:'バナナ',       note:'1本 約1g ／ 運動直後に摂る', p:1, unit:'本', slots:['b','l','d'], post:true},
   {id:'salad',   name:'ミックスサラダ',      short:'ミックスサラダ', note:'1袋 約2g',    p:2,    unit:'袋', slots:['l','d','b'], first:true}
 ];
 
@@ -852,9 +855,11 @@ function render(opts){
    1単位ずつに分解し、タンパク質の多いものから
    「その食品に適した時間帯」のうち最も不足している枠へ入れていく。
    ------------------------------------------------------------ */
-function distributeFoods(st, mealTargets, planIds){
+function distributeFoods(st, mealTargets, planIds, trained){
   // 朝食を摂らない設定のときは、朝食枠に割り当てようとする食品を昼食に回す
   const mapSlots = s => [...new Set(s.map(x => (st.skipB && x === 'b') ? 'l' : x))];
+  // 配分先として使える食事の枠（p＝運動直後は食事ではないので含めない）
+  const ORDER = st.skipB ? ['l','d'] : ['b','l','d'];
   const units = [];
 
   const firstUnits  = [];  // ミックスサラダなど「最初に食べる」もの。他の配分が済んでから割り当てる
@@ -864,8 +869,11 @@ function distributeFoods(st, mealTargets, planIds){
     const q = Math.round(st.foods[f.id]);
     for(let i = 0; i < q; i++){
       const u = {key:f.id, short:f.short, unit:f.unit, g:f.p,
-                 slots:mapSlots(f.slots), carb:f.carb, first:f.first, lock:f.lock, staple:f.staple};
-      (f.first ? firstUnits : f.lock ? lockedUnits : units).push(u);
+                 slots:mapSlots(f.slots), carb:f.carb, first:f.first, lock:f.lock,
+                 group:f.group, onePerSlot:f.onePerSlot};
+      // 運動した日は「運動直後」の枠にだけ入れる食品（他の枠には回さない）
+      if(f.post && trained){ u.slots = ['p']; u.lock = true; }
+      (f.first ? firstUnits : (u.lock ? lockedUnits : units)).push(u);
     }
   });
 
@@ -882,14 +890,22 @@ function distributeFoods(st, mealTargets, planIds){
   units.sort((a, b) => b.g - a.g);
 
   const mk   = () => ({items:[], total:0, adds:[], addTotal:0});
-  const bins = {b:mk(), l:mk(), d:mk()};
+  const bins = {b:mk(), l:mk(), d:mk(), p:mk()};   // p = 運動直後の枠
   const gap  = s => mealTargets[s] - bins[s].total - bins[s].addTotal;
   const put  = (s, u) => { bins[s].items.push(u); bins[s].total = r1(bins[s].total + u.g); };
 
-  // ご飯もの（主食）は1食につき1つまで。
-  // 2つ一度には食べられないため、置けない分は配分せず注意として表示する。
+  // 同じグループの品目が同じ時間帯に重ならないようにする。
+  //   onePerSlot（ご飯）… 同じ品目でも1枠に1つまで
+  //   それ以外（サラダチキン／サバ缶）… 別の品目とは同席させない（同じ品目の複数はOK）
+  // 置けない分は配分せず、注意として表示する。
   const unplaced  = [];
-  const stapleOk  = (s, u) => !u.staple || !bins[s].items.some(x => x.staple);
+  const stapleOk  = (s, u) => {
+    if(!u.group) return true;
+    const same = bins[s].items.filter(x => x.group === u.group);
+    if(!same.length) return true;
+    if(u.onePerSlot) return false;
+    return same.every(x => x.key === u.key);
+  };
 
   // 時間帯が固定された食品を先に配置する（指定枠以外へは絶対に回さない）
   lockedUnits.forEach(u => {
@@ -900,7 +916,7 @@ function distributeFoods(st, mealTargets, planIds){
 
   units.forEach(u => {
     const list = u.slots.filter(s => stapleOk(s, u));
-    if(u.staple && !list.length){ unplaced.push(u); return; }
+    if(u.group && !list.length){ unplaced.push(u); return; }
     const from = list.length ? list : u.slots;
     // 優先順位が下がるごとに 5g のペナルティ。ただし不足が大きい枠が優先される
     let best = from[0], bestScore = -Infinity;
@@ -908,16 +924,15 @@ function distributeFoods(st, mealTargets, planIds){
       const score = gap(s) - idx * 5;
       if(score > bestScore){ bestScore = score; best = s; }
     });
-    // 適した時間帯がすべて埋まっていれば、全体で最も余裕のある枠へ（主食の重複は避ける）
+    // 適した時間帯がすべて埋まっていれば、食事の枠の中で最も余裕のある枠へ（グループ制約は守る）
     if(gap(best) <= 0){
-      const all = ['b','l','d'].filter(s => stapleOk(s, u));
-      (all.length ? all : ['b','l','d']).forEach(s => { if(gap(s) > gap(best)) best = s; });
+      const all = ORDER.filter(s => stapleOk(s, u));
+      (all.length ? all : from).forEach(s => { if(gap(s) > gap(best)) best = s; });
     }
     put(best, u);
   });
 
   // 各枠に糖質メニューがあるかを判定
-  const ORDER = st.skipB ? ['l','d'] : ['b','l','d'];
   const hasCarb = s => bins[s].items.some(u => u.carb);
 
   // 最初に食べる野菜は「糖質メニューがあってまだ野菜が無い枠」を最優先で埋める
@@ -934,17 +949,26 @@ function distributeFoods(st, mealTargets, planIds){
   // ⑤で独立に提案すると④と品目が食い違い、買い物しづらくなるため。
   (planIds || []).map(id => {
     const f = foodById(id);
-    return {key:f.id, short:f.short, unit:f.unit, g:f.p, slots:mapSlots(f.slots)};
+    return {key:f.id, short:f.short, unit:f.unit, g:f.p, slots:mapSlots(f.slots),
+            group:f.group, onePerSlot:f.onePerSlot};
   }).sort((a, b) => b.g - a.g).forEach(u => {
-    let best = u.slots[0], bestScore = -Infinity;
-    u.slots.forEach((s, idx) => {
-      if(!ORDER.includes(s)) return;
+    // 追加分もグループ制約を守る（すでに配分済みの食品・追加分の両方を見る）
+    const okFor = s => {
+      if(!ORDER.includes(s)) return false;
+      if(!u.group) return true;
+      const same = bins[s].items.concat(bins[s].adds).filter(x => x.group === u.group);
+      if(!same.length) return true;
+      if(u.onePerSlot) return false;
+      return same.every(x => x.key === u.key);
+    };
+    const cand = ORDER.filter(okFor);
+    const from = cand.length ? cand : ORDER;
+    let best = from[0], bestScore = -Infinity;
+    u.slots.filter(s => from.includes(s)).forEach((s, idx) => {
       const score = gap(s) - idx * 5;
       if(score > bestScore){ bestScore = score; best = s; }
     });
-    if(!ORDER.includes(best) || gap(best) <= 0){
-      ORDER.forEach(s => { if(gap(s) > gap(best) || !ORDER.includes(best)) best = s; });
-    }
+    if(gap(best) <= 0) from.forEach(s => { if(gap(s) > gap(best)) best = s; });
     bins[best].adds.push(u);
     bins[best].addTotal = r1(bins[best].addTotal + u.g);
   });
@@ -1047,7 +1071,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   const liqText = sMorning ? liqOf(sMorning) : `${st.liquid.name} ${st.liquidMl}ml`;
 
   // 「② 今日の食事」の入力を朝・昼・晩へ自動配分
-  const bins  = distributeFoods(st, {b:mBreak, l:mLunch, d:mDinner}, plan);
+  const bins  = distributeFoods(st, {b:mBreak, l:mLunch, d:mDinner, p:0}, plan, trained);
   const empty = !bins.b.items.length && !bins.l.items.length && !bins.d.items.length;
 
   // 各食事行の「内容・ポイント」：入力の配分と、④で決めた追加分を示す
@@ -1073,7 +1097,12 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
           (sMorning && !sMorning.milk
             ? `<br>この回は<b>水</b>にしています。牛乳の脂質は胃の内容物の排出を遅らせるため、` +
               `運動直後は水のほうがアミノ酸が早く血中に届きます。`
-            : `<br>この回に水が使えると吸収がより速くなりますが、目標量に合わせた結果この配分になっています。`)
+            : `<br>この回に水が使えると吸収がより速くなりますが、目標量に合わせた結果この配分になっています。`) +
+          (bins.p.items.length
+            ? `<br><b>あわせて ${bins.p.label}</b>。` +
+              `糖質を補うことでタンパク質がエネルギーに回されるのを防げます。`
+            : '') +
+          `<br><small>この時間帯はザバスと上記のみで、他のものは摂りません。</small>`
         : '休養日でも睡眠中に筋肉の分解は進んでいます。不足があれば朝一番で補給を。'
     ],
     st.skipB
@@ -1215,7 +1244,16 @@ function usedCategories(st){
 /* 指定した g 数を満たす食品の組み合わせを提案する。
    1単位ずつ選び、まだ使っていないカテゴリを優先（同条件ならタンパク質密度が高い順）。 */
 function suggestPlan(g, st){
-  const pool = SUGGEST_ORDER.map(foodById).filter(Boolean);
+  // 同じグループの別品目がすでに全ての食事枠を埋めている場合、その食品は置き場所が無いので提案しない
+  //（例：サラダチキンを2P摂る2食の日は、サバ缶を提案してもどちらかと同席してしまう）
+  const slotCount = (st && st.meals === 3) ? 3 : 2;
+  const blocked = f => {
+    if(!f.group || !st || !st.foods) return false;
+    const others = FOODS.filter(x => x.group === f.group && x.id !== f.id)
+                        .reduce((a, x) => a + Math.round(st.foods[x.id] || 0), 0);
+    return others >= slotCount;
+  };
+  const pool = SUGGEST_ORDER.map(foodById).filter(f => f && !blocked(f));
   const cats = usedCategories(st);
   const picks = [];
   let rest = g, guard = 0;
@@ -1427,6 +1465,13 @@ const ALL_IDS = () => ['weight','baseFactor','meals','liquid','liquidMl','savasS
 // 「② 今日の食事」はその日限りの入力。日付が変わったら復元せず 0 から始める。
 // （同じ日のうちに開き直した場合は、入力し直さずに済むよう復元する）
 const DAILY_IDS = () => FOODS.map(f => 'f_' + f.id).concat(['otherP']);
+
+// 毎日の初期値。autoPerMeal の食品（ご飯）は「昼食と夕食で毎回1合」なので食事回数と同じ数にする。
+const dailyDefault = id => {
+  const f = FOODS.find(x => 'f_' + x.id === id);
+  return (f && f.autoPerMeal) ? (parseInt($('meals').value, 10) === 3 ? 3 : 2) : 0;
+};
+const applyDailyDefaults = () => DAILY_IDS().forEach(id => { if($(id)) $(id).value = dailyDefault(id); });
 const todayKey  = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
 
 function save(){
@@ -1446,7 +1491,7 @@ function load(){
 
   // 当日の入力でなければ食事欄を明示的に 0 に戻す。
   // ブラウザ側のフォーム値復元（リロードや「戻る」操作）で前日の値が残るのを防ぐため。
-  if(!sameDay) daily.forEach(id => { if($(id)) $(id).value = 0; });
+  if(!sameDay) applyDailyDefaults();
   if(!d) return;
 
   // 既定値を更新した欄は、保存済みの値を復元せず新しい既定値を使う
@@ -1513,7 +1558,7 @@ function copySettingsLink(){
 
 /* 「② 今日の食事」だけを 0 に戻す（設定はそのまま） */
 function clearFoods(){
-  DAILY_IDS().forEach(id => { if($(id)) $(id).value = 0; });
+  applyDailyDefaults();          // ご飯は「毎回1合」なので食事回数分が入った状態に戻す
   onInputChanged();
 }
 
@@ -1528,6 +1573,14 @@ document.addEventListener('change', onInputChanged);
 
 $('calc').addEventListener('click', () => render({scroll:true}));
 $('clearFoods').addEventListener('click', clearFoods);
+
+// 食事回数を変えたら、毎回1合のご飯もその数に合わせる
+$('meals').addEventListener('change', () => {
+  FOODS.filter(f => f.autoPerMeal).forEach(f => {
+    $('f_' + f.id).value = dailyDefault('f_' + f.id);
+  });
+  onInputChanged();
+});
 $('copyLink').addEventListener('click', copySettingsLink);
 
 $('reset').addEventListener('click', () => {
