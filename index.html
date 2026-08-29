@@ -37,7 +37,7 @@
      運動していない日はザバスを摂らず、目標分はすべて食事から確保します。
    ・食品のタンパク質量はスクリプト内の FOODS で一元管理しています（サラダチキン30.3g、
      サバ缶16.7g、ツナ缶12.7g、ご飯1合9g、納豆8.3g、豆腐7.2g、卵6g、チーズ3.1g、
-     ちくわ2.2g、ミックスサラダ2g、バナナ1g）。
+     ミックスサラダ2g、バナナ1g）。
    ※数値は目安です。商品リニューアル等で変わる場合は FOODS の p の値を修正すれば、
      入力欄・計算・スケジュール・早見表のすべてに反映されます。
 ================================================================================
@@ -416,7 +416,7 @@ table.mini td.amt{width:auto;text-align:right}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-08-26.26';
+const APP_VERSION = '2026-08-26.27';
 
 const SPOON_G   = 6.5;                  // ザバス付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -443,7 +443,6 @@ const FOODS = [
   {id:'tuna',    name:'ツナ缶',             short:'ツナ缶',       note:'1缶 約12.7g',          price:133, p:12.7, unit:'缶', slots:['l','d','b']},
   {id:'saba',    name:'サバ缶',             short:'サバ缶',       note:'1缶 約16.7g',          price:268, ruleNote:'サラダチキンと同じ時間帯にしない', p:16.7, unit:'缶', slots:['d','l','b'], group:'main'},
   {id:'egg',     name:'卵',                 short:'卵',           note:'1個 約6g',             price:53,  p:6,    unit:'個', slots:['b','l','d']},
-  {id:'chikuwa', name:'ちくわ',             short:'ちくわ',       note:'1本 約2.2g',           price:106, p:2.2,  unit:'本', slots:['l','d','b']},
   {id:'cheese',  name:'プロセスチーズ',      short:'チーズ',       note:'1個 約3.1g',           price:48,  p:3.1,  unit:'個', slots:['b','l','d']},
   {id:'banana',  name:'バナナ',             short:'バナナ',       note:'1本 約1g',             price:20,  ruleNote:'運動直後に必ず1本', p:1, unit:'本', slots:['b','l','d'], post:true, autoDaily:1},
   {id:'salad',   name:'ミックスサラダ',      short:'ミックスサラダ', note:'1袋 約2g',           price:106, p:2,    unit:'袋', slots:['l','d','b'], first:true}
@@ -1268,7 +1267,7 @@ const label    = (id, n) => { const f = foodById(id); return `${f.short} ${n}${f
 const SUGGEST_ORDER = ['chicken','saba','tuna','natto','tofu','egg'];
 const FOOD_CAT = {
   chicken:'肉', saba:'魚', tuna:'魚', natto:'大豆', tofu:'大豆',
-  egg:'卵', cheese:'乳製品', chikuwa:'練り物'
+  egg:'卵', cheese:'乳製品'
 };
 
 /* その日すでに摂っているタンパク源のカテゴリ */
