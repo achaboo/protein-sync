@@ -426,7 +426,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-08-26.31';
+const APP_VERSION = '2026-08-26.33';
 
 const SPOON_G   = 6.5;                  // ザバス付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -447,15 +447,15 @@ const SERVE_G   = SPOON_G * PER_SERVE;  // 1回 = 19.5g
 //   limitNote: 入力欄と早見表に添える制限の注記（時間帯の固定・1日の上限など）
 const FOODS = [
   {id:'rice',    name:'ご飯（1合）',        short:'ご飯',         note:'1合 約9g',            price:100, ruleNote:'昼食・夕食に毎回1合', p:9,    unit:'合', slots:['l','d','b'], carb:true, group:'staple', onePerSlot:true, autoPerMeal:true},
-  {id:'natto',   name:'納豆',               short:'納豆',         note:'1パック 約8.3g',       price:32,  p:8.3,  unit:'P',  slots:['b','d','l'], autoDaily:1},
-  {id:'tofu',    name:'豆腐',               short:'豆腐',         note:'1パック（150g） 約7.2g', price:35, p:7.2, unit:'P',  slots:['b','d','l'], autoDaily:1},
+  {id:'natto',   name:'納豆',               short:'納豆',         note:'1パック 約8.3g',       price:32,  p:8.3,  unit:'P',  slots:['b','d','l'], autoPerMeal:true},
+  {id:'tofu',    name:'豆腐',               short:'豆腐',         note:'1パック（150g） 約7.2g', price:35, p:7.2, unit:'P',  slots:['b','d','l'], autoPerMeal:true},
   {id:'chicken', name:'サラダチキン',       short:'サラダチキン', note:'1パック 約30.3g',      price:278, ruleNote:'サバ缶と同じ時間帯にしない', p:30.3, unit:'P', slots:['l','d','b'], group:'main'},
-  {id:'tuna',    name:'ツナ缶',             short:'ツナ缶',       note:'1缶 約12.7g',          price:133, p:12.7, unit:'缶', slots:['l','d','b']},
+  {id:'tuna',    name:'ツナ缶',             short:'ツナ缶',       note:'1缶 約12.7g',          price:133, p:12.7, unit:'缶', slots:['l','d','b'], autoPerMeal:true},
   {id:'saba',    name:'サバ缶',             short:'サバ缶',       note:'1缶 約16.7g',          price:268, ruleNote:'サラダチキンと同じ時間帯にしない', p:16.7, unit:'缶', slots:['d','l','b'], group:'main'},
-  {id:'egg',     name:'卵',                 short:'卵',           note:'1個 約6g',             price:53,  p:6,    unit:'個', slots:['b','l','d'], autoDaily:2},
+  {id:'egg',     name:'卵',                 short:'卵',           note:'1個 約6g',             price:53,  p:6,    unit:'個', slots:['b','l','d'], autoPerMeal:true},
   {id:'yogurt',  name:'無脂肪ヨーグルト（200g）', short:'ヨーグルト', note:'200g 約8g（カルシウム 約260mg）', price:70, p:8, unit:'杯', slots:['l','d','b']},
   {id:'banana',  name:'バナナ',             short:'バナナ',       note:'1本 約1g',             price:20,  ruleNote:'運動直後に必ず1本', p:1, unit:'本', slots:['b','l','d'], post:true, autoDaily:1},
-  {id:'salad',   name:'ミックスサラダ',      short:'ミックスサラダ', note:'1袋 約2g',           price:106, p:2,    unit:'袋', slots:['l','d','b'], first:true, autoDaily:1}
+  {id:'salad',   name:'ミックスサラダ',      short:'ミックスサラダ', note:'1袋 約2g',           price:106, p:2,    unit:'袋', slots:['l','d','b'], first:true, autoPerMeal:true}
 ];
 
 // ザバスは水のみで溶かす（乳類は摂らない前提）。水にタンパク質は含まれないため加算はない。
@@ -875,7 +875,9 @@ function distributeFoods(st, mealTargets, planIds, trained){
     for(let i = 0; i < q; i++){
       const u = {key:f.id, short:f.short, unit:f.unit, g:f.p,
                  slots:mapSlots(f.slots), carb:f.carb, first:f.first, lock:f.lock,
-                 group:f.group, onePerSlot:f.onePerSlot};
+                 group:f.group, onePerSlot:f.onePerSlot,
+                 // 「毎食1個」の品目は同じ食事に重ねず、各食事へ1つずつ配る
+                 perSlotMax:f.autoPerMeal ? 1 : 0};
       // 運動した日は「運動直後」の枠にだけ入れる食品（他の枠には回さない）
       if(f.post && trained){ u.slots = ['p']; u.lock = true; }
       (f.first ? firstUnits : (u.lock ? lockedUnits : units)).push(u);
@@ -919,24 +921,30 @@ function distributeFoods(st, mealTargets, planIds, trained){
     put(list.reduce((a, s) => gap(s) > gap(a) ? s : a, list[0]), u);
   });
 
+  // 「毎食1個」の品目がその枠にまだ入っていないか
+  const roomOk = (s, u) =>
+    !u.perSlotMax || bins[s].items.filter(x => x.key === u.key).length < u.perSlotMax;
+
   units.forEach(u => {
     const list = u.slots.filter(s => stapleOk(s, u));
     if(u.group && !list.length){ unplaced.push(u); return; }
+    // 毎食1個の品目は、まだ入っていない枠へ優先して配る（入力数が枠より多い場合は重ねる）
+    const spread = u.perSlotMax ? list.filter(s => roomOk(s, u)) : [];
     // 同じグループの品目は、すでに同じ品目が入っている枠にまとめる。
     // 散らすと別の品目（サバ缶など）の置き場所が無くなるため。
     const same = u.group
       ? list.filter(s => bins[s].items.some(x => x.group === u.group && x.key === u.key))
       : [];
-    const from = same.length ? same : (list.length ? list : u.slots);
+    const from = spread.length ? spread : (same.length ? same : (list.length ? list : u.slots));
     // 優先順位が下がるごとに 5g のペナルティ。ただし不足が大きい枠が優先される
     let best = from[0], bestScore = -Infinity;
     from.forEach((s, idx) => {
       const score = gap(s) - idx * 5;
       if(score > bestScore){ bestScore = score; best = s; }
     });
-    // 適した時間帯がすべて埋まっていれば、食事の枠の中で最も余裕のある枠へ（グループ制約は守る）
+    // 適した時間帯がすべて埋まっていれば、食事の枠の中で最も余裕のある枠へ（各制約は守る）
     if(gap(best) <= 0){
-      const all = ORDER.filter(s => stapleOk(s, u));
+      const all = ORDER.filter(s => stapleOk(s, u) && roomOk(s, u));
       (all.length ? all : from).forEach(s => { if(gap(s) > gap(best)) best = s; });
     }
     put(best, u);
@@ -1556,14 +1564,16 @@ function updateLive(){
 
   // 食事合計
   // 毎日の品目と、曜日ごとの型
-  const daily = FOODS.filter(f => f.autoDaily || f.autoPerMeal)
-    .map(f => `${f.short} ${f.autoPerMeal ? (st.meals === 3 ? 3 : 2) : f.autoDaily}${f.unit}`);
+  const perMeal = FOODS.filter(f => f.autoPerMeal).map(f => `${f.short} ${f.unit === '合' ? '1合' : '1' + f.unit}`);
+  const perDay  = FOODS.filter(f => f.autoDaily).map(f => `${f.short} ${f.autoDaily}${f.unit}`);
   $('dailyNote').innerHTML =
-    `<b>毎日：</b>${daily.join('・')}<br>` +
-    `<b>曜日ごと：</b>主菜（サラダチキン／ツナ缶／サバ缶）とヨーグルトを下表のとおり割り振ります。` +
+    `<b>毎食（${st.meals}食なので各${st.meals}）：</b>${perMeal.join('・')}` +
+    (perDay.length ? `<br><b>毎日：</b>${perDay.join('・')}` : '') +
+    `<br><b>曜日ごと：</b>下表のとおり1品だけ足します。` +
     `サバ缶は骨ごとでカルシウムが多いため、その日はヨーグルトを置いていません。`;
 
-  const rotIds = ['chicken','tuna','saba','yogurt'];
+  // ローテーションに登場する品目だけを列にする
+  const rotIds = [...new Set(Object.keys(WEEKLY_PLAN).flatMap(k => Object.keys(WEEKLY_PLAN[k])))];
   $('weekPlan').innerHTML =
     `<thead><tr><th>曜日</th>` + rotIds.map(id => `<th>${foodById(id).short}</th>`).join('') + `</tr></thead>` +
     `<tbody>` + WEEK_LABEL.map((w, i) => {
@@ -1613,17 +1623,18 @@ const ALL_IDS = () => ['weight','baseFactor','meals','savasShare','walk','cycle'
 // （同じ日のうちに開き直した場合は、入力し直さずに済むよう復元する）
 const DAILY_IDS = () => FOODS.map(f => 'f_' + f.id).concat(['otherP']);
 
-// 1週間の型。主菜（サラダチキン／ツナ缶／サバ缶）とヨーグルトを曜日で割り振る。
+// 1週間の型。毎食の品目に加えて、曜日ごとに1品だけ足す。
+//   サバ缶 週3回（火木土）／ヨーグルト 週4回（日月水金）
 //   サバ缶は骨ごとでカルシウムが多いため、その日はヨーグルトを置かない。
-//   サバ缶 週3回（火木土）／サラダチキン 週2回（月金）／ツナ缶 週2回（水日）／ヨーグルト 週4回
+//   ツナ缶は毎食に入るためローテーションからは外している。
 const WEEK_LABEL = ['日','月','火','水','木','金','土'];
 const WEEKLY_PLAN = {
-  0: {tuna:1,    yogurt:1},
-  1: {chicken:1, yogurt:1},
+  0: {yogurt:1},
+  1: {yogurt:1},
   2: {saba:1},
-  3: {tuna:1,    yogurt:1},
+  3: {yogurt:1},
   4: {saba:1},
-  5: {chicken:1, yogurt:1},
+  5: {yogurt:1},
   6: {saba:1}
 };
 const todayIdx = () => new Date().getDay();
