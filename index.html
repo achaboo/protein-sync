@@ -36,7 +36,7 @@
    ・ザバスは水300mlで溶かし、運動直後の1回だけ摂ります（乳類は使いません）。
      運動していない日はザバスを摂らず、目標分はすべて食事から確保します。
    ・食品のタンパク質量はスクリプト内の FOODS で一元管理しています（サラダチキン30.3g、
-     サバ缶16.7g、ツナ缶12.7g、ご飯1合9g、納豆8.3g、豆腐7.2g、卵6g、チーズ3.1g、
+     サバ缶16.7g、ツナ缶12.7g、ご飯1合9g、納豆8.3g、豆腐7.2g、卵6g、
      ミックスサラダ2g、バナナ1g）。
    ※数値は目安です。商品リニューアル等で変わる場合は FOODS の p の値を修正すれば、
      入力欄・計算・スケジュール・早見表のすべてに反映されます。
@@ -416,7 +416,7 @@ table.mini td.amt{width:auto;text-align:right}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-08-26.29';
+const APP_VERSION = '2026-08-26.30';
 
 const SPOON_G   = 6.5;                  // ザバス付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -443,7 +443,6 @@ const FOODS = [
   {id:'tuna',    name:'ツナ缶',             short:'ツナ缶',       note:'1缶 約12.7g',          price:133, p:12.7, unit:'缶', slots:['l','d','b']},
   {id:'saba',    name:'サバ缶',             short:'サバ缶',       note:'1缶 約16.7g',          price:268, ruleNote:'サラダチキンと同じ時間帯にしない', p:16.7, unit:'缶', slots:['d','l','b'], group:'main'},
   {id:'egg',     name:'卵',                 short:'卵',           note:'1個 約6g',             price:53,  p:6,    unit:'個', slots:['b','l','d']},
-  {id:'cheese',  name:'プロセスチーズ',      short:'チーズ',       note:'1個 約3.1g',           price:48,  p:3.1,  unit:'個', slots:['b','l','d']},
   {id:'banana',  name:'バナナ',             short:'バナナ',       note:'1本 約1g',             price:20,  ruleNote:'運動直後に必ず1本', p:1, unit:'本', slots:['b','l','d'], post:true, autoDaily:1},
   {id:'salad',   name:'ミックスサラダ',      short:'ミックスサラダ', note:'1袋 約2g',           price:106, p:2,    unit:'袋', slots:['l','d','b'], first:true}
 ];
@@ -1171,7 +1170,7 @@ function renderAltFoods(toFoodG, sv, st, plan){
           const used = [...usedCategories(st)];
           return used.length
             ? `今日すでに摂っている <b>${used.join('・')}</b> を避け、まだ摂っていないタンパク源から選んでいます。`
-            : `まだタンパク源の入力がないため、肉・魚・大豆・卵・乳製品にばらして選んでいます。`;
+            : `まだタンパク源の入力がないため、肉・魚・大豆・卵にばらして選んでいます。`;
         })()}</small>
         ${(() => {
           const cheap = cheapestPlan(toFoodG);
@@ -1321,7 +1320,7 @@ const label    = (id, n) => { const f = foodById(id); return `${f.short} ${n}${f
 const SUGGEST_ORDER = ['chicken','saba','tuna','natto','tofu','egg'];
 const FOOD_CAT = {
   chicken:'肉', saba:'魚', tuna:'魚', natto:'大豆', tofu:'大豆',
-  egg:'卵', cheese:'乳製品'
+  egg:'卵'
 };
 
 /* その日すでに摂っているタンパク源のカテゴリ */
@@ -1409,15 +1408,20 @@ function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, pl
 
   tips.push(['', `<b>② 食べる順番を守る（ベジ／ソイファースト）。</b>ご飯など糖質を摂るときは、必ず先に<b>ミックスサラダ・冷奴・納豆などの大豆製品</b>を食べてから。血糖値の急上昇（血糖値スパイク）を抑え、内臓脂肪の蓄積を防げます。特に<b>ご飯1合</b>は糖質量が大きいので、サラダと大豆製品の先食べを徹底しましょう。`]);
 
-  tips.push(['', `<b>③ 水分補給を十分に。</b>タンパク質の代謝では老廃物（尿素窒素）の排出に水が必要で、腎臓の負担軽減にもつながります。<b>1日 1.5〜2L</b>を目安に、運動中・運動後はこまめに。` +
+  tips.push(['', `<b>③ カルシウムは別枠で。</b>「② 今日の食事」の品目には乳製品が含まれていないため、` +
+    `<b>カルシウムはこのツールでは追えません</b>。牛乳・ヨーグルト・小魚・豆腐などで別途確保してください。` +
+    `55歳では骨密度の維持が課題になり、納豆のビタミンK2はカルシウムを骨に定着させる働きがあるため、` +
+    `納豆とカルシウム源はセットで考えると効果的です。`]);
+
+  tips.push(['', `<b>④ 水分補給を十分に。</b>タンパク質の代謝では老廃物（尿素窒素）の排出に水が必要で、腎臓の負担軽減にもつながります。<b>1日 1.5〜2L</b>を目安に、運動中・運動後はこまめに。` +
     (st.liqP > 0
       ? `${st.liquid.name}で溶かす場合、それ自体は水分補給になりますが、別に水も摂ってください。`
       : `ザバスも水 ${st.liquidMl}ml でしっかり溶かして飲んでください。`)]);
 
   if(ex.done > 0){
-    tips.push(['', `<b>④ 今日は筋トレ ${ex.done}種目 / 総負荷量 ${ex.volume.toLocaleString()}kg。</b>筋線維の修復は48時間程度続くため、<b>翌日もタンパク質量を落とさない</b>ことが重要です。負荷を上げるときは、重量を増やすより先に「セット数を1つ増やす」「回数を15→20回にする」ほうが関節への負担が少なく安全です。`]);
+    tips.push(['', `<b>⑤ 今日は筋トレ ${ex.done}種目 / 総負荷量 ${ex.volume.toLocaleString()}kg。</b>筋線維の修復は48時間程度続くため、<b>翌日もタンパク質量を落とさない</b>ことが重要です。負荷を上げるときは、重量を増やすより先に「セット数を1つ増やす」「回数を15→20回にする」ほうが関節への負担が少なく安全です。`]);
   }else{
-    tips.push(['', `<b>④ 今日は筋トレなし。</b>休養日こそ筋肉が作られる日です。最低でも 体重×1.5g（${r1(st.weight * 1.5)}g）は確保し、タンパク質を切らさないようにしましょう。`]);
+    tips.push(['', `<b>⑤ 今日は筋トレなし。</b>休養日こそ筋肉が作られる日です。最低でも 体重×1.5g（${r1(st.weight * 1.5)}g）は確保し、タンパク質を切らさないようにしましょう。`]);
   }
 
   // --- 不足の状態表示：追加すべき量を明示し、満たせば「解消」に切り替わる ---
@@ -1470,7 +1474,7 @@ function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, pl
   // 運動量に比例して増えるのはタンパク質ではなくエネルギー（糖質）
   const en = calcEnergy(st, ex);
   if(en.kcal > 0){
-    tips.push(['', `<b>⑤ 今日の運動での推定消費は 約${en.kcal} kcal です</b>` +
+    tips.push(['', `<b>⑥ 今日の運動での推定消費は 約${en.kcal} kcal です</b>` +
       `（筋トレ ${en.strength}kcal ／ 有酸素 ${en.cardio}kcal・概算）。<br>` +
       `タンパク質の必要量は運動量に比例せず <b>体重×1.8g で頭打ち</b>になりますが、` +
       `<b>エネルギーは運動量に比例して増えます</b>。ここが不足すると、せっかく摂ったタンパク質が` +
@@ -1491,7 +1495,7 @@ function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, pl
 
   // 粉への依存が大きいときの注意
   if(sv.totalG > 0 && sv.totalG >= target * 0.45){
-    tips.push(['', `<b>⑥ 今日は目標 ${target}g のうち ${sv.totalG}g（約${Math.round(sv.totalG / target * 100)}%）をザバスで賄う計算です。</b>` +
+    tips.push(['', `<b>⑦ 今日は目標 ${target}g のうち ${sv.totalG}g（約${Math.round(sv.totalG / target * 100)}%）をザバスで賄う計算です。</b>` +
       `プロテインは不足を埋める補助であって主役ではありません。ビタミン・ミネラル・食物繊維は粉からは摂れないため、` +
       `<b>サラダチキンや納豆・豆腐を1〜2品増やして、粉の比率を4割以下に下げる</b>ほうが望ましい状態です。`]);
   }
