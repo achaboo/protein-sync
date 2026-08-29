@@ -36,7 +36,7 @@
    ・ザバスは水300mlで溶かし、運動直後の1回だけ摂ります（乳類は使いません）。
      運動していない日はザバスを摂らず、目標分はすべて食事から確保します。
    ・食品のタンパク質量はスクリプト内の FOODS で一元管理しています
-     （サバ缶16.7g、ツナ缶12.7g、ご飯1合9g、納豆8.3g、ヨーグルト200g8g、
+     （サバ缶16.7g、ツナ缶12.7g、ご飯0.5合4.5g、納豆8.3g、ヨーグルト200g8g、
      豆腐7.2g、卵6g、ミックスサラダ2g、バナナ1g）。
    ※数値は目安です。商品リニューアル等で変わる場合は FOODS の p の値を修正すれば、
      入力欄・計算・スケジュール・早見表のすべてに反映されます。
@@ -426,7 +426,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-08-26.37';
+const APP_VERSION = '2026-08-26.39';
 
 const SPOON_G   = 6.5;                  // ザバス付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -440,13 +440,14 @@ const SERVE_G   = SPOON_G * PER_SERVE;  // 1回 = 19.5g
 //   first : 食事の最初に食べる食品（ベジファースト用。糖質メニューのある食事へ優先配分）
 //   lock  : true なら slots に挙げた時間帯「以外」には絶対に配分しない
 //   group : 同じグループの「別の品目」は同じ時間帯に配分しない
-//   onePerSlot: 同じ品目でも1つの時間帯に1つまで（例：ご飯は1食1合）
+//   slotLimit : 同じグループの品目を1つの時間帯に置ける上限（例：ご飯は1食0.5合＝1杯）
+//   perMealQty: 1食あたりに入れる数（既定1）
 //   post  : 運動した日は「運動直後」の枠にだけ配分する（例：バナナ）
-//   autoPerMeal: 食事回数と同じ数を毎日の初期値にする（例：昼食と夕食で毎回ご飯1合）
+//   autoPerMeal: 食事回数と同じ数を毎日の初期値にする（例：昼食と夕食で毎回ご飯0.5合）
 //   max   : 1日に入力できる上限（超える値は入力欄側で切り詰める）
 //   limitNote: 入力欄と早見表に添える制限の注記（時間帯の固定・1日の上限など）
 const FOODS = [
-  {id:'rice',    name:'ご飯（1合）',        short:'ご飯',         note:'1合 約9g',            price:100, ruleNote:'昼食・夕食に毎回1合', p:9,    unit:'合', slots:['l','d','b'], carb:true, group:'staple', onePerSlot:true, autoPerMeal:true},
+  {id:'rice',    name:'ご飯（0.5合）',      short:'ご飯',         note:'0.5合 約4.5g',        price:50,  ruleNote:'昼食・夕食に毎回0.5合', p:4.5, unit:'杯', slots:['l','d','b'], carb:true, group:'staple', slotLimit:1, autoPerMeal:true},
   {id:'natto',   name:'納豆',               short:'納豆',         note:'1パック 約8.3g',       price:32,  p:8.3,  unit:'P',  slots:['b','d','l'], autoPerMeal:true},
   {id:'tofu',    name:'豆腐',               short:'豆腐',         note:'1パック（150g） 約7.2g', price:35, p:7.2, unit:'P',  slots:['b','d','l'], autoPerMeal:true},
   {id:'tuna',    name:'ツナ缶',             short:'ツナ缶',       note:'1缶 約12.7g',          price:133, p:12.7, unit:'缶', slots:['l','d','b'], autoPerMeal:true},
@@ -886,9 +887,9 @@ function distributeFoods(st, mealTargets, planIds, trained){
     for(let i = 0; i < q; i++){
       const u = {key:f.id, short:f.short, unit:f.unit, g:f.p,
                  slots:mapSlots(f.slots), carb:f.carb, first:f.first, lock:f.lock,
-                 group:f.group, onePerSlot:f.onePerSlot,
-                 // 「毎食1個」の品目は同じ食事に重ねず、各食事へ1つずつ配る
-                 perSlotMax:f.autoPerMeal ? 1 : 0};
+                 group:f.group, slotLimit:f.slotLimit,
+                 // 「毎食◯個」の品目は、各食事にその数ずつ配る
+                 perSlotMax:f.autoPerMeal ? (f.perMealQty || 1) : 0};
       // 運動した日は「運動直後」の枠にだけ入れる食品（他の枠には回さない）
       if(f.post && trained){ u.slots = ['p']; u.lock = true; }
       (f.first ? firstUnits : (u.lock ? lockedUnits : units)).push(u);
@@ -913,7 +914,7 @@ function distributeFoods(st, mealTargets, planIds, trained){
   const put  = (s, u) => { bins[s].items.push(u); bins[s].total = r1(bins[s].total + u.g); };
 
   // 同じグループの品目が同じ時間帯に重ならないようにする。
-  //   onePerSlot（ご飯）… 同じ品目でも1枠に1つまで
+  //   slotLimit（ご飯）… 同じ品目でも1枠にこの数まで
   //   それ以外          … 別の品目とは同席させない（同じ品目の複数はOK）
   // 置けない分は配分せず、注意として表示する。
   const unplaced  = [];
@@ -921,7 +922,7 @@ function distributeFoods(st, mealTargets, planIds, trained){
     if(!u.group) return true;
     const same = bins[s].items.filter(x => x.group === u.group);
     if(!same.length) return true;
-    if(u.onePerSlot) return false;
+    if(u.slotLimit) return same.length < u.slotLimit;   // 枠あたりの上限（ご飯は1食0.5合＝1杯まで）
     return same.every(x => x.key === u.key);
   };
 
@@ -979,7 +980,7 @@ function distributeFoods(st, mealTargets, planIds, trained){
   (planIds || []).map(id => {
     const f = foodById(id);
     return {key:f.id, short:f.short, unit:f.unit, g:f.p, slots:mapSlots(f.slots),
-            group:f.group, onePerSlot:f.onePerSlot};
+            group:f.group, slotLimit:f.slotLimit};
   }).sort((a, b) => b.g - a.g).forEach(u => {
     // 追加分もグループ制約を守る（すでに配分済みの食品・追加分の両方を見る）
     const okFor = s => {
@@ -987,7 +988,7 @@ function distributeFoods(st, mealTargets, planIds, trained){
       if(!u.group) return true;
       const same = bins[s].items.concat(bins[s].adds).filter(x => x.group === u.group);
       if(!same.length) return true;
-      if(u.onePerSlot) return false;
+      if(u.slotLimit) return same.length < u.slotLimit;
       return same.every(x => x.key === u.key);
     };
     const cand = ORDER.filter(okFor);
@@ -1162,7 +1163,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   const un = bins.unplaced || [];
   $('schedNote').innerHTML = un.length
     ? `<span class="warnbox"><b>⚠ ${formatPlan(un.map(u => u.key))} は配分できませんでした。</b>` +
-      `ご飯ものは<b>1食につき1つまで</b>としているため、入力した数を収める時間帯がありません。` +
+      `ご飯は<b>1食につき0.5合（1杯）まで</b>としているため、入力した数を収める時間帯がありません。` +
       `「② 今日の食事」の数量を見直すか、この分は別の日に回してください。` +
       `（この分も「食事から摂取」の合計には含まれています）</span>`
     : '';
@@ -1436,7 +1437,7 @@ function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, pl
     `に分散してください。まとめ摂りした余剰分は筋肉に回らず、エネルギーや脂肪として処理されるだけになります。` +
     (st.skipB ? `2食だと1食あたりが増えやすいので、超えた分はザバスの回に回すほうが無駄になりません。` : '')]);
 
-  tips.push(['', `<b>② 食べる順番を守る（ベジ／ソイファースト）。</b>ご飯など糖質を摂るときは、必ず先に<b>ミックスサラダ・冷奴・納豆などの大豆製品</b>を食べてから。血糖値の急上昇（血糖値スパイク）を抑え、内臓脂肪の蓄積を防げます。特に<b>ご飯1合</b>は糖質量が大きいので、サラダと大豆製品の先食べを徹底しましょう。`]);
+  tips.push(['', `<b>② 食べる順番を守る（ベジ／ソイファースト）。</b>ご飯など糖質を摂るときは、必ず先に<b>ミックスサラダ・冷奴・納豆などの大豆製品</b>を食べてから。血糖値の急上昇（血糖値スパイク）を抑え、内臓脂肪の蓄積を防げます。特に<b>ご飯</b>は糖質量が大きいので、サラダと大豆製品の先食べを徹底しましょう。`]);
 
   tips.push(['', `<b>③ カルシウムは別枠で。</b>「② 今日の食事」の品目には乳製品が含まれていないため、` +
     `<b>カルシウムはこのツールでは追えません</b>。牛乳・ヨーグルト・小魚・豆腐などで別途確保してください。` +
@@ -1575,7 +1576,7 @@ function updateLive(){
 
   // 食事合計
   // 毎日の品目と、曜日ごとの型
-  const perMeal = FOODS.filter(f => f.autoPerMeal).map(f => `${f.short} ${f.unit === '合' ? '1合' : '1' + f.unit}`);
+  const perMeal = FOODS.filter(f => f.autoPerMeal).map(f => `${f.short} ${f.perMealQty || 1}${f.unit}`);
   const perDay  = FOODS.filter(f => f.autoDaily).map(f => `${f.short} ${f.autoDaily}${f.unit}`);
   $('dailyNote').innerHTML =
     `<b>毎食（${st.meals}食なので各${st.meals}）：</b>${perMeal.join('・')}` +
@@ -1657,7 +1658,7 @@ const todayIdx = () => new Date().getDay();
 const dailyDefault = id => {
   const f = FOODS.find(x => 'f_' + x.id === id);
   if(!f) return 0;
-  if(f.autoPerMeal) return parseInt($('meals').value, 10) === 3 ? 3 : 2;
+  if(f.autoPerMeal) return (parseInt($('meals').value, 10) === 3 ? 3 : 2) * (f.perMealQty || 1);
   return (f.autoDaily || 0) + ((WEEKLY_PLAN[todayIdx()] || {})[f.id] || 0);
 };
 const applyDailyDefaults = () => DAILY_IDS().forEach(id => { if($(id)) $(id).value = dailyDefault(id); });
@@ -1744,7 +1745,7 @@ function copySettingsLink(){
 
 /* 「② 今日の食事」だけを 0 に戻す（設定はそのまま） */
 function clearFoods(){
-  applyDailyDefaults();          // ご飯は「毎回1合」なので食事回数分が入った状態に戻す
+  applyDailyDefaults();          // ご飯は「毎回0.5合」なので食事回数分が入った状態に戻す
   onInputChanged();
 }
 
@@ -1760,7 +1761,7 @@ document.addEventListener('change', onInputChanged);
 $('calc').addEventListener('click', () => render({scroll:true}));
 $('clearFoods').addEventListener('click', clearFoods);
 
-// 食事回数を変えたら、毎回1合のご飯もその数に合わせる
+// 食事回数を変えたら、毎回0.5合のご飯もその数に合わせる
 $('meals').addEventListener('change', () => {
   FOODS.filter(f => f.autoPerMeal).forEach(f => {
     $('f_' + f.id).value = dailyDefault('f_' + f.id);
