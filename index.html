@@ -416,7 +416,7 @@ table.mini td.amt{width:auto;text-align:right}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-08-26.25';
+const APP_VERSION = '2026-08-26.26';
 
 const SPOON_G   = 6.5;                  // ザバス付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -436,17 +436,17 @@ const SERVE_G   = SPOON_G * PER_SERVE;  // 1回 = 19.5g
 //   max   : 1日に入力できる上限（超える値は入力欄側で切り詰める）
 //   limitNote: 入力欄と早見表に添える制限の注記（時間帯の固定・1日の上限など）
 const FOODS = [
-  {id:'rice',    name:'ご飯（1合）',        short:'ご飯',         note:'1合 約9g ／ 昼食・夕食に毎回1合', p:9, unit:'合', slots:['l','d','b'], carb:true, group:'staple', onePerSlot:true, autoPerMeal:true},
-  {id:'natto',   name:'納豆',               short:'納豆',         note:'1パック 約8.3g', p:8.3,  unit:'P',  slots:['b','d','l']},
-  {id:'tofu',    name:'豆腐',               short:'豆腐',         note:'1パック（150g） 約7.2g', p:7.2, unit:'P', slots:['b','d','l']},
-  {id:'chicken', name:'サラダチキン',       short:'サラダチキン', note:'1パック 約30.3g ／ サバ缶と同じ時間帯にしない', p:30.3, unit:'P', slots:['l','d','b'], group:'main'},
-  {id:'tuna',    name:'ツナ缶',             short:'ツナ缶',       note:'1缶 約12.7g',   p:12.7, unit:'缶', slots:['l','d','b']},
-  {id:'saba',    name:'サバ缶',             short:'サバ缶',       note:'1缶 約16.7g ／ サラダチキンと同じ時間帯にしない', p:16.7, unit:'缶', slots:['d','l','b'], group:'main'},
-  {id:'egg',     name:'卵',                 short:'卵',           note:'1個 約6g',      p:6,    unit:'個', slots:['b','l','d']},
-  {id:'chikuwa', name:'ちくわ',             short:'ちくわ',       note:'1本 約2.2g',    p:2.2,  unit:'本', slots:['l','d','b']},
-  {id:'cheese',  name:'プロセスチーズ',      short:'チーズ',       note:'1個 約3.1g',    p:3.1,  unit:'個', slots:['b','l','d']},
-  {id:'banana',  name:'バナナ',             short:'バナナ',       note:'1本 約1g ／ 運動直後に必ず1本', p:1, unit:'本', slots:['b','l','d'], post:true, autoDaily:1},
-  {id:'salad',   name:'ミックスサラダ',      short:'ミックスサラダ', note:'1袋 約2g',    p:2,    unit:'袋', slots:['l','d','b'], first:true}
+  {id:'rice',    name:'ご飯（1合）',        short:'ご飯',         note:'1合 約9g',            price:100, ruleNote:'昼食・夕食に毎回1合', p:9,    unit:'合', slots:['l','d','b'], carb:true, group:'staple', onePerSlot:true, autoPerMeal:true},
+  {id:'natto',   name:'納豆',               short:'納豆',         note:'1パック 約8.3g',       price:32,  p:8.3,  unit:'P',  slots:['b','d','l']},
+  {id:'tofu',    name:'豆腐',               short:'豆腐',         note:'1パック（150g） 約7.2g', price:35, p:7.2, unit:'P',  slots:['b','d','l']},
+  {id:'chicken', name:'サラダチキン',       short:'サラダチキン', note:'1パック 約30.3g',      price:278, ruleNote:'サバ缶と同じ時間帯にしない', p:30.3, unit:'P', slots:['l','d','b'], group:'main'},
+  {id:'tuna',    name:'ツナ缶',             short:'ツナ缶',       note:'1缶 約12.7g',          price:133, p:12.7, unit:'缶', slots:['l','d','b']},
+  {id:'saba',    name:'サバ缶',             short:'サバ缶',       note:'1缶 約16.7g',          price:268, ruleNote:'サラダチキンと同じ時間帯にしない', p:16.7, unit:'缶', slots:['d','l','b'], group:'main'},
+  {id:'egg',     name:'卵',                 short:'卵',           note:'1個 約6g',             price:53,  p:6,    unit:'個', slots:['b','l','d']},
+  {id:'chikuwa', name:'ちくわ',             short:'ちくわ',       note:'1本 約2.2g',           price:106, p:2.2,  unit:'本', slots:['l','d','b']},
+  {id:'cheese',  name:'プロセスチーズ',      short:'チーズ',       note:'1個 約3.1g',           price:48,  p:3.1,  unit:'個', slots:['b','l','d']},
+  {id:'banana',  name:'バナナ',             short:'バナナ',       note:'1本 約1g',             price:20,  ruleNote:'運動直後に必ず1本', p:1, unit:'本', slots:['b','l','d'], post:true, autoDaily:1},
+  {id:'salad',   name:'ミックスサラダ',      short:'ミックスサラダ', note:'1袋 約2g',           price:106, p:2,    unit:'袋', slots:['l','d','b'], first:true}
 ];
 
 // ザバスは水のみで溶かす（乳類は摂らない前提）。水にタンパク質は含まれないため加算はない。
@@ -489,7 +489,8 @@ const serveText = n => n === 1 ? '1回で摂取' : `${n}回に分けて摂取`;
    ============================================================ */
 $('foods').innerHTML = FOODS.map(f => `
   <div class="row">
-    <div class="name"><b>${f.name}</b><small>${f.note}${f.limitNote ? ` ／ <b>${f.limitNote}</b>` : ''}</small></div>
+    <div class="name"><b>${f.name}</b><small>${f.note} <b>${f.price}円</b>` +
+      `${f.ruleNote ? ` ／ ${f.ruleNote}` : ''}${f.limitNote ? ` ／ <b>${f.limitNote}</b>` : ''}</small></div>
     <div class="qty"><input type="number" inputmode="numeric" id="f_${f.id}" value="0" min="0" step="1"${f.max ? ` max="${f.max}"` : ''}></div>
     <div class="unit">${f.unit}</div>
   </div>`).join('');
@@ -539,18 +540,19 @@ function readState(){
    ============================================================ */
 // 食事からの合計タンパク質
 function calcFood(st){
-  let total = st.otherP;
+  let total = st.otherP, cost = 0;
   const list = [];
   FOODS.forEach(f => {
     const q = st.foods[f.id];
     if(q > 0){
       const g = q * f.p;
       total += g;
+      cost  += q * (f.price || 0);
       list.push(`${f.name} ${r1(q)}${f.unit}（${r1(g)}g）`);
     }
   });
   if(st.otherP > 0) list.push(`その他（${r1(st.otherP)}g）`);
-  return {total: r1(total), list};
+  return {total: r1(total), cost: Math.round(cost), list};
 }
 
 // 運動量から目標係数（g/kg）を決定
@@ -1150,7 +1152,8 @@ function renderAltFoods(toFoodG, sv, st, plan){
   const rows = shown.map(f => {
     const n = Math.ceil(toFoodG / f.p);
     return `<tr>
-      <td class="food">${f.name}${f.limitNote ? `<br><small>（${f.limitNote}）</small>` : ''}</td>
+      <td class="food">${f.name}<br><small>1${f.unit} ${f.price}円` +
+        `${f.ruleNote ? ` ／ ${f.ruleNote}` : ''}${f.limitNote ? ` ／ ${f.limitNote}` : ''}</small></td>
       <td class="num">${n} ${f.unit}<br><small>${r1(n * f.p)}g</small></td>
     </tr>`;
   }).join('');
@@ -1484,7 +1487,10 @@ function updateLive(){
     `運動していない日はザバスを摂らず、目標分はすべて食事から確保します。`;
 
   // 食事合計
-  $('foodNote').innerHTML = `現在の食事合計：<b>${calcFood(st).total} g</b>`;
+  const fc = calcFood(st);
+  $('foodNote').innerHTML =
+    `現在の食事合計：<b>${fc.total} g</b>　／　合計金額：<b>${fc.cost.toLocaleString()} 円</b>` +
+    `<br><small>「その他（自由入力）」は金額に含まれません。</small>`;
 
   // 基本係数の目安表（体重に合わせて目標gを再計算）
   const w = st.weight;
