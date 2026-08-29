@@ -416,7 +416,7 @@ table.mini td.amt{width:auto;text-align:right}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-08-26.24';
+const APP_VERSION = '2026-08-26.25';
 
 const SPOON_G   = 6.5;                  // ザバス付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -612,6 +612,7 @@ function calcFactor(st){
 // それを超える不足分は粉に頼らず食事で補う想定とし、excess として返す。
 // liqP＝1回あたりに液体（牛乳・豆乳など）から摂れるタンパク質 g。水なら 0。
 const MAX_SESSIONS  = 1;    // ザバスは運動直後の1回だけ。他の時間帯では摂らない
+const MIN_SPOONS_TRAINED = 3;  // 筋トレをした日に必ず飲む最低杯数（製品推奨の1回3杯）
 const MAX_PER_SERVE = 6;    // 1回にまとめるため、吸収上限 40g に収まる範囲で杯数を許容
 const ABSORB_CAP    = 40;   // 1回の摂取上限 g
 
@@ -712,10 +713,15 @@ function render(opts){
   const coverG    = Math.min(lack, savasCap);
   // ザバスは運動直後の1回のみ。運動していない日は摂らない。
   const trained   = ex.done > 0 || ex.cardio > 0;
-  const sv        = trained ? splitSavas(coverG, st, true)
+  let   sv        = trained ? splitSavas(coverG, st, true)
                             : {spoons:0, sessions:[], savasG:0, liquidG:0, totalG:0, remainG:0, overG:0, maxSingleG:0};
-  const capBinds  = lack > savasCap && st.savasShare < 1;
-  const toFoodG   = r1(Math.max(0, lack - sv.totalG));   // 食事で補うべき残り
+  // 筋トレをした日はザバスを必ず摂る。食事だけで目標に届いていても最低 PER_SERVE 杯は飲む。
+  if(trained && sv.spoons < MIN_SPOONS_TRAINED) sv = fixedSavas(MIN_SPOONS_TRAINED);
+  const capBinds  = lack > savasCap && st.savasShare < 1 && sv.spoons > MIN_SPOONS_TRAINED;
+
+  const intake    = r1(food.total + sv.totalG);          // 食事＋ザバスの見込み合計
+  const toFoodG   = r1(Math.max(0, target - intake));    // 食事で補うべき残り
+  const reduceG   = r1(Math.max(0, intake - target));    // 食事から減らすべき量
   // 残りを補う組み合わせは1回だけ決め、④の早見表と⑤のスケジュールで同じ品目を使う
   const plan      = toFoodG > 0 ? suggestPlan(toFoodG, st) : [];
   // 提案どおり摂った場合に1日の目標へ届くか（届くなら食事ごとのズレは配分の問題）
@@ -736,6 +742,12 @@ function render(opts){
 
   // ---- ザバス提案 ----
   const liqName = st.liquid.name;
+  // 超過する場合は、どの食品を減らすとよいかを栄養バランスから提案する
+  const cut = reduceG >= 5 ? suggestReduce(reduceG, st) : {label:'', cutG:0};
+  const cutWhy = cut.label
+    ? `<br><small>タンパク源が偏っているカテゴリ（${[...usedCategories(st)].join('・')}のうち量が多いもの）から` +
+      `減らしています。ご飯・バナナ・ミックスサラダはルールで固定しているため対象外です。</small>`
+    : '';
   if(sv.spoons > 0){
     $('oSavas').innerHTML =
       `ザバス 付属スプーン ` +
@@ -746,31 +758,42 @@ function render(opts){
     $('oSavasSub').innerHTML =
       `＝ ${serveText(sv.sessions.length)}　${detail}` +
       `<br>水で溶かすため、タンパク質は粉の ${sv.savasG}g のみです。` +
-      `<br>不足 ${lack}g のうち <b>${sv.totalG}g</b> をこれで補います。` +
-      (toFoodG > 0
-        ? `<b> 残り ${toFoodG}g は食事で補ってください。</b>`
-        : sv.overG > 0 ? `（${sv.overG}g 多めですが誤差の範囲です）` : '（過不足なし）') +
+      (reduceG >= 5
+        ? `<br><b>食事＋ザバスの合計は ${intake}g で、目標を ${reduceG}g 上回ります。</b>` +
+          (cut.label
+            ? `<br><b>食事から ${cut.label}（−${cut.cutG}g）を減らしてください。</b>` +
+              (cut.cutG < reduceG - 0.05
+                ? `これでも ${r1(reduceG - cut.cutG)}g 多めですが、これ以上減らすと今度は不足します。`
+                : '') + cutWhy
+            : `<br>ただし1単位が大きい品目しかないため、減らすと今度は不足します。この日は多めのままで構いません。`)
+        : reduceG > 0
+          ? `<br>食事＋ザバスの合計は ${intake}g（目標を ${reduceG}g 上回りますが誤差の範囲です）。`
+          : `<br>不足 ${lack}g のうち <b>${sv.totalG}g</b> をこれで補います。` +
+            (toFoodG > 0
+              ? `<b> 残り ${toFoodG}g は食事で補ってください。</b>`
+              : '（過不足なし）')) +
+      (sv.forced
+        ? `<br><small>筋トレをした日はザバスを必ず摂る設定のため、` +
+          `不足の有無にかかわらず最低 ${MIN_SPOONS_TRAINED}杯（${r1(MIN_SPOONS_TRAINED * SPOON_G)}g）を確保しています。</small>`
+        : '') +
       // 上限に張り付いている間は杯数が動かないため、その理由を目立つ位置に出す
       (capBinds
         ? `<br><b>この杯数は上限（目標の${Math.round(st.savasShare * 100)}% ＝ ${savasCap}g）に張り付いています。</b>` +
           `食事を増やしてもすぐには減らず、まず上の「残り」が減っていきます。` +
           `不足が ${savasCap}g を下回ると杯数も減ります。`
         : '') +
-      // なぜこの量・この回数になったのかを必ず説明する
-      `<br><small>※ ` +
+      // なぜこの量になったのかを説明する（説明することが無い場合は出さない）
+      ((capBinds || !sv.forced) ? `<br><small>※ ` : `<span style="display:none">`) +
       (capBinds
         ? `不足 ${lack}g の全量を粉で摂ると食事からのビタミン・ミネラル・食物繊維が不足するため、上限を設けています。` +
           `上限は「① 基本設定」で変更できます（100%にすると不足の全量をザバスで補います）。`
         : '') +
-      (sv.sessions.length > 1
-        ? `1回で摂れるのは最大 <b>${sv.maxSingleG}g</b>（1回${MAX_PER_SERVE}杯まで／吸収上限${ABSORB_CAP}g）。` +
-          `${coverG}g には1回では届かないため <b>${sv.sessions.length}回</b>に分けています。`
-        : `${coverG}g は1回で収まるため、1回にまとめています。`) +
+      (sv.forced ? '' : `${coverG}g は運動直後の1回にまとめています。`) +
       (sv.packed
         ? `推奨の${PER_SERVE}杯より多めですが、ザバスは運動直後の1回にまとめるため、` +
           `吸収上限${ABSORB_CAP}gの範囲で1回に収めています。`
         : '') +
-      `</small>`;
+      ((capBinds || !sv.forced) ? `</small>` : `</span>`);
   }else if(lack > 0){
     $('oSavas').innerHTML = `ザバスは不要です<span style="font-size:1rem">（不足 ${lack}g）</span>`;
     $('oSavasSub').innerHTML = (st.liqP > 0
@@ -807,7 +830,7 @@ function render(opts){
 
   renderAltFoods(toFoodG, sv, st, plan);
   renderSchedule(st, ex, target, sv, plan, dayCovered);
-  renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, planned);
+  renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, intake, reduceG, cut);
 
   // 更新されたことが必ず分かるように、時刻を刻んでハイライトする
   const el = $('result');
@@ -1168,6 +1191,60 @@ function calcEnergy(st, ex){
   };
 }
 
+/* 筋トレをした日に必ず飲む最低量（製品推奨の1回3杯）を組み立てる */
+function fixedSavas(spoons){
+  const savasG = r1(spoons * SPOON_G);
+  return {
+    spoons, sessions:[{milk:false, cap:spoons, spoons}],
+    savasG, liquidG:0, totalG:savasG,
+    maxSingleG:r1(Math.min(MAX_PER_SERVE, Math.floor(ABSORB_CAP / SPOON_G)) * SPOON_G),
+    packed:spoons > PER_SERVE, mixed:false, remainG:0, overG:0, forced:true
+  };
+}
+
+/* ザバスを足すと目標を超える場合に、食事のどれを減らすとよいかを提案する。
+   ルールで固定している食品（ご飯・バナナ・ミックスサラダ）は対象外とし、
+   タンパク源が偏っているカテゴリから優先して減らす。 */
+const REDUCE_EXCLUDE = ['rice','banana','salad'];
+function suggestReduce(overG, st){
+  const qty = {};
+  FOODS.forEach(f => qty[f.id] = Math.round((st.foods && st.foods[f.id]) || 0));
+
+  const catTotals = () => {
+    const t = {};
+    FOODS.forEach(f => {
+      const c = FOOD_CAT[f.id];
+      if(c && qty[f.id] > 0) t[c] = (t[c] || 0) + qty[f.id] * f.p;
+    });
+    return t;
+  };
+
+  const picks = [];
+  let rest = overG, guard = 0;
+  while(rest > 0.05 && guard++ < 30){
+    const t = catTotals();
+    // 超過分より大きく削りすぎないよう、許容誤差の範囲に収まる品目だけを候補にする
+    const cands = FOODS.filter(f => qty[f.id] > 0 && FOOD_CAT[f.id] &&
+                                    REDUCE_EXCLUDE.indexOf(f.id) < 0 &&
+                                    f.p <= rest + TOLERANCE);
+    if(!cands.length) break;
+    // 摂取量が多いカテゴリから、1単位あたりが大きいものを減らす（減らす個数を最小にする）
+    cands.sort((a, b) => ((t[FOOD_CAT[b.id]] || 0) - (t[FOOD_CAT[a.id]] || 0)) || (b.p - a.p));
+    const f = cands[0];
+    qty[f.id] -= 1;
+    picks.push(f.id);
+    rest = r1(rest - f.p);
+  }
+  if(!picks.length) return {label:'', cutG:0};
+
+  const map = new Map();
+  picks.forEach(id => map.set(id, (map.get(id) || 0) + 1));
+  return {
+    label: [...map].map(([id, n]) => `${foodById(id).short} ${n}${foodById(id).unit}`).join(' ＋ '),
+    cutG:  r1(picks.reduce((a, id) => a + pOf(id), 0))
+  };
+}
+
 /* 不足がザバス1回分より小さいとき、液体を減らして1杯で合わせる案を返す */
 function liquidCutSuggestion(st, lack){
   if(!(st.liquid.p100 > 0) || lack <= SPOON_G) return '';
@@ -1253,7 +1330,7 @@ function formatPlan(ids){
 function suggestFoods(g, st){ return formatPlan(suggestPlan(g, st)); }
 
 /* 食事・栄養のポイント */
-function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, planned){
+function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, planned, reduceG, cut){
   const tips = [];
 
   // 目標に届かない日でも「ここまでで十分」が分かるようにする
@@ -1288,7 +1365,14 @@ function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, pl
   }
 
   // --- 不足の状態表示：追加すべき量を明示し、満たせば「解消」に切り替わる ---
-  if(toFoodG >= 5){
+  if(reduceG >= 5 && cut && cut.label){
+    tips.push(['alert',
+      `<b>⚠ 食事から ${cut.label}（−${cut.cutG}g）を減らしてください。</b>` +
+      `筋トレをした日はザバス ${sv.spoons}杯（${sv.totalG}g）を必ず摂るため、` +
+      `このままでは目標 ${target}g を ${reduceG}g 上回ります。<br>` +
+      `減らす対象は、その日のタンパク源が偏っているカテゴリから選んでいます。` +
+      `ご飯・バナナ・ミックスサラダはルールで固定しているため減らしません。`]);
+  }else if(toFoodG >= 5){
     const more = toFoodG;
     tips.push(['alert',
       `<b>⚠ あと ${more}g を食事で追加してください。</b>` +
