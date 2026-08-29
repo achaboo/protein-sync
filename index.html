@@ -190,6 +190,7 @@ td.amt{font-weight:700;color:var(--brand-d);width:20%}   /* 液体名を含む�
 table.mini{font-size:.82rem}
 table.mini td.time{width:auto;white-space:nowrap}
 table.mini td.amt{width:auto;text-align:right}
+table.mini tr.today td{background:#eef4ff;font-weight:700}
 /* ザバスを使わずに食事で補う場合の早見表 */
 .alt{border:1px solid var(--line);border-radius:12px;padding:12px 12px 4px;margin-bottom:14px;background:#fbfcfe}
 .alt h4{margin:0 0 8px;font-size:.9rem}
@@ -335,6 +336,15 @@ table.mini td.amt{width:auto;text-align:right}
       <div class="unit">g</div>
     </div>
     <p class="hint" id="foodNote"></p>
+
+    <h3>1週間の型（初期値として自動入力）</h3>
+    <p class="hint" id="dailyNote" style="margin-top:0"></p>
+    <div class="table-wrap"><table class="mini" id="weekPlan"></table></div>
+    <p class="hint">
+      毎日その日の型が自動で入ります。実際に食べたものが違えば数量を書き換えてください
+      （書き換えた内容はその日のうちは保持され、翌日また型に戻ります）。
+      いま反映したい場合は上の「食事をリセット」を押してください。
+    </p>
   </section>
 
   <!-- ③ 運動 -->
@@ -416,7 +426,7 @@ table.mini td.amt{width:auto;text-align:right}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-08-26.30';
+const APP_VERSION = '2026-08-26.31';
 
 const SPOON_G   = 6.5;                  // ザバス付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -437,14 +447,15 @@ const SERVE_G   = SPOON_G * PER_SERVE;  // 1回 = 19.5g
 //   limitNote: 入力欄と早見表に添える制限の注記（時間帯の固定・1日の上限など）
 const FOODS = [
   {id:'rice',    name:'ご飯（1合）',        short:'ご飯',         note:'1合 約9g',            price:100, ruleNote:'昼食・夕食に毎回1合', p:9,    unit:'合', slots:['l','d','b'], carb:true, group:'staple', onePerSlot:true, autoPerMeal:true},
-  {id:'natto',   name:'納豆',               short:'納豆',         note:'1パック 約8.3g',       price:32,  p:8.3,  unit:'P',  slots:['b','d','l']},
-  {id:'tofu',    name:'豆腐',               short:'豆腐',         note:'1パック（150g） 約7.2g', price:35, p:7.2, unit:'P',  slots:['b','d','l']},
+  {id:'natto',   name:'納豆',               short:'納豆',         note:'1パック 約8.3g',       price:32,  p:8.3,  unit:'P',  slots:['b','d','l'], autoDaily:1},
+  {id:'tofu',    name:'豆腐',               short:'豆腐',         note:'1パック（150g） 約7.2g', price:35, p:7.2, unit:'P',  slots:['b','d','l'], autoDaily:1},
   {id:'chicken', name:'サラダチキン',       short:'サラダチキン', note:'1パック 約30.3g',      price:278, ruleNote:'サバ缶と同じ時間帯にしない', p:30.3, unit:'P', slots:['l','d','b'], group:'main'},
   {id:'tuna',    name:'ツナ缶',             short:'ツナ缶',       note:'1缶 約12.7g',          price:133, p:12.7, unit:'缶', slots:['l','d','b']},
   {id:'saba',    name:'サバ缶',             short:'サバ缶',       note:'1缶 約16.7g',          price:268, ruleNote:'サラダチキンと同じ時間帯にしない', p:16.7, unit:'缶', slots:['d','l','b'], group:'main'},
-  {id:'egg',     name:'卵',                 short:'卵',           note:'1個 約6g',             price:53,  p:6,    unit:'個', slots:['b','l','d']},
+  {id:'egg',     name:'卵',                 short:'卵',           note:'1個 約6g',             price:53,  p:6,    unit:'個', slots:['b','l','d'], autoDaily:2},
+  {id:'yogurt',  name:'無脂肪ヨーグルト（200g）', short:'ヨーグルト', note:'200g 約8g（カルシウム 約260mg）', price:70, p:8, unit:'杯', slots:['l','d','b']},
   {id:'banana',  name:'バナナ',             short:'バナナ',       note:'1本 約1g',             price:20,  ruleNote:'運動直後に必ず1本', p:1, unit:'本', slots:['b','l','d'], post:true, autoDaily:1},
-  {id:'salad',   name:'ミックスサラダ',      short:'ミックスサラダ', note:'1袋 約2g',           price:106, p:2,    unit:'袋', slots:['l','d','b'], first:true}
+  {id:'salad',   name:'ミックスサラダ',      short:'ミックスサラダ', note:'1袋 約2g',           price:106, p:2,    unit:'袋', slots:['l','d','b'], first:true, autoDaily:1}
 ];
 
 // ザバスは水のみで溶かす（乳類は摂らない前提）。水にタンパク質は含まれないため加算はない。
@@ -1317,10 +1328,10 @@ const label    = (id, n) => { const f = foodById(id); return `${f.short} ${n}${f
 /* 提案に使う食品と、そのタンパク源のカテゴリ。
    同じ供給源に偏るとアミノ酸組成やビタミン・ミネラルが偏るため、
    その日まだ摂っていないカテゴリを優先して提案する。 */
-const SUGGEST_ORDER = ['chicken','saba','tuna','natto','tofu','egg'];
+const SUGGEST_ORDER = ['chicken','saba','tuna','natto','yogurt','tofu','egg'];
 const FOOD_CAT = {
   chicken:'肉', saba:'魚', tuna:'魚', natto:'大豆', tofu:'大豆',
-  egg:'卵'
+  egg:'卵', yogurt:'乳製品'
 };
 
 /* その日すでに摂っているタンパク源のカテゴリ */
@@ -1544,6 +1555,23 @@ function updateLive(){
     `運動していない日はザバスを摂らず、目標分はすべて食事から確保します。`;
 
   // 食事合計
+  // 毎日の品目と、曜日ごとの型
+  const daily = FOODS.filter(f => f.autoDaily || f.autoPerMeal)
+    .map(f => `${f.short} ${f.autoPerMeal ? (st.meals === 3 ? 3 : 2) : f.autoDaily}${f.unit}`);
+  $('dailyNote').innerHTML =
+    `<b>毎日：</b>${daily.join('・')}<br>` +
+    `<b>曜日ごと：</b>主菜（サラダチキン／ツナ缶／サバ缶）とヨーグルトを下表のとおり割り振ります。` +
+    `サバ缶は骨ごとでカルシウムが多いため、その日はヨーグルトを置いていません。`;
+
+  const rotIds = ['chicken','tuna','saba','yogurt'];
+  $('weekPlan').innerHTML =
+    `<thead><tr><th>曜日</th>` + rotIds.map(id => `<th>${foodById(id).short}</th>`).join('') + `</tr></thead>` +
+    `<tbody>` + WEEK_LABEL.map((w, i) => {
+      const plan = WEEKLY_PLAN[i] || {};
+      const cells = rotIds.map(id => `<td class="amt">${plan[id] ? plan[id] + foodById(id).unit : '—'}</td>`).join('');
+      return `<tr${i === todayIdx() ? ' class="today"' : ''}><td class="time">${w}${i === todayIdx() ? '（今日）' : ''}</td>${cells}</tr>`;
+    }).join('') + `</tbody>`;
+
   const fc = calcFood(st);
   $('foodNote').innerHTML =
     `現在の食事合計：<b>${fc.total} g</b>　／　合計金額：<b>${fc.cost.toLocaleString()} 円</b>` +
@@ -1585,12 +1613,30 @@ const ALL_IDS = () => ['weight','baseFactor','meals','savasShare','walk','cycle'
 // （同じ日のうちに開き直した場合は、入力し直さずに済むよう復元する）
 const DAILY_IDS = () => FOODS.map(f => 'f_' + f.id).concat(['otherP']);
 
-// 毎日の初期値。autoPerMeal の食品（ご飯）は「昼食と夕食で毎回1合」なので食事回数と同じ数にする。
+// 1週間の型。主菜（サラダチキン／ツナ缶／サバ缶）とヨーグルトを曜日で割り振る。
+//   サバ缶は骨ごとでカルシウムが多いため、その日はヨーグルトを置かない。
+//   サバ缶 週3回（火木土）／サラダチキン 週2回（月金）／ツナ缶 週2回（水日）／ヨーグルト 週4回
+const WEEK_LABEL = ['日','月','火','水','木','金','土'];
+const WEEKLY_PLAN = {
+  0: {tuna:1,    yogurt:1},
+  1: {chicken:1, yogurt:1},
+  2: {saba:1},
+  3: {tuna:1,    yogurt:1},
+  4: {saba:1},
+  5: {chicken:1, yogurt:1},
+  6: {saba:1}
+};
+const todayIdx = () => new Date().getDay();
+
+// 毎日の初期値。
+//   autoPerMeal（ご飯）… 食事回数と同じ数
+//   autoDaily          … 毎日欠かさない品目の数
+//   WEEKLY_PLAN        … 曜日ごとに割り振る品目の数
 const dailyDefault = id => {
   const f = FOODS.find(x => 'f_' + x.id === id);
   if(!f) return 0;
   if(f.autoPerMeal) return parseInt($('meals').value, 10) === 3 ? 3 : 2;
-  return f.autoDaily || 0;
+  return (f.autoDaily || 0) + ((WEEKLY_PLAN[todayIdx()] || {})[f.id] || 0);
 };
 const applyDailyDefaults = () => DAILY_IDS().forEach(id => { if($(id)) $(id).value = dailyDefault(id); });
 const todayKey  = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
