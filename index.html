@@ -35,9 +35,9 @@
        付属スプーン 1杯 = タンパク質 約 6.5g / 推奨 1回 3杯 = 約 19.5g
    ・ザバスは水300mlで溶かし、運動直後の1回だけ摂ります（乳類は使いません）。
      運動していない日はザバスを摂らず、目標分はすべて食事から確保します。
-   ・食品のタンパク質量はスクリプト内の FOODS で一元管理しています（サラダチキン30.3g、
-     サバ缶16.7g、ツナ缶12.7g、ご飯1合9g、納豆8.3g、豆腐7.2g、卵6g、
-     ミックスサラダ2g、バナナ1g）。
+   ・食品のタンパク質量はスクリプト内の FOODS で一元管理しています
+     （サバ缶16.7g、ツナ缶12.7g、ご飯1合9g、納豆8.3g、ヨーグルト200g8g、
+     豆腐7.2g、卵6g、ミックスサラダ2g、バナナ1g）。
    ※数値は目安です。商品リニューアル等で変わる場合は FOODS の p の値を修正すれば、
      入力欄・計算・スケジュール・早見表のすべてに反映されます。
 ================================================================================
@@ -426,7 +426,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-08-26.34';
+const APP_VERSION = '2026-08-26.35';
 
 const SPOON_G   = 6.5;                  // ザバス付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -439,7 +439,7 @@ const SERVE_G   = SPOON_G * PER_SERVE;  // 1回 = 19.5g
 //   carb  : 糖質が多く、血糖値が上がりやすい食品（先に野菜を食べたい対象）
 //   first : 食事の最初に食べる食品（ベジファースト用。糖質メニューのある食事へ優先配分）
 //   lock  : true なら slots に挙げた時間帯「以外」には絶対に配分しない
-//   group : 同じグループの「別の品目」は同じ時間帯に配分しない（例：サラダチキンとサバ缶）
+//   group : 同じグループの「別の品目」は同じ時間帯に配分しない
 //   onePerSlot: 同じ品目でも1つの時間帯に1つまで（例：ご飯は1食1合）
 //   post  : 運動した日は「運動直後」の枠にだけ配分する（例：バナナ）
 //   autoPerMeal: 食事回数と同じ数を毎日の初期値にする（例：昼食と夕食で毎回ご飯1合）
@@ -449,9 +449,8 @@ const FOODS = [
   {id:'rice',    name:'ご飯（1合）',        short:'ご飯',         note:'1合 約9g',            price:100, ruleNote:'昼食・夕食に毎回1合', p:9,    unit:'合', slots:['l','d','b'], carb:true, group:'staple', onePerSlot:true, autoPerMeal:true},
   {id:'natto',   name:'納豆',               short:'納豆',         note:'1パック 約8.3g',       price:32,  p:8.3,  unit:'P',  slots:['b','d','l'], autoPerMeal:true},
   {id:'tofu',    name:'豆腐',               short:'豆腐',         note:'1パック（150g） 約7.2g', price:35, p:7.2, unit:'P',  slots:['b','d','l'], autoPerMeal:true},
-  {id:'chicken', name:'サラダチキン',       short:'サラダチキン', note:'1パック 約30.3g',      price:278, ruleNote:'サバ缶と同じ時間帯にしない', p:30.3, unit:'P', slots:['l','d','b'], group:'main'},
   {id:'tuna',    name:'ツナ缶',             short:'ツナ缶',       note:'1缶 約12.7g',          price:133, p:12.7, unit:'缶', slots:['l','d','b'], autoPerMeal:true},
-  {id:'saba',    name:'サバ缶',             short:'サバ缶',       note:'1缶 約16.7g',          price:268, ruleNote:'サラダチキンと同じ時間帯にしない', p:16.7, unit:'缶', slots:['d','l','b'], group:'main'},
+  {id:'saba',    name:'サバ缶',             short:'サバ缶',       note:'1缶 約16.7g',          price:268, p:16.7, unit:'缶', slots:['d','l','b']},
   {id:'egg',     name:'卵',                 short:'卵',           note:'1個 約6g',             price:53,  p:6,    unit:'個', slots:['b','l','d'], autoPerMeal:true},
   {id:'yogurt',  name:'無脂肪ヨーグルト（200g）', short:'ヨーグルト', note:'200g 約8g（カルシウム 約260mg）', price:70, p:8, unit:'杯', slots:['l','d','b']},
   {id:'banana',  name:'バナナ',             short:'バナナ',       note:'1本 約1g',             price:20,  ruleNote:'運動直後に必ず1本', p:1, unit:'本', slots:['b','l','d'], post:true, autoDaily:1},
@@ -912,7 +911,7 @@ function distributeFoods(st, mealTargets, planIds, trained){
 
   // 同じグループの品目が同じ時間帯に重ならないようにする。
   //   onePerSlot（ご飯）… 同じ品目でも1枠に1つまで
-  //   それ以外（サラダチキン／サバ缶）… 別の品目とは同席させない（同じ品目の複数はOK）
+  //   それ以外          … 別の品目とは同席させない（同じ品目の複数はOK）
   // 置けない分は配分せず、注意として表示する。
   const unplaced  = [];
   const stapleOk  = (s, u) => {
@@ -1102,7 +1101,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   // 各食事行の「内容・ポイント」：入力の配分と、④で決めた追加分を示す
   const meal = (bin, targetG, tail) => {
     if(empty && !bin.addTotal){
-      return `<b>「② 今日の食事」が未入力です。</b>食べたもの（納豆・豆腐・サラダチキンなど）を入力すると、ここに ${targetG}g 分の配分が自動表示されます。`;
+      return `<b>「② 今日の食事」が未入力です。</b>食べたもの（納豆・豆腐・サバ缶など）を入力すると、ここに ${targetG}g 分の配分が自動表示されます。`;
     }
     if(bin.items.length){
       return `${orderNote(bin)}<b>${bin.label}</b> ＝ 合計 <b>${bin.total}g</b><br>${mealAdvice(bin, targetG, st, dayCovered)}${tail}`;
@@ -1345,9 +1344,9 @@ const label    = (id, n) => { const f = foodById(id); return `${f.short} ${n}${f
 /* 提案に使う食品と、そのタンパク源のカテゴリ。
    同じ供給源に偏るとアミノ酸組成やビタミン・ミネラルが偏るため、
    その日まだ摂っていないカテゴリを優先して提案する。 */
-const SUGGEST_ORDER = ['chicken','saba','tuna','natto','yogurt','tofu','egg'];
+const SUGGEST_ORDER = ['saba','tuna','natto','yogurt','tofu','egg'];
 const FOOD_CAT = {
-  chicken:'肉', saba:'魚', tuna:'魚', natto:'大豆', tofu:'大豆',
+  saba:'魚', tuna:'魚', natto:'大豆', tofu:'大豆',
   egg:'卵', yogurt:'乳製品'
 };
 
@@ -1361,7 +1360,7 @@ function usedCategories(st){
 /* 指定した g 数を満たす食品の組み合わせを提案する。
    1単位ずつ選び、まだ使っていないカテゴリを優先（同条件ならタンパク質密度が高い順）。 */
 function suggestPlan(g, st){
-  // 同じグループ（サラダチキンとサバ缶など）は1つの時間帯に1種類までなので、
+  // 同じグループの品目は1つの時間帯に1種類までなので、
   // 1日で置ける種類数は食事の枠数まで。すでに埋まっているなら別の種類は提案しない。
   const slotCount = (st && st.meals === 3) ? 3 : 2;
   const kinds = {};   // グループ名 → その日に使う品目idの集合
@@ -1403,7 +1402,7 @@ function suggestPlan(g, st){
   return picks;                            // 食品idの配列（1単位ごと）
 }
 
-/* 品目idの配列を「サラダチキン 1P（30.3g） ＋ …」の表示に整形する */
+/* 品目idの配列を「サバ缶 1缶（16.7g） ＋ …」の表示に整形する */
 function formatPlan(ids){
   const map = new Map();
   (ids || []).forEach(id => map.set(id, (map.get(id) || 0) + 1));
@@ -1525,7 +1524,7 @@ function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, pl
   if(sv.totalG > 0 && sv.totalG >= target * 0.45){
     tips.push(['', `<b>⑦ 今日は目標 ${target}g のうち ${sv.totalG}g（約${Math.round(sv.totalG / target * 100)}%）をザバスで賄う計算です。</b>` +
       `プロテインは不足を埋める補助であって主役ではありません。ビタミン・ミネラル・食物繊維は粉からは摂れないため、` +
-      `<b>サラダチキンや納豆・豆腐を1〜2品増やして、粉の比率を4割以下に下げる</b>ほうが望ましい状態です。`]);
+      `<b>サバ缶や納豆・豆腐を1〜2品増やして、粉の比率を4割以下に下げる</b>ほうが望ましい状態です。`]);
   }
 
   if(lack === 0 && food.total > target + 30){
