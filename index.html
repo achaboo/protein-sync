@@ -426,7 +426,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-08-26.33';
+const APP_VERSION = '2026-08-26.34';
 
 const SPOON_G   = 6.5;                  // ザバス付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -628,6 +628,9 @@ const MAX_PER_SERVE = 4;    // 1回あたりの上限。推奨は3杯で、5杯�
 const ABSORB_CAP    = 40;   // 1回の摂取上限 g
 
 const TOLERANCE     = 3;    // これ以上の摂りすぎは許容しない g
+// 目標とのズレがこの範囲なら誤差として扱い、増やす／減らすの提案をしない。
+// 増減で別の閾値を使うと「減らせ」と「補え」が交互に出てしまうため、両方でこの値を使う。
+const DEVIATION_OK  = 5;
 const MIN_PER_SERVE = 2;    // 2回以上に分けるときの1回あたり最低杯数
 const MILK_SLACK    = 1.5;  // 牛乳を優先するために許容する「目標とのズレ」の上乗せ g
 
@@ -733,11 +736,13 @@ function render(opts){
   const intake    = r1(food.total + sv.totalG);          // 食事＋ザバスの見込み合計
   const toFoodG   = r1(Math.max(0, target - intake));    // 食事で補うべき残り
   const reduceG   = r1(Math.max(0, intake - target));    // 食事から減らすべき量
-  // 残りを補う組み合わせは1回だけ決め、④の早見表と⑤のスケジュールで同じ品目を使う
-  const plan      = toFoodG > 0 ? suggestPlan(toFoodG, st) : [];
+  // 残りを補う組み合わせは1回だけ決め、④の早見表と⑤のスケジュールで同じ品目を使う。
+  // 誤差の範囲（DEVIATION_OK 未満）なら提案しない。
+  const plan      = toFoodG >= DEVIATION_OK ? suggestPlan(toFoodG, st) : [];
   // 提案どおり摂った場合に1日の目標へ届くか（届くなら食事ごとのズレは配分の問題）
   const planTotal  = r1(plan.reduce((a, id) => a + pOf(id), 0));
-  const dayCovered = r1(food.total + sv.totalG + planTotal) >= target - 0.05;
+  const dayCovered = toFoodG < DEVIATION_OK ||
+                     r1(food.total + sv.totalG + planTotal) >= target - 0.05;
 
   // ---- サマリー ----
   const floor   = r1(st.weight * FLOOR_FACTOR);       // ここを超えていればその日は十分
@@ -754,7 +759,7 @@ function render(opts){
   // ---- ザバス提案 ----
   const liqName = st.liquid.name;
   // 超過する場合は、どの食品を減らすとよいかを栄養バランスから提案する
-  const cut = reduceG >= 5 ? suggestReduce(reduceG, st) : {label:'', cutG:0};
+  const cut = reduceG >= DEVIATION_OK ? suggestReduce(reduceG, st) : {label:'', cutG:0};
   const cutWhy = cut.label
     ? `<br><small>タンパク源が偏っているカテゴリ（${[...usedCategories(st)].join('・')}のうち量が多いもの）から` +
       `減らしています。ご飯・バナナ・ミックスサラダはルールで固定しているため対象外です。</small>`
@@ -769,20 +774,24 @@ function render(opts){
     $('oSavasSub').innerHTML =
       `＝ ${serveText(sv.sessions.length)}　${detail}` +
       `<br>水で溶かすため、タンパク質は粉の ${sv.savasG}g のみです。` +
-      (reduceG >= 5
+      (reduceG >= DEVIATION_OK
         ? `<br><b>食事＋ザバスの合計は ${intake}g で、目標を ${reduceG}g 上回ります。</b>` +
           (cut.label
             ? `<br><b>食事から ${cut.label}（−${cut.cutG}g）を減らしてください。</b>` +
               (cut.cutG < reduceG - 0.05
                 ? `これでも ${r1(reduceG - cut.cutG)}g 多めですが、これ以上減らすと今度は不足します。`
-                : '') + cutWhy
+                : cut.cutG > reduceG + 0.05
+                  ? `減らすと ${r1(cut.cutG - reduceG)}g 少なめになりますが、誤差の範囲です。`
+                  : '') + cutWhy
             : `<br>ただし1単位が大きい品目しかないため、減らすと今度は不足します。この日は多めのままで構いません。`)
         : reduceG > 0
           ? `<br>食事＋ザバスの合計は ${intake}g（目標を ${reduceG}g 上回りますが誤差の範囲です）。`
           : `<br>不足 ${lack}g のうち <b>${sv.totalG}g</b> をこれで補います。` +
-            (toFoodG > 0
+            (toFoodG >= DEVIATION_OK
               ? `<b> 残り ${toFoodG}g は食事で補ってください。</b>`
-              : '（過不足なし）')) +
+              : toFoodG > 0
+                ? `（残り ${toFoodG}g は誤差の範囲です）`
+                : '（過不足なし）')) +
       (sv.forced
         ? `<br><small>筋トレをした日はザバスを必ず摂る設定のため、` +
           `不足の有無にかかわらず最低 ${MIN_SPOONS_TRAINED}杯（${r1(MIN_SPOONS_TRAINED * SPOON_G)}g）を確保しています。</small>`
@@ -1160,7 +1169,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
 /* 上の計算結果どおりザバスを摂ったうえで、残りを食事で補う場合の早見表 */
 function renderAltFoods(toFoodG, sv, st, plan){
   const box = $('altFoods');
-  if(toFoodG <= 0){ box.innerHTML = ''; return; }
+  if(toFoodG < DEVIATION_OK){ box.innerHTML = ''; return; }
 
   // 最初に食べる野菜（血糖値対策の位置づけ）と、単品では非現実的な低密度の食品は除外する
   const ALT_MIN_P = 5;
@@ -1444,14 +1453,14 @@ function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, pl
   }
 
   // --- 不足の状態表示：追加すべき量を明示し、満たせば「解消」に切り替わる ---
-  if(reduceG >= 5 && cut && cut.label){
+  if(reduceG >= DEVIATION_OK && cut && cut.label){
     tips.push(['alert',
       `<b>⚠ 食事から ${cut.label}（−${cut.cutG}g）を減らしてください。</b>` +
       `筋トレをした日はザバス ${sv.spoons}杯（${sv.totalG}g）を必ず摂るため、` +
       `このままでは目標 ${target}g を ${reduceG}g 上回ります。<br>` +
       `減らす対象は、その日のタンパク源が偏っているカテゴリから選んでいます。` +
       `ご飯・バナナ・ミックスサラダはルールで固定しているため減らしません。`]);
-  }else if(toFoodG >= 5){
+  }else if(toFoodG >= DEVIATION_OK){
     const more = toFoodG;
     tips.push(['alert',
       `<b>⚠ あと ${more}g を食事で追加してください。</b>` +
