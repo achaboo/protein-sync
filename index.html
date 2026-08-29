@@ -416,7 +416,7 @@ table.mini td.amt{width:auto;text-align:right}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-08-26.28';
+const APP_VERSION = '2026-08-26.29';
 
 const SPOON_G   = 6.5;                  // ザバス付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -614,7 +614,7 @@ function calcFactor(st){
 // liqP＝1回あたりに液体（牛乳・豆乳など）から摂れるタンパク質 g。水なら 0。
 const MAX_SESSIONS  = 1;    // ザバスは運動直後の1回だけ。他の時間帯では摂らない
 const MIN_SPOONS_TRAINED = 3;  // 筋トレをした日に必ず飲む最低杯数（製品推奨の1回3杯）
-const MAX_PER_SERVE = 6;    // 1回にまとめるため、吸収上限 40g に収まる範囲で杯数を許容
+const MAX_PER_SERVE = 4;    // 1回あたりの上限。推奨は3杯で、5杯以上はメーカーも推奨していない
 const ABSORB_CAP    = 40;   // 1回の摂取上限 g
 
 const TOLERANCE     = 3;    // これ以上の摂りすぎは許容しない g
@@ -791,8 +791,8 @@ function render(opts){
         : '') +
       (sv.forced ? '' : `${coverG}g は運動直後の1回にまとめています。`) +
       (sv.packed
-        ? `推奨の${PER_SERVE}杯より多めですが、ザバスは運動直後の1回にまとめるため、` +
-          `吸収上限${ABSORB_CAP}gの範囲で1回に収めています。`
+        ? `推奨の${PER_SERVE}杯より1杯多めですが、ザバスは運動直後の1回だけなので` +
+          `上限の${MAX_PER_SERVE}杯（${r1(MAX_PER_SERVE * SPOON_G)}g）まで使っています。`
         : '') +
       ((capBinds || !sv.forced) ? `</small>` : `</span>`);
   }else if(lack > 0){
