@@ -16,7 +16,7 @@
    5. 「計算する」を押すと、
         ・今日の目標タンパク質（運動量に応じて 体重×1.5〜1.8g で自動変動）
         ・食事からの合計タンパク質
-        ・不足分と、それを補うザバスのスプーン杯数 / 回数
+        ・不足分と、それを補うSAVASのスプーン杯数 / 回数
         ・朝・昼・晩・運動後・間食/就寝前の「時間帯別スケジュール表」
         ・食事と栄養のポイント
       が下に表示されます。
@@ -31,10 +31,10 @@
       保存内容も削除されます。
 
   【計算の前提値】
-   ・ザバス ホエイプロテイン100 リッチショコラ味
+   ・SAVAS ホエイプロテイン100 リッチショコラ味
        付属スプーン 1杯 = タンパク質 約 6.5g / 推奨 1回 3杯 = 約 19.5g
-   ・ザバスは水300mlで溶かし、運動直後の1回だけ摂ります（乳類は使いません）。
-     運動していない日はザバスを摂らず、目標分はすべて食事から確保します。
+   ・SAVASは水300mlで溶かし、運動直後の1回だけ摂ります（乳類は使いません）。
+     運動していない日はSAVASを摂らず、目標分はすべて食事から確保します。
    ・食品のタンパク質量はスクリプト内の FOODS で一元管理しています
      （サバ缶16.7g、ツナ缶12.7g、ご飯0.5合4.5g、納豆8.3g、ヨーグルト200g8g、
      豆腐7.2g、卵6g、ミックスサラダ2g、バナナ1g）。
@@ -191,7 +191,7 @@ table.mini{font-size:.82rem}
 table.mini td.time{width:auto;white-space:nowrap}
 table.mini td.amt{width:auto;text-align:right}
 table.mini tr.today td{background:#eef4ff;font-weight:700}
-/* ザバスを使わずに食事で補う場合の早見表 */
+/* SAVASを使わずに食事で補う場合の早見表 */
 .alt{border:1px solid var(--line);border-radius:12px;padding:12px 12px 4px;margin-bottom:14px;background:#fbfcfe}
 .alt h4{margin:0 0 8px;font-size:.9rem}
 .alt table{font-size:.84rem}
@@ -232,7 +232,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
 <header>
   <div class="wrap">
     <h1>Protein Sync ― 一日のたんぱく質 設計ツール</h1>
-    <p>体重と運動量から目標量を決め、その日の献立・時間帯・食費・ザバスの杯数までまとめて設計します。</p>
+    <p>体重と運動量から目標量を決め、その日の献立・時間帯・食費・SAVASの杯数までまとめて設計します。</p>
   </div>
 </header>
 
@@ -262,7 +262,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
 
     <div class="grid2" style="margin-top:12px">
       <div>
-        <label for="savasShare">ザバスで賄う上限（1日の目標に対する割合 %）</label>
+        <label for="savasShare">SAVASで賄う上限（1日の目標に対する割合 %）</label>
         <input type="number" inputmode="numeric" id="savasShare" value="40" min="0" max="100" step="5">
       </div>
       <div>
@@ -318,7 +318,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
 
     <h3>設定の持ち運び（別の端末で同じ設定を使う）</h3>
     <p class="hint" style="margin-top:0">
-      <b>画面の入力をすべて</b> URL に埋め込みます（体重・基本係数・食事回数・ザバスで賄う上限・
+      <b>画面の入力をすべて</b> URL に埋め込みます（体重・基本係数・食事回数・SAVASで賄う上限・
       筋トレの重量／回数／セット数・実施した種目のチェック・有酸素の距離・今日の食事の数量）。
       できたリンクを別の端末で開くと同じ内容で立ち上がり、その端末にも保存されます。<br>
       <b>ボタンを押した時点のスナップショットです。</b>そのあとこの端末で値を変えてもリンク側は変わりません。
@@ -438,9 +438,9 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-08-26.46';
+const APP_VERSION = '2026-08-26.47';
 
-const SPOON_G   = 6.5;                  // ザバス付属スプーン1杯あたりのタンパク質(g)
+const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
 const SERVE_G   = SPOON_G * PER_SERVE;  // 1回 = 19.5g
 
@@ -470,7 +470,7 @@ const FOODS = [
   {id:'salad',   name:'ミックスサラダ',      short:'ミックスサラダ', note:'1袋 約2g',           price:106, p:2,    unit:'袋', slots:['l','d','b'], first:true, autoPerMeal:true}
 ];
 
-// ザバスは水のみで溶かす（乳類は摂らない前提）。水にタンパク質は含まれないため加算はない。
+// SAVASは水のみで溶かす（乳類は摂らない前提）。水にタンパク質は含まれないため加算はない。
 const WATER = {id:'water', name:'水', p100:0};
 const WATER_ML = 300;   // 1回あたりに溶かす水の量（表示用）
 
@@ -545,13 +545,13 @@ function readState(){
     walk: num('walk'), cycle: num('cycle'), otherP: num('otherP'),
     foods: {}, ex: {}
   };
-  // ザバスは水で溶かす固定。液体からのタンパク質は 0。
+  // SAVASは水で溶かす固定。液体からのタンパク質は 0。
   st.liquid     = WATER;
   st.liquidMl   = WATER_ML;
   st.liqP       = 0;
   st.meals       = parseInt($('meals').value, 10) === 3 ? 3 : 2;
   st.skipB       = st.meals === 2;                    // 朝食を摂らない
-  st.savasShare  = Math.min(100, num('savasShare')) / 100;   // ザバスで賄う上限（目標比）
+  st.savasShare  = Math.min(100, num('savasShare')) / 100;   // SAVASで賄う上限（目標比）
   FOODS.forEach(f => st.foods[f.id] = num('f_' + f.id));
   EXERCISES.forEach(e => st.ex[e.id] = {
     on: $('c_' + e.id).checked, w: num('w_' + e.id), r: num('r_' + e.id), s: num('s_' + e.id)
@@ -637,7 +637,7 @@ function calcFactor(st){
 // 1回の吸収上限と胃への負担を考慮し、1回は最大3杯・1日最大3回（＝9杯/約58.5g）まで。
 // それを超える不足分は粉に頼らず食事で補う想定とし、excess として返す。
 // liqP＝1回あたりに液体（牛乳・豆乳など）から摂れるタンパク質 g。水なら 0。
-const MAX_SESSIONS  = 1;    // ザバスは運動直後の1回だけ。他の時間帯では摂らない
+const MAX_SESSIONS  = 1;    // SAVASは運動直後の1回だけ。他の時間帯では摂らない
 const MIN_SPOONS_TRAINED = 3;  // 筋トレをした日に必ず飲む最低杯数（製品推奨の1回3杯）
 const MAX_PER_SERVE = 4;    // 1回あたりの上限。推奨は3杯で、5杯以上はメーカーも推奨していない
 const ABSORB_CAP    = 40;   // 1回の摂取上限 g
@@ -736,19 +736,19 @@ function render(opts){
   const lack   = r1(Math.max(0, target - food.total));
   const over   = r1(Math.max(0, food.total - target));
 
-  // ザバスで賄うのは目標の一定割合までとし、残りは食事に回す。
+  // SAVASで賄うのは目標の一定割合までとし、残りは食事に回す。
   // 不足の全量を粉で埋めると、1日の大半をプロテインで摂ることになってしまうため。
   const savasCap  = r1(target * st.savasShare);
   const coverG    = Math.min(lack, savasCap);
-  // ザバスは運動直後の1回のみ。運動していない日は摂らない。
+  // SAVASは運動直後の1回のみ。運動していない日は摂らない。
   const trained   = ex.done > 0 || ex.cardio > 0;
   let   sv        = trained ? splitSavas(coverG, st, true)
                             : {spoons:0, sessions:[], savasG:0, liquidG:0, totalG:0, remainG:0, overG:0, maxSingleG:0};
-  // 筋トレをした日はザバスを必ず摂る。食事だけで目標に届いていても最低 PER_SERVE 杯は飲む。
+  // 筋トレをした日はSAVASを必ず摂る。食事だけで目標に届いていても最低 PER_SERVE 杯は飲む。
   if(trained && sv.spoons < MIN_SPOONS_TRAINED) sv = fixedSavas(MIN_SPOONS_TRAINED);
   const capBinds  = lack > savasCap && st.savasShare < 1 && sv.spoons > MIN_SPOONS_TRAINED;
 
-  const intake    = r1(food.total + sv.totalG);          // 食事＋ザバスの見込み合計
+  const intake    = r1(food.total + sv.totalG);          // 食事＋SAVASの見込み合計
   const toFoodG   = r1(Math.max(0, target - intake));    // 食事で補うべき残り
   const reduceG   = r1(Math.max(0, intake - target));    // 食事から減らすべき量
   // 残りを補う組み合わせは1回だけ決め、④の早見表と⑤のスケジュールで同じ品目を使う。
@@ -761,7 +761,7 @@ function render(opts){
 
   // ---- サマリー ----
   const floor   = r1(st.weight * FLOOR_FACTOR);       // ここを超えていればその日は十分
-  const planned = r1(food.total + sv.totalG);         // 食事＋ザバスの合計見込み
+  const planned = r1(food.total + sv.totalG);         // 食事＋SAVASの合計見込み
   $('oFloor').textContent  = floor + ' g';
   $('oTarget').textContent = target + ' g';
   $('oFood').textContent   = food.total + ' g';
@@ -771,7 +771,7 @@ function render(opts){
   badge.textContent = ex.level.t;
   badge.style.background = ex.level.c;
 
-  // ---- ザバス提案 ----
+  // ---- SAVAS提案 ----
   const liqName = st.liquid.name;
   // 超過する場合は、どの食品を減らすとよいかを栄養バランスから提案する
   const cut = reduceG >= DEVIATION_OK ? suggestReduce(reduceG, st) : {label:'', cutG:0};
@@ -781,7 +781,7 @@ function render(opts){
     : '';
   if(sv.spoons > 0){
     $('oSavas').innerHTML =
-      `ザバス 付属スプーン ` +
+      `SAVAS 付属スプーン ` +
       `<span style="white-space:nowrap"><span style="font-size:2.1rem">${sv.spoons}</span> 杯</span>` +
       `<span style="font-size:1rem">　（合計 約 ${sv.totalG}g）</span>`;
     const detail = sv.sessions.map(sn =>
@@ -790,7 +790,7 @@ function render(opts){
       `＝ ${serveText(sv.sessions.length)}　${detail}` +
       `<br>水で溶かすため、タンパク質は粉の ${sv.savasG}g のみです。` +
       (reduceG >= DEVIATION_OK
-        ? `<br><b>食事＋ザバスの合計は ${intake}g で、目標を ${reduceG}g 上回ります。</b>` +
+        ? `<br><b>食事＋SAVASの合計は ${intake}g で、目標を ${reduceG}g 上回ります。</b>` +
           (cut.label
             ? `<br><b>食事から ${cut.label}（−${cut.cutG}g）を減らしてください。</b>` +
               (cut.cutG < reduceG - 0.05
@@ -800,7 +800,7 @@ function render(opts){
                   : '') + cutWhy
             : `<br>ただし1単位が大きい品目しかないため、減らすと今度は不足します。この日は多めのままで構いません。`)
         : reduceG > 0
-          ? `<br>食事＋ザバスの合計は ${intake}g（目標を ${reduceG}g 上回りますが誤差の範囲です）。`
+          ? `<br>食事＋SAVASの合計は ${intake}g（目標を ${reduceG}g 上回りますが誤差の範囲です）。`
           : `<br>不足 ${lack}g のうち <b>${sv.totalG}g</b> をこれで補います。` +
             (toFoodG >= DEVIATION_OK
               ? `<b> 残り ${toFoodG}g は食事で補ってください。</b>`
@@ -808,7 +808,7 @@ function render(opts){
                 ? `（残り ${toFoodG}g は誤差の範囲です）`
                 : '（過不足なし）')) +
       (sv.forced
-        ? `<br><small>筋トレをした日はザバスを必ず摂る設定のため、` +
+        ? `<br><small>筋トレをした日はSAVASを必ず摂る設定のため、` +
           `不足の有無にかかわらず最低 ${MIN_SPOONS_TRAINED}杯（${r1(MIN_SPOONS_TRAINED * SPOON_G)}g）を確保しています。</small>`
         : '') +
       // 上限に張り付いている間は杯数が動かないため、その理由を目立つ位置に出す
@@ -821,22 +821,22 @@ function render(opts){
       ((capBinds || !sv.forced) ? `<br><small>※ ` : `<span style="display:none">`) +
       (capBinds
         ? `不足 ${lack}g の全量を粉で摂ると食事からのビタミン・ミネラル・食物繊維が不足するため、上限を設けています。` +
-          `上限は「① 基本設定」で変更できます（100%にすると不足の全量をザバスで補います）。`
+          `上限は「① 基本設定」で変更できます（100%にすると不足の全量をSAVASで補います）。`
         : '') +
       (sv.forced ? '' : `${coverG}g は運動直後の1回にまとめています。`) +
       (sv.packed
-        ? `推奨の${PER_SERVE}杯より1杯多めですが、ザバスは運動直後の1回だけなので` +
+        ? `推奨の${PER_SERVE}杯より1杯多めですが、SAVASは運動直後の1回だけなので` +
           `上限の${MAX_PER_SERVE}杯（${r1(MAX_PER_SERVE * SPOON_G)}g）まで使っています。`
         : '') +
       ((capBinds || !sv.forced) ? `</small>` : `</span>`);
   }else if(lack > 0){
-    $('oSavas').innerHTML = `ザバスは不要です<span style="font-size:1rem">（不足 ${lack}g）</span>`;
+    $('oSavas').innerHTML = `SAVASは不要です<span style="font-size:1rem">（不足 ${lack}g）</span>`;
     $('oSavasSub').innerHTML = (st.liqP > 0
       ? `1回分（スプーン1杯＋${liqName}${st.liquidMl}ml＝約${r1(SPOON_G + st.liqP)}g）を飲むと逆に摂りすぎになります。${label('egg', 1)}など少量の食品で調整してください。`
       : `残り ${lack}g は少量なので、${label('egg', 1)}などの食品で調整するほうが確実です。`) +
       (liquidCutSuggestion(st, lack) ? `<br>${liquidCutSuggestion(st, lack)}` : '');
   }else{
-    $('oSavas').innerHTML = 'ザバスの追加摂取は不要です 👍';
+    $('oSavas').innerHTML = 'SAVASの追加摂取は不要です 👍';
     $('oSavasSub').textContent = over > 0
       ? `食事だけで目標を ${over}g 上回っています。飲む場合は運動直後に1〜2杯に留めましょう。`
       : '食事だけで今日の目標を達成しています。';
@@ -846,7 +846,7 @@ function render(opts){
   $('oReason').innerHTML =
     // 端末ごとに設定が違うと結果も変わるため、比較できるよう設定値を並べる
     `<b>設定：</b>体重 ${r1(st.weight)}kg ／ ${st.meals}食 ／ 基本係数 ${st.baseFactor.toFixed(2)} ／ ` +
-    `ザバス上限 ${Math.round(st.savasShare * 100)}% ／ バージョン ${APP_VERSION}<br>` +
+    `SAVAS上限 ${Math.round(st.savasShare * 100)}% ／ バージョン ${APP_VERSION}<br>` +
     `<b>目標の算出根拠：</b>体重 ${r1(st.weight)}kg × <b>${ex.factor.toFixed(2)} g/kg</b> = <b>${target}g</b><br>` +
     `　内訳：基本係数 <b>${ex.base.toFixed(2)}</b>` +
     (ex.bonus > 0
@@ -862,7 +862,7 @@ function render(opts){
     ex.reasons.map(r => '・' + r).join('<br>') +
     `<br><b>食事の内訳：</b>` + (food.list.length ? food.list.join('、') : '入力なし') +
     (sv.spoons > 0 && st.liqP > 0
-      ? `<br><b>ザバスの内訳：</b>粉 ${sv.savasG}g ＋ ${liqName} ${sv.liquidG}g = ${sv.totalG}g` +
+      ? `<br><b>SAVASの内訳：</b>粉 ${sv.savasG}g ＋ ${liqName} ${sv.liquidG}g = ${sv.totalG}g` +
         `（${liqName}は ${st.liquid.p100}g/100ml で計算）`
       : '');
 
@@ -1098,7 +1098,7 @@ function mealAdvice(bin, target, st, dayCovered){
 function renderSchedule(st, ex, target, sv, plan, dayCovered){
   const trained = ex.done > 0 || ex.cardio > 0;
 
-  // 食事で摂るべき量 = 目標 − ザバスで補う量（粉＋液体）を 朝30% / 昼35% / 晩35% に配分（1回40g上限）
+  // 食事で摂るべき量 = 目標 − SAVASで補う量（粉＋液体）を 朝30% / 昼35% / 晩35% に配分（1回40g上限）
   const byMeal  = Math.max(0, target - sv.totalG);
   const cap     = g => Math.min(40, Math.round(g));
   // 朝食を抜く場合は昼・夕で半分ずつ
@@ -1107,7 +1107,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   const mLunch  = cap(byMeal * share.l);
   const mDinner = cap(byMeal * share.d);
 
-  const sMorning = sv.sessions[0];   // ザバスは運動直後の1回のみ
+  const sMorning = sv.sessions[0];   // SAVASは運動直後の1回のみ
   const cup = sn => {
     if(!sn || sn.spoons <= 0) return '—';
     return `スプーン ${sn.spoons}杯<br><small>（水${WATER_ML}mlで溶かす<br>約${r1(sn.spoons * SPOON_G)}g）</small>`;
@@ -1142,8 +1142,8 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
             ? `<br><b>あわせて ${bins.p.label}</b>。` +
               `糖質を補うことでタンパク質がエネルギーに回されるのを防げます。`
             : `<br><b>バナナ1本もあわせて</b>摂ってください（「② 今日の食事」で本数を入力すると反映されます）。`) +
-          `<br><small>この時間帯はザバスとバナナのみで、他のものは摂りません。</small>`
-        : `運動していない日はザバスを摂りません。目標分はすべて食事から確保してください。`
+          `<br><small>この時間帯はSAVASとバナナのみで、他のものは摂りません。</small>`
+        : `運動していない日はSAVASを摂りません。目標分はすべて食事から確保してください。`
     ],
     st.skipB
       ? [
@@ -1151,7 +1151,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
           '—',
           `朝食を摂らない設定のため、この枠には配分していません。` +
           `前夜の夕食から昼食まで長時間タンパク質が入らないので、` +
-          `<b>${trained ? '運動直後' : '起床後'}のザバスが実質的な朝の補給</b>になります。ここは抜かないでください。`
+          `<b>${trained ? '運動直後' : '起床後'}のSAVASが実質的な朝の補給</b>になります。ここは抜かないでください。`
         ]
       : [
           '朝食',
@@ -1184,7 +1184,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
     : '';
 }
 
-/* 上の計算結果どおりザバスを摂ったうえで、残りを食事で補う場合の早見表 */
+/* 上の計算結果どおりSAVASを摂ったうえで、残りを食事で補う場合の早見表 */
 function renderAltFoods(toFoodG, sv, st, plan){
   const box = $('altFoods');
   if(toFoodG < DEVIATION_OK){ box.innerHTML = ''; return; }
@@ -1208,7 +1208,7 @@ function renderAltFoods(toFoodG, sv, st, plan){
   box.innerHTML =
     `<div class="alt">
       <h4>残り ${toFoodG}g を食事で補うなら
-        <small>（上のザバス ${sv.spoons}杯・${sv.totalG}g を摂った前提）</small></h4>
+        <small>（上のSAVAS ${sv.spoons}杯・${sv.totalG}g を摂った前提）</small></h4>
       <div class="table-wrap"><table><tbody>${rows}</tbody></table></div>
       <div class="combo">
         <b>栄養バランス重視：</b>${formatPlan(plan)}　<b>${planCost(plan).toLocaleString()}円</b>
@@ -1303,7 +1303,7 @@ function fixedSavas(spoons){
   };
 }
 
-/* ザバスを足すと目標を超える場合に、食事のどれを減らすとよいかを提案する。
+/* SAVASを足すと目標を超える場合に、食事のどれを減らすとよいかを提案する。
    ルールで固定している食品（ご飯・バナナ・ミックスサラダ）は対象外とし、
    タンパク源が偏っているカテゴリから優先して減らす。 */
 const REDUCE_EXCLUDE = ['rice','banana','salad'];
@@ -1346,7 +1346,7 @@ function suggestReduce(overG, st){
   };
 }
 
-/* 不足がザバス1回分より小さいとき、液体を減らして1杯で合わせる案を返す */
+/* 不足がSAVAS1回分より小さいとき、液体を減らして1杯で合わせる案を返す */
 function liquidCutSuggestion(st, lack){
   if(!(st.liquid.p100 > 0) || lack <= SPOON_G) return '';
   const ml = Math.round((lack - SPOON_G) * 100 / st.liquid.p100 / 50) * 50;
@@ -1448,9 +1448,9 @@ function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, pl
   }
 
   tips.push(['', `<b>① 1回の摂取は30〜40gまで。</b>1度に吸収・利用できるタンパク質は 30〜40g 程度が上限です。今日の目標 ${target}g は一気に摂らず、` +
-    (st.skipB ? `<b>昼・夕の2食＋ザバス</b>` : `<b>朝・昼・晩＋補食</b>`) +
+    (st.skipB ? `<b>昼・夕の2食＋SAVAS</b>` : `<b>朝・昼・晩＋補食</b>`) +
     `に分散してください。まとめ摂りした余剰分は筋肉に回らず、エネルギーや脂肪として処理されるだけになります。` +
-    (st.skipB ? `2食だと1食あたりが増えやすいので、超えた分はザバスの回に回すほうが無駄になりません。` : '')]);
+    (st.skipB ? `2食だと1食あたりが増えやすいので、超えた分はSAVASの回に回すほうが無駄になりません。` : '')]);
 
   tips.push(['', `<b>② 食べる順番を守る（ベジ／ソイファースト）。</b>ご飯など糖質を摂るときは、必ず先に<b>ミックスサラダ・冷奴・納豆などの大豆製品</b>を食べてから。血糖値の急上昇（血糖値スパイク）を抑え、内臓脂肪の蓄積を防げます。特に<b>ご飯</b>は糖質量が大きいので、サラダと大豆製品の先食べを徹底しましょう。`]);
 
@@ -1462,7 +1462,7 @@ function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, pl
   tips.push(['', `<b>④ 水分補給を十分に。</b>タンパク質の代謝では老廃物（尿素窒素）の排出に水が必要で、腎臓の負担軽減にもつながります。<b>1日 1.5〜2L</b>を目安に、運動中・運動後はこまめに。` +
     (st.liqP > 0
       ? `${st.liquid.name}で溶かす場合、それ自体は水分補給になりますが、別に水も摂ってください。`
-      : `ザバスも水 ${st.liquidMl}ml でしっかり溶かして飲んでください。`)]);
+      : `SAVASも水 ${st.liquidMl}ml でしっかり溶かして飲んでください。`)]);
 
   if(ex.done > 0){
     tips.push(['', `<b>⑤ 今日は筋トレ ${ex.done}種目 / 総負荷量 ${ex.volume.toLocaleString()}kg。</b>筋線維の修復は48時間程度続くため、<b>翌日もタンパク質量を落とさない</b>ことが重要です。負荷を上げるときは、重量を増やすより先に「セット数を1つ増やす」「回数を15→20回にする」ほうが関節への負担が少なく安全です。`]);
@@ -1474,7 +1474,7 @@ function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, pl
   if(reduceG >= DEVIATION_OK && cut && cut.label){
     tips.push(['alert',
       `<b>⚠ 食事から ${cut.label}（−${cut.cutG}g）を減らしてください。</b>` +
-      `筋トレをした日はザバス ${sv.spoons}杯（${sv.totalG}g）を必ず摂るため、` +
+      `筋トレをした日はSAVAS ${sv.spoons}杯（${sv.totalG}g）を必ず摂るため、` +
       `このままでは目標 ${target}g を ${reduceG}g 上回ります。<br>` +
       `減らす対象は、その日のタンパク源が偏っているカテゴリから選んでいます。` +
       `ご飯・バナナ・ミックスサラダはルールで固定しているため減らしません。`]);
@@ -1483,28 +1483,28 @@ function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, pl
     tips.push(['alert',
       `<b>⚠ あと ${more}g を食事で追加してください。</b>` +
       (capBinds
-        ? `ザバスで賄うのは目標の${Math.round(st.savasShare * 100)}%までとしているため、` +
+        ? `SAVASで賄うのは目標の${Math.round(st.savasShare * 100)}%までとしているため、` +
           `残りは食品から摂る前提の数字です。`
         : sv.spoons > 0
-          ? `ザバス ${sv.spoons}杯（合計 ${sv.totalG}g）では、不足 ${lack}g のうち ${more}g が残ります。`
-          : `不足 ${lack}g に対しザバス1回分（スプーン1杯＋${st.liquid.name}で約${r1(SPOON_G + st.liqP)}g）は多すぎるため、食品で補うほうが正確です。`) +
+          ? `SAVAS ${sv.spoons}杯（合計 ${sv.totalG}g）では、不足 ${lack}g のうち ${more}g が残ります。`
+          : `不足 ${lack}g に対しSAVAS1回分（スプーン1杯＋${st.liquid.name}で約${r1(SPOON_G + st.liqP)}g）は多すぎるため、食品で補うほうが正確です。`) +
       `<br>例：<b>${suggestFoods(more, st)}</b> を「② 今日の食事」に追加すると、この指摘は消えます。` +
       (sv.spoons === 0 && liquidCutSuggestion(st, lack) ? `<br>${liquidCutSuggestion(st, lack)}` : '')]);
   }else if(lack > 0 && sv.spoons > 0){
     tips.push(['done',
-      `<b>✅ 食事の追加は不要です。</b>不足している ${lack}g は、ザバス ${sv.spoons}杯` +
+      `<b>✅ 食事の追加は不要です。</b>不足している ${lack}g は、SAVAS ${sv.spoons}杯` +
       (st.liqP > 0 ? `＋${st.liquid.name}（合計 ${sv.totalG}g）` : '') +
       `（${serveText(sv.sessions.length)}）で補えます。` +
       (toFoodG > 0 ? `差分 ${toFoodG}g は誤差の範囲です。`
                    : sv.overG > 0 ? `${sv.overG}g 多めですが誤差の範囲です。` : '')]);
   }else if(lack > 0){
     tips.push(['done',
-      `<b>✅ 不足は ${lack}g だけです。</b>ザバスを1回飲むと摂りすぎになるため、` +
+      `<b>✅ 不足は ${lack}g だけです。</b>SAVASを1回飲むと摂りすぎになるため、` +
       `そのままか、${label('egg', 1)}程度で調整してください。`]);
   }else{
     tips.push(['done',
       `<b>✅ 今日の目標 ${target}g を食事だけで達成しています。</b>` +
-      `ザバスの追加摂取は不要です。運動直後にどうしても飲みたい場合は1〜2杯までに留めてください。`]);
+      `SAVASの追加摂取は不要です。運動直後にどうしても飲みたい場合は1〜2杯までに留めてください。`]);
   }
 
   // 食事の入力漏れで不足が過大に出ているケースへの注意
@@ -1541,13 +1541,13 @@ function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, pl
 
   // 粉への依存が大きいときの注意
   if(sv.totalG > 0 && sv.totalG >= target * 0.45){
-    tips.push(['', `<b>⑦ 今日は目標 ${target}g のうち ${sv.totalG}g（約${Math.round(sv.totalG / target * 100)}%）をザバスで賄う計算です。</b>` +
+    tips.push(['', `<b>⑦ 今日は目標 ${target}g のうち ${sv.totalG}g（約${Math.round(sv.totalG / target * 100)}%）をSAVASで賄う計算です。</b>` +
       `プロテインは不足を埋める補助であって主役ではありません。ビタミン・ミネラル・食物繊維は粉からは摂れないため、` +
       `<b>サバ缶や納豆・豆腐を1〜2品増やして、粉の比率を4割以下に下げる</b>ほうが望ましい状態です。`]);
   }
 
   if(lack === 0 && food.total > target + 30){
-    tips.push(['alert', `<b>⚠ 目標を大きく超えています（${r1(food.total - target)}g オーバー）。</b>タンパク質も摂りすぎれば余剰カロリーになります。明日は食事量かザバスの杯数で調整しましょう。`]);
+    tips.push(['alert', `<b>⚠ 目標を大きく超えています（${r1(food.total - target)}g オーバー）。</b>タンパク質も摂りすぎれば余剰カロリーになります。明日は食事量かSAVASの杯数で調整しましょう。`]);
   }
 
   $('tips').innerHTML = tips.map(t => `<li class="${t[0]}">${t[1]}</li>`).join('');
@@ -1578,16 +1578,16 @@ function updateLive(){
 
   const st = readState();
 
-  // ザバスで賄う上限
+  // SAVASで賄う上限
   $('shareNote').innerHTML = st.savasShare >= 1
-    ? `不足分をすべてザバスで補います。`
+    ? `不足分をすべてSAVASで補います。`
     : `目標の${Math.round(st.savasShare * 100)}%（${r1(st.weight * st.baseFactor * st.savasShare)}〜${r1(st.weight * capOf(st.baseFactor) * st.savasShare)}g）まで。残りは食事から摂る前提です。`;
 
-  // ザバスの摂り方（水のみ・運動直後の1回のみ）
+  // SAVASの摂り方（水のみ・運動直後の1回のみ）
   $('liquidNote').innerHTML =
-    `<b>ザバスは水${WATER_ML}mlで溶かし、運動直後の1回だけ摂ります。</b>` +
+    `<b>SAVASは水${WATER_ML}mlで溶かし、運動直後の1回だけ摂ります。</b>` +
     `水にタンパク質は含まれないため加算はありません。` +
-    `運動していない日はザバスを摂らず、目標分はすべて食事から確保します。`;
+    `運動していない日はSAVASを摂らず、目標分はすべて食事から確保します。`;
 
   // 食事合計
   // 毎日の品目と、曜日ごとの型
