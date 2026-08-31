@@ -477,7 +477,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-08-26.60';
+const APP_VERSION = '2026-08-26.61';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -1106,8 +1106,8 @@ function orderNote(bin){
   return '';
 }
 
-/* 各食事の過不足に応じた一言 */
-function mealAdvice(bin, target, st, dayCovered){
+/* 各食事の過不足に応じた一言。splitLabel があれば「回し分」の行へ誘導する */
+function mealAdvice(bin, target, st, dayCovered, splitLabel){
   // ④で決めた品目がこの食事に割り当てられていれば、それを提示する
   const after = r1(bin.total + bin.addTotal);
   const d = r1(target - after);
@@ -1125,10 +1125,14 @@ function mealAdvice(bin, target, st, dayCovered){
   }else if(d <= -5){
     msg += (bin.locked && bin.locked.length)
       ? `目安より約${r1(-d)}g多めですが、<b>${bin.locked.join('・')}</b>はこの時間帯にしか摂れないため、そのままで構いません。その分、他の時間帯を軽めに調整してください。`
-      : `目安より約${r1(-d)}g多めです。他の時間帯に回すと1回30〜40gの範囲に収まります。` +
-        `<br><small>回すときは<b>3〜4時間ほど空ける</b>のが目安です。` +
-        `一度の食事で高まった筋タンパク合成は3時間ほどで元に戻り、そこから次の一回が改めて効きます。` +
-        `2時間以内に続けて摂ると、まとめて食べたのとあまり変わりません。</small>`;
+      : splitLabel
+        ? `目安より約${r1(-d)}g多めです。<b>入りきらない分は下の「${splitLabel}」に回してください。</b>` +
+          `<br><small>一度の食事で高まった筋タンパク合成は3時間ほどで元に戻り、そこから次の一回が改めて効きます。` +
+          `2時間以内に続けて摂ると、まとめて食べたのとあまり変わりません。</small>`
+        : `目安より約${r1(-d)}g多めです。他の時間帯に回すと1回30〜40gの範囲に収まります。` +
+          `<br><small>回すときは<b>3〜4時間ほど空ける</b>のが目安です。` +
+          `一度の食事で高まった筋タンパク合成は3時間ほどで元に戻り、そこから次の一回が改めて効きます。` +
+          `2時間以内に続けて摂ると、まとめて食べたのとあまり変わりません。</small>`;
   }else{
     msg += '目安どおりのバランスです。';
   }
@@ -1175,6 +1179,48 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   };
   const overG = (bin, targetG) => r1(r1(bin.total + bin.addTotal) - targetG);
 
+  /* 回し分に出す品目を選ぶ。ご飯（主食）とミックスサラダ（先に食べる野菜）は
+     食事側に残す必要があるため対象外。超過量にいちばん近い組み合わせを選ぶ。 */
+  const movable = list => list
+    .filter(u => !u.first && !u.carb && u.group !== 'staple' && !u.lock)
+    .sort((a, b) => b.g - a.g)
+    .slice(0, 12);                            // 総当たりの上限（2^12）
+  const bestSubset = (cand, needG) => {
+    if(!cand.length) return null;
+    let best = null, bestDiff = Infinity;
+    for(let mask = 1; mask < (1 << cand.length); mask++){
+      let sum = 0, n = 0;
+      for(let i = 0; i < cand.length; i++) if(mask & (1 << i)){ sum += cand[i].g; n++; }
+      const diff = Math.abs(sum - needG);
+      // 差が同じなら品目数が少ないほうを採る
+      if(diff < bestDiff - 0.001 || (Math.abs(diff - bestDiff) < 0.001 && best && n < best.n)){
+        bestDiff = diff; best = {mask, sum:r1(sum), n};
+      }
+    }
+    if(!best) return null;
+    const picked = cand.filter((_, i) => best.mask & (1 << i));
+    const map = new Map();
+    picked.forEach(u => {
+      const cur = map.get(u.key) || {short:u.short, unit:u.unit, n:0, g:0, isOther:u.isOther};
+      cur.n += 1; cur.g = r1(cur.g + u.g);
+      map.set(u.key, cur);
+    });
+    return {
+      g: best.sum,
+      diff: r1(bestDiff),
+      label: [...map.values()]
+        .map(v => v.isOther ? `その他（${v.g}g）` : `${v.short} ${v.n}${v.unit}（${v.g}g）`)
+        .join(' ＋ ')
+    };
+  };
+  /* ④で追加した分を優先して回す（もとの食事の形を崩さずに済むため）。
+     それでうまく収まらない場合は、その食事に配分済みの品目も対象にする。 */
+  const pickMove = (bin, needG) => {
+    const fromAdds = bestSubset(movable(bin.adds), needG);
+    if(fromAdds && fromAdds.diff <= 3) return fromAdds;
+    return bestSubset(movable(bin.items.concat(bin.adds)), needG) || fromAdds;
+  };
+
   const anchor = (() => {                     // "HH:MM" → 分。未入力なら時刻表示なし
     const v = ($('startTime') && $('startTime').value) || '';
     const m = v.match(/^(\d{1,2}):(\d{2})$/);
@@ -1211,7 +1257,8 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
     prevRow  = off;
     nextFrom = off;
     if(overBin(bin, t)){                      // 入りきらない分は3時間後に回す
-      split[k] = {at:clock(off + SPLIT_GAP), g:overG(bin, t)};
+      const need = overG(bin, t);
+      split[k] = {at:clock(off + SPLIT_GAP), g:need, move:pickMove(bin, need)};
       nextFrom = off + SPLIT_GAP;
       afterSplit = true;
     }else{
@@ -1227,27 +1274,42 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
     if(g) parts.push(`${g}時間後`);
     return parts.length ? `<br><small>（${parts.join('・')}）</small>` : '';
   };
-  const splitNote = k => {
+  const MEAL_NAME = {b:'朝食', l:'昼食', d:'夕食'};
+  // 回し分は独立した行として表に差し込む
+  const splitRow = k => {
     const s = split[k];
-    if(!s) return '';
-    const late = s.at !== null && s.at !== undefined && s.at >= LATE_HHMM;
-    return `<br><small><b>入りきらない約${s.g}gは` +
-      (s.at !== null && s.at !== undefined ? ` ${hhmm(s.at)} ごろ` : ` ${SPLIT_GAP}時間後`) +
-      `（${SPLIT_GAP}時間後）に回してください。</b>次の食事はそこからさらに${SPLIT_GAP}時間後にしています。` +
-      (late ? `<br><b>この時刻は就寝前にかかります。</b>運動を早い時間に移すか、品目を減らすほうが確実です。` : '') +
-      `</small>`;
+    if(!s) return null;
+    const at   = (s.at !== null && s.at !== undefined) ? s.at : null;
+    const late = at !== null && at >= LATE_HHMM;
+    const head = `${MEAL_NAME[k]}の回し分` +
+      `<br><small>（${(at !== null ? hhmm(at) + '・' : '')}${SPLIT_GAP}時間後）</small>`;
+    const hasNext = k !== 'd';                // 夕食のあとに食事は続かない
+    const body = s.move
+      ? `<b>${s.move.label}</b> を${MEAL_NAME[k]}から回します（合計 ${s.move.g}g）。` +
+        `${MEAL_NAME[k]}が1回の上限40gを超えるため、この分だけ時間をずらします。` +
+        `<br><small>ご飯とミックスサラダは${MEAL_NAME[k]}に残します（主食と、先に食べる野菜のため）。` +
+        (hasNext ? `次の食事はここからさらに${SPLIT_GAP}時間後にしています。` : `今日はこれが最後の摂取になります。`) +
+        `</small>`
+      : `<b>回せる品目がありません。</b>${MEAL_NAME[k]}の超過分はご飯・ミックスサラダによるものです。` +
+        `品目を減らすか、食事回数を3食にして分散してください。`;
+    return [head, `約&nbsp;${s.move ? s.move.g : s.g}&nbsp;g`,
+      body + (late
+        ? `<br><span class="warnbox"><b>⚠ この時刻は就寝前にかかります。</b>` +
+          `運動を早い時間に移すか、品目を減らすほうが確実です。</span>`
+        : '')];
   };
 
   // 各食事行の「内容・ポイント」：入力の配分と、④で決めた追加分を示す
-  const meal = (bin, targetG, tail) => {
+  const meal = (bin, targetG, tail, k) => {
+    const sl = split[k] ? `${MEAL_NAME[k]}の回し分` : '';
     if(empty && !bin.addTotal){
       return `<b>「② 今日の食事」が未入力です。</b>食べたもの（納豆・豆腐・サバ缶など）を入力すると、ここに ${targetG}g 分の配分が自動表示されます。`;
     }
     if(bin.items.length){
-      return `${orderNote(bin)}<b>${bin.label}</b> ＝ 合計 <b>${bin.total}g</b><br>${mealAdvice(bin, targetG, st, dayCovered)}${tail}`;
+      return `${orderNote(bin)}<b>${bin.label}</b> ＝ 合計 <b>${bin.total}g</b><br>${mealAdvice(bin, targetG, st, dayCovered, sl)}${tail}`;
     }
     if(bin.addTotal){
-      return `${orderNote(bin)}入力済みの食事はこの時間帯に配分されていません。<br>${mealAdvice(bin, targetG, st, dayCovered)}${tail}`;
+      return `${orderNote(bin)}入力済みの食事はこの時間帯に配分されていません。<br>${mealAdvice(bin, targetG, st, dayCovered, sl)}${tail}`;
     }
     return `今日の入力分はすべて他の時間帯に配分されました。ここで摂るなら ${targetG}g 前後を目安に。${tail}`;
   };
@@ -1279,19 +1341,22 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
       : [
           '朝食' + timeLabel('b'),
           `約&nbsp;${mBreak}&nbsp;g`,
-          meal(bins.b, mBreak, '<br>朝は最も不足しやすい時間帯です。' + splitNote('b'))
+          meal(bins.b, mBreak, '<br>朝は最も不足しやすい時間帯です。', 'b')
         ],
+    splitRow('b'),
     [
       '昼食' + timeLabel('l'),
       `約&nbsp;${mLunch}&nbsp;g`,
-      meal(bins.l, mLunch, splitNote('l'))
+      meal(bins.l, mLunch, '', 'l')
     ],
+    splitRow('l'),
     [
       '夕食' + timeLabel('d'),
       `約&nbsp;${mDinner}&nbsp;g`,
-      meal(bins.d, mDinner, '<br>就寝の3時間前までに済ませると消化と睡眠の質の面で有利です。' + splitNote('d'))
-    ]
-  ];
+      meal(bins.d, mDinner, '<br>就寝の3時間前までに済ませると消化と睡眠の質の面で有利です。', 'd')
+    ],
+    splitRow('d')
+  ].filter(Boolean);
 
   $('schedule').innerHTML = rows.map(r =>
     `<tr><td class="time">${r[0]}</td><td class="amt">${r[1]}</td><td>${r[2]}</td></tr>`
