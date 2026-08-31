@@ -430,7 +430,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-08-26.41';
+const APP_VERSION = '2026-08-26.42';
 
 const SPOON_G   = 6.5;                  // ザバス付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -456,9 +456,9 @@ const FOODS = [
   {id:'tofu',    name:'豆腐',               short:'豆腐',         note:'1パック（150g） 約7.2g', price:35, p:7.2, unit:'P',  slots:['b','d','l'], autoPerMeal:true},
   {id:'tuna',    name:'ツナ缶',             short:'ツナ缶',       note:'1缶 約12.7g',          price:133, p:12.7, unit:'缶', slots:['l','d','b'], autoPerMeal:true},
   {id:'saba',    name:'サバ缶',             short:'サバ缶',       note:'1缶 約16.7g',          price:268, p:16.7, unit:'缶', slots:['d','l','b']},
-  {id:'egg',     name:'卵',                 short:'卵',           note:'1個 約6g',             price:53,  p:6,    unit:'個', slots:['b','l','d'], autoPerMeal:true},
+  {id:'egg',     name:'卵',                 short:'卵',           note:'1個 約6g',             price:27,  p:6,    unit:'個', slots:['b','l','d'], autoPerMeal:true},
   {id:'yogurt',  name:'無脂肪ヨーグルト（200g）', short:'ヨーグルト', note:'200g 約8g（カルシウム 約260mg）', price:70, p:8, unit:'杯', slots:['l','d','b']},
-  {id:'banana',  name:'バナナ',             short:'バナナ',       note:'1本 約1g',             price:20,  ruleNote:'運動直後に必ず1本', p:1, unit:'本', slots:['b','l','d'], post:true, autoDaily:1},
+  {id:'banana',  name:'バナナ',             short:'バナナ',       note:'1本 約1g',             price:40,  ruleNote:'運動直後に必ず1本', p:1, unit:'本', slots:['b','l','d'], post:true, autoDaily:1},
   {id:'salad',   name:'ミックスサラダ',      short:'ミックスサラダ', note:'1袋 約2g',           price:106, p:2,    unit:'袋', slots:['l','d','b'], first:true, autoPerMeal:true}
 ];
 
