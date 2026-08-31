@@ -468,7 +468,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-08-26.55';
+const APP_VERSION = '2026-08-26.56';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -1164,7 +1164,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
 
   const rows = [
     [
-      trained ? '運動直後<br><small>（〜30分以内）</small>' : '起床後<br><small>（朝食前）</small>',
+      trained ? '運動直後<br><small>（30分以内）</small>' : '起床後<br><small>（朝食前）</small>',
       cup(sMorning),
       trained
         ? `トレーニング後30分以内の「ゴールデンタイム」。<b>水${WATER_ML}ml</b>に溶かして飲み、筋肉の修復材料を最優先で入れます。` +
