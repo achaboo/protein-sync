@@ -69,21 +69,48 @@ body{
   padding-left:max(14px, env(safe-area-inset-left));
   padding-right:max(14px, env(safe-area-inset-right));
 }
+/* タイトル行は画面上部に固定する。スクロールすると説明文を隠して細くなる */
 header{
   background:linear-gradient(135deg,#1f6feb,#0b3f96); color:#fff;
   padding:22px 0 26px; margin-bottom:18px;
+  position:sticky; top:0; z-index:60;
+  transition:padding .18s ease;
 }
-header h1{margin:0;font-size:1.32rem;letter-spacing:.02em;line-height:1.35}
+header h1{margin:0;font-size:1.32rem;letter-spacing:.02em;line-height:1.35;transition:font-size .18s ease}
 header p{margin:6px 0 0;font-size:.85rem;opacity:.9}
+header.compact{padding:12px 0;box-shadow:0 2px 10px rgba(11,63,150,.28)}
+header.compact h1{font-size:1.06rem}
+header.compact h1 br{display:none}          /* 細い状態では1行にまとめる */
+header.compact h1 .t2::before{content:"　"}
+header.compact p{display:none}
+/* 狭い画面では細い状態の副題を省き、1行に収める */
+@media (max-width:480px){ header.compact h1 .t2{display:none} }
 section{
   background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow);
   padding:16px 16px 18px; margin-bottom:16px;
+  scroll-margin-top:76px;                    /* 固定ヘッダーの下に隠れないように */
 }
 h2{
   font-size:1.02rem; margin:0 0 12px; padding-left:10px;
   border-left:5px solid var(--brand); line-height:1.3;
   display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px;
 }
+/* --- 開閉式（アコーディオン）：1つ開くと他が閉じる --- */
+section.acc{padding-bottom:16px}
+section.acc > h2{
+  margin:0; cursor:pointer; user-select:none; -webkit-user-select:none;
+  padding-right:26px; position:relative;
+}
+section.acc > h2::after{                     /* 開閉を示す矢印 */
+  content:""; position:absolute; right:4px; top:50%;
+  width:8px; height:8px; margin-top:-6px;
+  border-right:2px solid var(--sub); border-bottom:2px solid var(--sub);
+  transform:rotate(45deg); transition:transform .18s ease;
+}
+section.acc.open > h2{margin-bottom:12px}
+section.acc.open > h2::after{transform:rotate(-135deg); margin-top:-2px}
+section.acc > .acc-body{display:none}
+section.acc.open > .acc-body{display:block}
 h3{font-size:.92rem;margin:16px 0 8px;color:var(--sub)}
 label{font-size:.9rem}
 .hint{font-size:.78rem;color:var(--sub);margin:8px 0 0}
@@ -232,7 +259,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
 
 <header>
   <div class="wrap">
-    <h1>Protein Sync<br>一日のたんぱく質 設計ツール</h1>
+    <h1>Protein Sync<br><span class="t2">一日のたんぱく質 設計ツール</span></h1>
     <p>体重と運動量から目標量を決め、その日の献立・時間帯・食費・SAVASの杯数までまとめて設計します。</p>
   </div>
 </header>
@@ -439,7 +466,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-08-26.49';
+const APP_VERSION = '2026-08-26.50';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -879,7 +906,8 @@ function render(opts){
   void el.offsetWidth;              // アニメーションを再開させるための強制リフロー
   el.classList.add('flash');
 
-  if(scroll) el.scrollIntoView({behavior:'smooth', block:'start'});
+  // 「計算する」を押したときは「④ 計算結果」を開いてそこへ移動する
+  if(scroll) openSection(sectionOf('oTarget'), {scroll:true});
   calculated = true;
 }
 
@@ -1797,6 +1825,66 @@ function onInputChanged(){
 document.addEventListener('input',  onInputChanged);
 document.addEventListener('change', onInputChanged);
 
+/* ------------------------------------------------------------
+   開閉式（アコーディオン）。①〜⑥のセクションは、見出しを押すと
+   そのセクションだけが開き、他は閉じる（排他）。
+   見出し以降の中身を .acc-body で包んで表示を切り替えるだけなので、
+   入力欄の id やイベントはそのまま使える（値も保持される）。
+   ------------------------------------------------------------ */
+const ACC_KEY = 'savas-calc-open';   // 最後に開いていたセクションを覚えておく
+const accSections = [];
+
+function setupAccordion(){
+  document.querySelectorAll('section').forEach(sec => {
+    const h2 = sec.querySelector(':scope > h2');
+    if(!h2) return;
+
+    // 見出しより後ろの要素をまとめて包む
+    const body = document.createElement('div');
+    body.className = 'acc-body';
+    while(h2.nextSibling) body.appendChild(h2.nextSibling);
+    sec.appendChild(body);
+    sec.classList.add('acc');
+
+    // 見出しの中のボタン（「食事をリセット」）は開閉に反応させない
+    h2.querySelectorAll('button').forEach(b =>
+      b.addEventListener('click', ev => ev.stopPropagation()));
+
+    h2.setAttribute('role', 'button');
+    h2.setAttribute('tabindex', '0');
+    h2.addEventListener('click', () => toggleSection(sec));
+    h2.addEventListener('keydown', ev => {
+      if(ev.key === 'Enter' || ev.key === ' '){ ev.preventDefault(); toggleSection(sec); }
+    });
+    accSections.push(sec);
+  });
+  accSections.forEach(syncAria);
+}
+
+function openSection(sec, opts){
+  if(!sec) return;
+  accSections.forEach(s => s.classList.toggle('open', s === sec));
+  accSections.forEach(syncAria);
+  try{ localStorage.setItem(ACC_KEY, accSections.indexOf(sec)); }catch(err){}
+  if(opts && opts.scroll) requestAnimationFrame(() => sec.scrollIntoView({behavior:'smooth', block:'start'}));
+}
+
+function toggleSection(sec){
+  if(sec.classList.contains('open')){        // 開いているものを押したら閉じる
+    sec.classList.remove('open');
+    syncAria(sec);
+    try{ localStorage.setItem(ACC_KEY, -1); }catch(err){}
+    return;
+  }
+  openSection(sec, {scroll:true});
+}
+
+const syncAria = sec =>
+  sec.querySelector(':scope > h2').setAttribute('aria-expanded', sec.classList.contains('open'));
+
+// 結果を表示する側から「④ 計算結果」を開くために使う
+const sectionOf = id => { const el = $(id); return el ? el.closest('section') : null; };
+
 $('calc').addEventListener('click', () => render({scroll:true}));
 $('clearFoods').addEventListener('click', clearFoods);
 
@@ -1838,6 +1926,32 @@ if(fromLink){
       'この端末にも保存したので、次回からは通常のURLで開いて構いません。';
 }
 updateLive();
+
+/* 開閉式にして、前回開いていたセクションを復元する（既定は「① 基本設定」） */
+setupAccordion();
+(() => {
+  let idx = 0;
+  try{ const v = parseInt(localStorage.getItem(ACC_KEY), 10); if(!isNaN(v)) idx = v; }catch(err){}
+  // 結果の3セクションは計算前は空なので、その場合は「① 基本設定」を開く
+  if(idx >= 3 && $('result').style.display !== 'block') idx = 0;
+  if(idx >= 0 && accSections[idx]) openSection(accSections[idx]);
+})();
+
+/* タイトル行を細くする（少しスクロールしたら説明文を隠す） */
+(() => {
+  const head = document.querySelector('header');
+  let ticking = false;
+  const sync = () => {
+    head.classList.toggle('compact', window.scrollY > 24);
+    ticking = false;
+  };
+  addEventListener('scroll', () => {
+    if(ticking) return;
+    ticking = true;
+    requestAnimationFrame(sync);
+  }, {passive:true});
+  sync();
+})();
 </script>
 </body>
 </html>
