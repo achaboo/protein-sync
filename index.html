@@ -318,9 +318,14 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
 
     <h3>設定の持ち運び（別の端末で同じ設定を使う）</h3>
     <p class="hint" style="margin-top:0">
-      体重・基本係数・液体の種類と量・ザバスで賄う上限・筋トレの重量／回数／セット数を URL に埋め込みます。
-      できたリンクを別の端末で開くと同じ設定で立ち上がり、その端末にも保存されます。
-      <b>食事や運動など当日の入力は含みません。</b>
+      <b>画面の入力をすべて</b> URL に埋め込みます（体重・基本係数・食事回数・ザバスで賄う上限・
+      筋トレの重量／回数／セット数・実施した種目のチェック・有酸素の距離・今日の食事の数量）。
+      できたリンクを別の端末で開くと同じ内容で立ち上がり、その端末にも保存されます。<br>
+      <b>ボタンを押した時点のスナップショットです。</b>そのあとこの端末で値を変えてもリンク側は変わりません。
+      変更を反映したいときは、もう一度ボタンを押して新しいリンクを配ってください。<br>
+      <b>食事・距離・実施種目は「リンクを作った日と同じ日」に開いた場合だけ反映されます。</b>
+      日付が変わってから開いたときは設定だけを反映し、食事はその日の型に戻します
+      （食事は毎日入力し直す前提のため）。
     </p>
     <div class="actions" style="margin:0 0 8px">
       <button type="button" id="copyLink" class="sub-btn">設定リンクをコピー</button>
@@ -433,7 +438,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-08-26.44';
+const APP_VERSION = '2026-08-26.45';
 
 const SPOON_G   = 6.5;                  // ザバス付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -1710,26 +1715,48 @@ function load(){
 }
 
 /* ------------------------------------------------------------
-   設定の持ち運び：端末をまたいで使えるよう、設定だけを URL に埋め込む。
-   当日の入力（食事・距離・実施した種目）は日ごとに変わるため含めない。
+   設定の持ち運び：端末をまたいで使えるよう、画面の入力をすべて URL に埋め込む。
+   ボタンを押した時点の値を写し取るスナップショットなので、あとで元の端末で
+   値を変えてもリンク側は変わらない（変えたら押し直して配り直す）。
+
+   当日の入力（食事・距離・実施した種目）も含めるが、作った日付を一緒に入れて
+   おき、受け取り側では「同じ日に作られたリンクのときだけ」当日の入力を復元する。
+   前日以前のリンクなら設定だけを反映し、食事はその日の型に戻す
+   （この端末の localStorage が日付をまたぐと食事を 0 に戻すのと同じ扱い）。
    ------------------------------------------------------------ */
 const SETTING_IDS = () => ['weight','baseFactor','meals','savasShare']
   .concat(EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]));
+// 当日の入力（食事＋その他＋有酸素の距離）。実施種目のチェックは d.c で持ち運ぶ。
+const LINK_DAILY_IDS = () => DAILY_IDS().concat(['walk','cycle']);
 
 function buildSettingsLink(){
-  const d = {v:{}};
-  SETTING_IDS().forEach(id => d.v[id] = $(id).value);
+  const d = {v:{}, c:{}, date:todayKey()};
+  SETTING_IDS().concat(LINK_DAILY_IDS()).forEach(id => { if($(id)) d.v[id] = $(id).value; });
+  EXERCISES.forEach(e => d.c[e.id] = $('c_' + e.id).checked);
   // クエリ（キャッシュ回避用の ?v= など）は引き継がず、素のURLに設定だけを付ける
   return location.href.split(/[?#]/)[0] + '#s=' + btoa(JSON.stringify(d));
 }
 
-function applySettingsFromHash(){
-  const m = location.hash.match(/[#&]s=([^&]+)/);
+// 戻り値: false（リンクなし・壊れている）／'all'（当日分も反映）／'settings'（設定のみ）
+// hash は省略時 location.hash（引数を取れるようにしてあるのは動作確認用）
+function applySettingsFromHash(hash){
+  const m = (hash === undefined ? location.hash : hash).match(/[#&]s=([^&]+)/);
   if(!m) return false;
   try{
     const d = JSON.parse(atob(m[1]));
-    SETTING_IDS().forEach(id => { if(d.v && d.v[id] !== undefined && $(id)) $(id).value = d.v[id]; });
-    return true;
+    if(!d.v) return false;
+    const put = id => { if(d.v[id] !== undefined && $(id)) $(id).value = d.v[id]; };
+    SETTING_IDS().forEach(put);
+
+    // 日付を持たない古いリンクは設定のみ。当日のリンクなら食事・距離・種目も反映する
+    const sameDay = d.date === todayKey();
+    if(!sameDay){
+      applyDailyDefaults();        // 食事は受け取った端末の「その日の型」に戻す
+      return 'settings';
+    }
+    LINK_DAILY_IDS().forEach(put);
+    EXERCISES.forEach(e => { if(d.c && d.c[e.id] !== undefined && $('c_' + e.id)) $('c_' + e.id).checked = !!d.c[e.id]; });
+    return 'all';
   }catch(err){ return false; }
 }
 
@@ -1746,7 +1773,8 @@ function copySettingsLink(){
   }
   if(navigator.clipboard && navigator.clipboard.writeText){
     navigator.clipboard.writeText(url)
-      .then(() => show('<b>コピーしました。</b>このリンクを別の端末で開くと同じ設定になります。'))
+      .then(() => show('<b>コピーしました。</b>このリンクを別の端末で開くと、今この画面にある内容がそのまま再現されます' +
+                       '（食事・距離・実施種目は今日中に開いた場合のみ）。'))
       .catch(() => show('<b>自動コピーできませんでした。</b>下の欄を選択してコピーしてください。'));
   }else{
     show('<b>下の欄を選択してコピーしてください。</b>');
@@ -1798,9 +1826,15 @@ $('ver').textContent = `バージョン ${APP_VERSION}　（表示が古い場�
 
 load();
 // URL に設定が埋め込まれていれば、保存内容より優先して適用しこの端末にも保存する
-if(applySettingsFromHash()){
+const fromLink = applySettingsFromHash();
+if(fromLink){
   save();
-  $('linkNote').innerHTML = '<b>リンクの設定を読み込みました。</b>この端末にも保存したので、次回からは通常のURLで開いて構いません。';
+  $('linkNote').innerHTML = fromLink === 'all'
+    ? '<b>リンクの内容をすべて読み込みました。</b>設定に加えて、その日の食事・運動の入力も反映しています。' +
+      'この端末にも保存したので、次回からは通常のURLで開いて構いません。'
+    : '<b>リンクの設定を読み込みました。</b>リンクが作られた日と今日が違うため、' +
+      '食事の入力は今日の型に戻しています（設定・筋トレの重量などは反映済みです）。' +
+      'この端末にも保存したので、次回からは通常のURLで開いて構いません。';
 }
 updateLive();
 </script>
