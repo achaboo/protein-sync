@@ -70,32 +70,20 @@ body{
   padding-right:max(14px, env(safe-area-inset-right));
 }
 /* タイトル行は画面上部に固定する。スクロールすると説明文を隠して細くなる */
-/* 細くなるときに「Protein Sync」の文字が動かないよう、
-   上の余白と文字サイズは変えず、下に続く副題・説明文だけを畳む。 */
+/* タイトル行は画面上部に固定するだけ。表示内容は常に同じ（縮めない）。 */
 header{
   background:linear-gradient(135deg,#1f6feb,#0b3f96); color:#fff;
-  padding:20px 0 24px; margin-bottom:18px;
+  padding:12px 0 14px; margin-bottom:18px;
   position:sticky; top:0; z-index:60;
-  transition:padding-bottom .18s ease;
+  box-shadow:0 2px 10px rgba(11,63,150,.28);
 }
 header h1{margin:0;font-size:1.32rem;letter-spacing:.02em;line-height:1.35}
-header h1 .t2{display:block}                /* 副題は常に2行目。1行目の位置は動かない */
-header p{margin:6px 0 0;font-size:.85rem;opacity:.9}
-/* 畳むときは高さも滑らかに変える（display:none だと本文が一段跳ねるため） */
-header h1 .t2,
-header p{
-  overflow:hidden;
-  transition:max-height .18s ease, opacity .12s ease, margin-top .18s ease;
-}
-header h1 .t2{max-height:3em}
-header p{max-height:6em}
-header.compact{padding-bottom:14px;box-shadow:0 2px 10px rgba(11,63,150,.28)}
-header.compact h1 .t2,
-header.compact p{max-height:0;opacity:0;margin-top:0}
+header h1 .t2{display:block}                /* 副題は2行目 */
+header p{margin:4px 0 0;font-size:.85rem;opacity:.9}
 section{
   background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow);
   padding:16px 16px 18px; margin-bottom:16px;
-  scroll-margin-top:76px;                    /* 固定ヘッダーの下に隠れないように */
+  scroll-margin-top:var(--head-h, 120px);    /* 固定ヘッダーの下に隠れないように */
 }
 h2{
   font-size:1.02rem; margin:0 0 12px; padding-left:10px;
@@ -473,7 +461,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-08-26.51';
+const APP_VERSION = '2026-08-26.52';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -1944,21 +1932,16 @@ setupAccordion();
   if(idx >= 0 && accSections[idx]) openSection(accSections[idx]);
 })();
 
-/* タイトル行を細くする（少しスクロールしたら説明文を隠す） */
+/* 見出しへ移動したときに固定ヘッダーの下へ潜らないよう、実際の高さを渡す */
 (() => {
   const head = document.querySelector('header');
-  let ticking = false;
-  const sync = () => {
-    head.classList.toggle('compact', window.scrollY > 24);
-    ticking = false;
-  };
-  addEventListener('scroll', () => {
-    if(ticking) return;
-    ticking = true;
-    requestAnimationFrame(sync);
-  }, {passive:true});
+  const sync = () => document.documentElement.style
+    .setProperty('--head-h', (head.getBoundingClientRect().height + 10) + 'px');
   sync();
+  addEventListener('resize', sync);
+  addEventListener('orientationchange', sync);
 })();
+
 </script>
 </body>
 </html>
