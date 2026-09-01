@@ -36,6 +36,8 @@
        付属スプーン 1杯 = タンパク質 約 6.5g / 推奨 1回 3杯 = 約 19.5g
    ・SAVASは水300mlで溶かし、運動直後の1回だけ摂ります（乳類は使いません）。
      運動していない日はSAVASを摂らず、目標分はすべて食事から確保します。
+     ただし「① 基本設定」の「運動しなかった日もSAVASを摂る」をオンにすると、
+     休養日も不足分があるときだけ起床後に1回摂る計算になります（回復期向け）。
    ・食品のタンパク質量はスクリプト内の FOODS で一元管理しています
      （サバ缶16.7g、ツナ缶12.7g、ご飯0.5合4.5g、納豆8.3g、ヨーグルト200g8g、
      豆腐7.2g、卵6g、ミックスサラダ2g、バナナ1g）。
@@ -303,6 +305,12 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
 
     <p class="hint" id="liquidNote"></p>
 
+    <div class="ex-head" style="margin-top:12px">
+      <input type="checkbox" id="restSavas">
+      <label for="restSavas">運動しなかった日もSAVASを摂る</label>
+    </div>
+    <p class="hint" id="restNote" style="margin-top:6px"></p>
+
     <h3>基本係数の入力目安</h3>
     <div class="table-wrap">
       <table class="mini">
@@ -477,7 +485,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-08-26.63';
+const APP_VERSION = '2026-08-26.64';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -579,7 +587,7 @@ const num = id => { const v = parseFloat($(id).value); return (isNaN(v) || v < 0
 
 function readState(){
   const st = {
-    weight: num('weight') || 75,
+    weight: num('weight') || 74,
     baseFactor: num('baseFactor') || 1.5,
     walk: num('walk'), cycle: num('cycle'), otherP: num('otherP'),
     foods: {}, ex: {}
@@ -591,6 +599,7 @@ function readState(){
   st.meals       = parseInt($('meals').value, 10) === 3 ? 3 : 2;
   st.skipB       = st.meals === 2;                    // 朝食を摂らない
   st.savasShare  = Math.min(100, num('savasShare')) / 100;   // SAVASで賄う上限（目標比）
+  st.restSavas   = $('restSavas').checked;                    // 運動しなかった日もSAVASを摂るか
   FOODS.forEach(f => st.foods[f.id] = num('f_' + f.id));
   EXERCISES.forEach(e => st.ex[e.id] = {
     on: $('c_' + e.id).checked, w: num('w_' + e.id), r: num('r_' + e.id), s: num('s_' + e.id)
@@ -779,11 +788,14 @@ function render(opts){
   // 不足の全量を粉で埋めると、1日の大半をプロテインで摂ることになってしまうため。
   const savasCap  = r1(target * st.savasShare);
   const coverG    = Math.min(lack, savasCap);
-  // SAVASは運動直後の1回のみ。運動していない日は摂らない。
+  // SAVASは1日1回のみ。運動していない日は摂らないが、
+  // 「運動しなかった日もSAVASを摂る」を選んだ場合（回復期など）は不足分を補う。
   const trained   = ex.done > 0 || ex.cardio > 0;
-  let   sv        = trained ? splitSavas(coverG, st, true)
+  const useSavas  = trained || st.restSavas;
+  let   sv        = useSavas ? splitSavas(coverG, st, true)
                             : {spoons:0, sessions:[], savasG:0, liquidG:0, totalG:0, remainG:0, overG:0, maxSingleG:0};
   // 筋トレをした日はSAVASを必ず摂る。食事だけで目標に届いていても最低 PER_SERVE 杯は飲む。
+  // 休養日は「不足があるときだけ」なので、この最低杯数は適用しない。
   if(trained && sv.spoons < MIN_SPOONS_TRAINED) sv = fixedSavas(MIN_SPOONS_TRAINED);
   const capBinds  = lack > savasCap && st.savasShare < 1 && sv.spoons > MIN_SPOONS_TRAINED;
 
@@ -1147,7 +1159,8 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   const mLunch  = cap(byMeal * share.l);
   const mDinner = cap(byMeal * share.d);
 
-  const sMorning = sv.sessions[0];   // SAVASは運動直後の1回のみ
+  const sMorning = sv.sessions[0];   // SAVASは1日1回（運動直後、休養日は起床後）
+  const dosed    = !!(sMorning && sMorning.spoons > 0);
   const cup = sn => {
     if(!sn || sn.spoons <= 0) return '—';
     return `スプーン ${sn.spoons}杯<br><small>（水${WATER_ML}mlで溶かす<br>約${r1(sn.spoons * SPOON_G)}g）</small>`;
@@ -1235,7 +1248,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   let nextFrom = null;                        // 次の食事を数える起点（回し分があればその時刻）
   let started  = false;                       // 起点となる摂取が済んだか
   let afterSplit = false;                     // 直前が「回し分」だったか
-  if(trained){ times.p = clock(0); prevRow = 0; nextFrom = 0; started = true; }
+  if(dosed){ times.p = clock(0); prevRow = 0; nextFrom = 0; started = true; }
 
   [['b', bins.b, mBreak], ['l', bins.l, mLunch], ['d', bins.d, mDinner]].forEach(([k, bin, t]) => {
     if(k === 'b' && st.skipB) return;         // 抜く朝食は起点にならない
@@ -1351,7 +1364,13 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
               `糖質を補うことでタンパク質がエネルギーに回されるのを防げます。`
             : `<br><b>バナナ1本もあわせて</b>摂ってください（「② 今日の食事」で本数を入力すると反映されます）。`) +
           `<br><small>この時間帯はSAVASとバナナのみで、他のものは摂りません。</small>`
-        : `運動していない日はSAVASを摂りません。目標分はすべて食事から確保してください。`
+        : dosed
+          ? `<b>運動しなかった日もSAVASを摂る</b>設定です。不足分をここで補います。` +
+            `<b>水${WATER_ML}ml</b>に溶かし、起床後から朝のうちに飲んでください。` +
+            `<br><small>筋線維の修復は運動後48〜72時間続くため、休養日にタンパク質を落とさないことに意味があります。</small>`
+          : st.restSavas
+            ? `<b>運動しなかった日もSAVASを摂る</b>設定ですが、今日は食事だけで目標に届いているため0杯です。`
+            : `運動していない日はSAVASを摂りません。目標分はすべて食事から確保してください。`
     ],
     st.skipB
       ? [
@@ -1798,7 +1817,16 @@ function updateLive(){
   $('liquidNote').innerHTML =
     `<b>SAVASは水${WATER_ML}mlで溶かし、運動直後の1回だけ摂ります。</b>` +
     `水にタンパク質は含まれないため加算はありません。` +
-    `運動していない日はSAVASを摂らず、目標分はすべて食事から確保します。`;
+    (st.restSavas
+      ? `運動しなかった日は<b>起床後</b>に、不足分があるときだけ摂ります。`
+      : `運動していない日はSAVASを摂らず、目標分はすべて食事から確保します。`);
+
+  // 運動しなかった日のSAVAS
+  $('restNote').innerHTML = st.restSavas
+    ? `<b>オンです。</b>運動しなかった日も、不足があれば起床後にSAVASを摂る計算にします` +
+      `（筋トレをした日と違い、不足がなければ0杯です）。回復期や、休養日に食事だけで目標へ届かないときに使ってください。`
+    : `オフのままなら、運動しなかった日はSAVASを摂らず食事だけで目標を確保します。` +
+      `休養日に食事だけでは届かないとき（回復期など）はオンにしてください。`;
 
   // 食事合計
   // 毎日の品目と、曜日ごとの型
@@ -1894,7 +1922,7 @@ const applyDailyDefaults = () => DAILY_IDS().forEach(id => { if($(id)) $(id).val
 const todayKey  = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
 
 function save(){
-  const d = {v:{}, c:{}, date:todayKey(), dv:DEFAULTS_VER};
+  const d = {v:{}, c:{}, date:todayKey(), dv:DEFAULTS_VER, rest:$('restSavas').checked};
   ALL_IDS().forEach(id => d.v[id] = $(id).value);
   EXERCISES.forEach(e => d.c[e.id] = $('c_' + e.id).checked);
   try{ localStorage.setItem(KEY, JSON.stringify(d)); }catch(err){}
@@ -1925,6 +1953,7 @@ function load(){
       if(d.v[id] !== undefined && $(id)) $(id).value = d.v[id];
     });
     EXERCISES.forEach(e => { if($('c_' + e.id)) $('c_' + e.id).checked = !!d.c[e.id]; });
+    if(d.rest !== undefined) $('restSavas').checked = !!d.rest;
   }catch(err){}
 }
 
@@ -1944,7 +1973,7 @@ const SETTING_IDS = () => ['weight','baseFactor','meals','savasShare','startTime
 const LINK_DAILY_IDS = () => DAILY_IDS().concat(['walk','cycle']);
 
 function buildSettingsLink(){
-  const d = {v:{}, c:{}, date:todayKey()};
+  const d = {v:{}, c:{}, date:todayKey(), rest:$('restSavas').checked};
   SETTING_IDS().concat(LINK_DAILY_IDS()).forEach(id => { if($(id)) d.v[id] = $(id).value; });
   EXERCISES.forEach(e => d.c[e.id] = $('c_' + e.id).checked);
   // クエリ（キャッシュ回避用の ?v= など）は引き継がず、素のURLに設定だけを付ける
@@ -1961,6 +1990,7 @@ function applySettingsFromHash(hash){
     if(!d.v) return false;
     const put = id => { if(d.v[id] !== undefined && $(id)) $(id).value = d.v[id]; };
     SETTING_IDS().forEach(put);
+    if(d.rest !== undefined) $('restSavas').checked = !!d.rest;   // 設定なので日付に関係なく反映
 
     // 日付を持たない古いリンクは設定のみ。当日のリンクなら食事・距離・種目も反映する
     const sameDay = d.date === todayKey();
@@ -2093,6 +2123,7 @@ $('reset').addEventListener('click', () => {
     '・「今日の食事」の数量とその他入力 → すべて 0\n' +
     '・ウォーキング / サイクリングの距離 → 0\n' +
     '・筋トレのチェック → 全種目オン（重量・回数・セット数も既定値に戻ります）\n' +
+    '・「運動しなかった日もSAVASを摂る」→ オフ\n' +
     '・ブラウザに保存された前回の入力内容も削除されます\n\n' +
     'よろしいですか？';
   if(!confirm(msg)) return;
