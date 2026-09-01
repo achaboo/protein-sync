@@ -485,7 +485,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-08-26.64';
+const APP_VERSION = '2026-08-26.65';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -1188,7 +1188,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   /* 回し分に出す品目を選ぶ。ご飯（主食）とミックスサラダ（先に食べる野菜）は
      食事側に残す必要があるため対象外。超過量にいちばん近い組み合わせを選ぶ。 */
   const movable = list => list
-    .filter(u => !u.first && !u.carb && u.group !== 'staple' && !u.lock)
+    .filter(u => !u.first && !u.carb && u.group !== 'staple' && !u.lock && !u.isOther)
     .sort((a, b) => b.g - a.g)
     .slice(0, 12);                            // 総当たりの上限（2^12）
   const bestSubset = (cand, needG) => {
@@ -1326,7 +1326,8 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
       `<br><small>（${(at !== null ? hhmm(at) + '・' : '')}${SPLIT_GAP}時間後）</small>`;
     const body = s.move
       ? `<b>${s.move.label}</b>`
-      : `<b>回せる品目がありません。</b>${MEAL_NAME[k]}の超過分はご飯・ミックスサラダによるものです。` +
+      : `<b>回せる品目がありません。</b>${MEAL_NAME[k]}の超過分は` +
+        `ご飯・ミックスサラダ・その他（自由入力）によるもので、いずれも回し分には出しません。` +
         `品目を減らすか、食事回数を3食にして分散してください。`;
     return [head, `約&nbsp;${s.move ? s.move.g : s.g}&nbsp;g`,
       body + (late
