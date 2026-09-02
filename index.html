@@ -311,6 +311,17 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
     </div>
     <p class="hint" id="restNote" style="margin-top:6px"></p>
 
+    <div class="grid2" style="margin-top:12px">
+      <div>
+        <label for="fixSpoons">SAVASの杯数を指定（空欄＝自動）</label>
+        <input type="number" inputmode="numeric" id="fixSpoons" value="" min="1" max="4" step="1" placeholder="自動">
+      </div>
+      <div>
+        <label>&nbsp;</label>
+        <p class="hint" id="fixNote" style="margin:0"></p>
+      </div>
+    </div>
+
     <h3>基本係数の入力目安</h3>
     <div class="table-wrap">
       <table class="mini">
@@ -485,7 +496,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-08-26.66';
+const APP_VERSION = '2026-08-26.67';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -600,6 +611,11 @@ function readState(){
   st.skipB       = st.meals === 2;                    // 朝食を摂らない
   st.savasShare  = Math.min(100, num('savasShare')) / 100;   // SAVASで賄う上限（目標比）
   st.restSavas   = $('restSavas').checked;                    // 運動しなかった日もSAVASを摂るか
+  // 杯数の手動指定（空欄・範囲外は自動計算）
+  st.fixSpoons   = (() => {
+    const v = parseInt($('fixSpoons').value, 10);
+    return (v >= 1 && v <= MAX_PER_SERVE) ? v : 0;
+  })();
   FOODS.forEach(f => st.foods[f.id] = num('f_' + f.id));
   EXERCISES.forEach(e => st.ex[e.id] = {
     on: $('c_' + e.id).checked, w: num('w_' + e.id), r: num('r_' + e.id), s: num('s_' + e.id)
@@ -797,7 +813,10 @@ function render(opts){
   // 筋トレをした日はSAVASを必ず摂る。食事だけで目標に届いていても最低 PER_SERVE 杯は飲む。
   // 休養日は「不足があるときだけ」なので、この最低杯数は適用しない。
   if(trained && sv.spoons < MIN_SPOONS_TRAINED) sv = fixedSavas(MIN_SPOONS_TRAINED);
-  const capBinds  = lack > savasCap && st.savasShare < 1 && sv.spoons > MIN_SPOONS_TRAINED;
+  // 杯数を手で指定した場合は、その杯数で計算する（自動計算の値は併記する）
+  const autoSpoons = sv.spoons;
+  if(useSavas && st.fixSpoons){ sv = fixedSavas(st.fixSpoons); sv.manual = true; }
+  const capBinds  = lack > savasCap && st.savasShare < 1 && sv.spoons > MIN_SPOONS_TRAINED && !sv.manual;
 
   const intake    = r1(food.total + sv.totalG);          // 食事＋SAVASの見込み合計
   const toFoodG   = r1(Math.max(0, target - intake));    // 食事で補うべき残り
@@ -858,10 +877,13 @@ function render(opts){
               : toFoodG > 0
                 ? `（残り ${toFoodG}g は誤差の範囲です）`
                 : '（過不足なし）')) +
-      (sv.forced
-        ? `<br><small>筋トレをした日はSAVASを必ず摂る設定のため、` +
-          `不足の有無にかかわらず最低 ${MIN_SPOONS_TRAINED}杯（${r1(MIN_SPOONS_TRAINED * SPOON_G)}g）を確保しています。</small>`
-        : '') +
+      (sv.manual
+        ? `<br><small><b>杯数を手動で ${sv.spoons}杯 に指定しています</b>` +
+          `（自動計算では ${autoSpoons}杯）。自動に戻すには「① 基本設定」の指定欄を空にしてください。</small>`
+        : sv.forced
+          ? `<br><small>筋トレをした日はSAVASを必ず摂る設定のため、` +
+            `不足の有無にかかわらず最低 ${MIN_SPOONS_TRAINED}杯（${r1(MIN_SPOONS_TRAINED * SPOON_G)}g）を確保しています。</small>`
+          : '') +
       // 上限に張り付いている間は杯数が動かないため、その理由を目立つ位置に出す
       (capBinds
         ? `<br><b>この杯数は上限（目標の${Math.round(st.savasShare * 100)}% ＝ ${savasCap}g）に張り付いています。</b>` +
@@ -1822,6 +1844,12 @@ function updateLive(){
       ? `運動しなかった日は<b>起床後</b>に、不足分があるときだけ摂ります。`
       : `運動していない日はSAVASを摂らず、目標分はすべて食事から確保します。`);
 
+  // 杯数の手動指定
+  $('fixNote').innerHTML = st.fixSpoons
+    ? `<b>${st.fixSpoons}杯（${r1(st.fixSpoons * SPOON_G)}g）に固定</b>します。空欄にすると不足量から自動で決めます。`
+    : `空欄なら不足量から自動で決めます（不足23g以上で4杯、それ未満は3杯）。` +
+      `夕食を食べきれない日など、粉を多めにしたいときは 1〜${MAX_PER_SERVE} を入力してください。`;
+
   // 運動しなかった日のSAVAS
   $('restNote').innerHTML = st.restSavas
     ? `<b>オンです。</b>運動しなかった日も、不足があれば起床後にSAVASを摂る計算にします` +
@@ -1885,7 +1913,7 @@ const DEFAULTS_VER = 6;
 // （体重を入れたままにすると、以後の更新で入力済みの体重まで戻ってしまう）。
 const RESET_IDS = () =>
   EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]).concat(['baseFactor', 'weight']);
-const ALL_IDS = () => ['weight','baseFactor','meals','savasShare','walk','cycle','otherP','startTime']
+const ALL_IDS = () => ['weight','baseFactor','meals','savasShare','walk','cycle','otherP','startTime','fixSpoons']
   .concat(FOODS.map(f => 'f_' + f.id))
   .concat(EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]));
 
@@ -1968,7 +1996,7 @@ function load(){
    前日以前のリンクなら設定だけを反映し、食事はその日の型に戻す
    （この端末の localStorage が日付をまたぐと食事を 0 に戻すのと同じ扱い）。
    ------------------------------------------------------------ */
-const SETTING_IDS = () => ['weight','baseFactor','meals','savasShare','startTime']
+const SETTING_IDS = () => ['weight','baseFactor','meals','savasShare','startTime','fixSpoons']
   .concat(EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]));
 // 当日の入力（食事＋その他＋有酸素の距離）。実施種目のチェックは d.c で持ち運ぶ。
 const LINK_DAILY_IDS = () => DAILY_IDS().concat(['walk','cycle']);
@@ -2125,6 +2153,7 @@ $('reset').addEventListener('click', () => {
     '・ウォーキング / サイクリングの距離 → 0\n' +
     '・筋トレのチェック → 全種目オン（重量・回数・セット数も既定値に戻ります）\n' +
     '・「運動しなかった日もSAVASを摂る」→ オフ\n' +
+    '・「SAVASの杯数を指定」→ 空欄（自動計算）\n' +
     '・ブラウザに保存された前回の入力内容も削除されます\n\n' +
     'よろしいですか？';
   if(!confirm(msg)) return;
