@@ -513,7 +513,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.8';
+const APP_VERSION = '2026-09-01.9';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -2146,8 +2146,8 @@ function updateLive(){
   const menuOf = (plan, slot) => Object.keys(plan)
     .map(foodById).filter(f => f && f.slot === slot)
     .map(f => `${f.weekName || f.short}<br><small>${f.p}g ／ ${f.price}円</small>`).join('<br>') || '—';
-  // 品目名と数量は行を分け、数量は（）で囲む
-  const qtyLine = (f, n) => `${f.weekName || f.short}<br>（${n}${f.unit}）`;
+  // 型としては毎日1つずつなので、追加列は品目名だけを出す（2つ以上のときだけ数量を添える）
+  const qtyLine = (f, n) => `${f.weekName || f.short}${n > 1 ? `（${n}${f.unit}）` : ''}`;
   const extraOf = plan => Object.keys(plan)
     .map(id => ({f:foodById(id), n:plan[id]})).filter(x => x.f && !x.f.slot)
     .map(x => qtyLine(x.f, x.n)).join('<br>');
