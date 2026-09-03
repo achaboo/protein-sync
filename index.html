@@ -513,7 +513,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.13';
+const APP_VERSION = '2026-09-01.14';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -1559,6 +1559,16 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   };
 
   // 自宅の食材をまとめて摂る「間食」の行
+  /* 運動直後の枠に入れた品目（バナナ）を、SAVASの回数に合わせて振り分ける。
+     2回に分ける日は 1回目を多めにする（奇数なら 1回目が1つ多い）。 */
+  const postSplit = (() => {
+    const items = bins.p.items;
+    const two   = !!(sEvening && sEvening.spoons > 0);
+    if(!items.length) return {first:[], second:[]};
+    if(!two) return {first:items, second:[]};
+    const n1 = Math.ceil(items.length / 2);
+    return {first:items.slice(0, n1), second:items.slice(n1)};
+  })();
   const snackRow = k => {
     if(!snack || snack.afterKey !== k) return null;
     const at   = snack.at;
@@ -1605,9 +1615,12 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
         ? `運動後は<b>吸収に有利な時間帯</b>です（この状態は数時間〜翌日まで続くので、30分を過ぎても無駄にはなりません）。` +
           `<b>水${WATER_ML}ml</b>に溶かして飲み、筋肉の修復材料を入れます。` +
           `脂質を含まないぶん胃を素早く通過し、アミノ酸が早く血中に届きます。` +
-          (bins.p.items.length
-            ? `<br><b>あわせて ${bins.p.label}</b>。` +
-              `糖質を補うことでタンパク質がエネルギーに回されるのを防げます。`
+          (postSplit.first.length
+            ? `<br><b>あわせて ${labelOf(postSplit.first)}</b>。` +
+              `糖質を補うことでタンパク質がエネルギーに回されるのを防げます。` +
+              (postSplit.second.length
+                ? `<br><small>残りは下の「2回目のSAVAS」に回しています。</small>`
+                : '')
             : `<br><b>バナナ1本もあわせて</b>摂ってください（「② 今日の食事」で本数を入力すると反映されます）。`) +
           `<br><small>この時間帯はSAVASとバナナのみで、他のものは摂りません。</small>`
         : dosed
@@ -1666,6 +1679,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
         `2回目のSAVAS<br><small>（${at !== null ? hhmm(at) + '・' : ''}${SPLIT_GAP}時間後）</small>`,
         cup(sEvening),
         `夕食で摂りきれない分をここで補います。<b>水${WATER_ML}ml</b>に溶かして飲んでください。` +
+        (postSplit.second.length ? `<br><b>あわせて ${labelOf(postSplit.second)}</b>。` : '') +
         `<br><small>運動直後に全部まとめるより、1回30〜40gの範囲に収まるほうが筋肉の材料として使われます。</small>` +
         // SAVASは吸収が速く脂質も少ないため、就寝前でも食事のような負担にならない。
         // 食品の回し分・間食と違って警告は出さず、補足だけを添える。
