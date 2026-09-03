@@ -513,7 +513,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.19';
+const APP_VERSION = '2026-09-01.20';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -536,25 +536,29 @@ const SERVE_G   = SPOON_G * PER_SERVE;  // 1回 = 19.5g
 //   shop  : 店名（入力欄では店名で改行して表示する）
 //   slot  : 1週間の型の表で「朝食／夕食」どちらの列に出すか（外食メニュー用）
 //   fixedMenu: 1週間の型で固定しているメニュー（減らす提案の対象にしない）
+//   eggs  : そのメニューに含まれる卵の個数（卵の1日上限に加算する）
 const FOODS = [
   // --- 牛丼チェーン（1食＝1単位。朝食メニューは朝食、夕食メニューは夕食の枠にだけ配分する） ---
-  {id:'sk_saba',      shop:'すき家',  name:'塩さばたまかけ朝食',   short:'塩さばたまかけ朝食',
-   weekName:'塩さば<br>たまかけ朝食', note:'1食 約22g',
-   price:490, p:22, unit:'食', slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
-  {id:'sk_mazenokke', shop:'すき家',  name:'まぜのっけ朝食',       short:'まぜのっけ朝食', note:'1食 約15g',
-   price:390, p:15, unit:'食', slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
-  {id:'sk_light',     shop:'すき家',  name:'牛丼ライト（お肉並盛）', short:'牛丼ライト', note:'1食 約25g',
-   price:530, p:25, unit:'食', slots:['d'], lock:true, slot:'d', fixedMenu:true},
+  {id:'sk_saba',      shop:'すき家',  name:'塩さばたまかけ定食',   short:'塩さばたまかけ定食',
+   weekName:'塩さば<br>たまかけ定食', note:'1食 約22g（卵1個ぶん）',
+   price:580, p:22, unit:'食', slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1},
+  {id:'sk_mazenokke', shop:'すき家',  name:'まぜのっけ朝食',       short:'まぜのっけ朝食',
+   note:'1食 約15g（卵1個ぶん）',
+   price:330, p:15, unit:'食', slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1},
+  {id:'sk_gyudon',    shop:'すき家',  name:'牛丼（並）',           short:'牛丼',         note:'1食 約21.7g',
+   price:480, p:21.7, unit:'食', slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
   {id:'mt_gyuzara',   shop:'松屋',    name:'得朝牛皿定食',         short:'得朝牛皿定食',   note:'1食 約15g',
    price:400, p:15, unit:'食', slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
-  {id:'mt_gyumeshi',  shop:'松屋',    name:'牛めし（並盛）＋生玉子', short:'牛めし＋生玉子',
-   weekName:'牛めし<br>＋生玉子', note:'1食 約23g',
-   price:490, p:23, unit:'食', slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
+  {id:'mt_gyumeshi',  shop:'松屋',    name:'牛めし（並）',         short:'牛めし',       note:'1食 約17.1g',
+   price:460, p:17.1, unit:'食', slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
   {id:'ys_hamegg',    shop:'吉野家',  name:'ハムエッグ納豆定食',   short:'ハムエッグ納豆定食',
-   weekName:'ハムエッグ<br>納豆定食', note:'1食 約18g',
-   price:468, p:18, unit:'食', slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
-  {id:'nk_oyako',     shop:'なか卯',  name:'親子丼（並盛）',       short:'親子丼',       note:'1食 約30g',
-   price:450, p:30, unit:'食', slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
+   weekName:'ハムエッグ<br>納豆定食', note:'1食 約18g（卵1個ぶん）',
+   price:468, p:18, unit:'食', slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1},
+  {id:'ys_butadon',   shop:'吉野家',  name:'豚丼（並）',           short:'豚丼',         note:'1食 約14.4g',
+   price:465, p:14.4, unit:'食', slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
+  {id:'nk_oyako',     shop:'なか卯',  name:'親子丼（並）',         short:'親子丼',
+   note:'1食 約30g（卵1個ぶん）',
+   price:450, p:30, unit:'食', slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true, eggs:1},
 
   // --- 運動直後 ---
   {id:'banana',  name:'バナナ',              short:'バナナ',       note:'1本 約1g',
@@ -565,8 +569,8 @@ const FOODS = [
    price:40, ruleNote:'毎日2杯（カリウム補給）', p:1.8, unit:'杯',
    slots:['s'], lock:true, home:true, autoDaily:2},
   {id:'egg',     name:'卵',                  short:'卵',           note:'1個 約6g',
-   price:27, ruleNote:'1日2個まで', p:6, unit:'個',
-   slots:['s'], lock:true, home:true, autoDaily:1, max:2},
+   price:27, ruleNote:'1日2個まで（メニューに含まれる卵も数える）', p:6, unit:'個',
+   slots:['s'], lock:true, home:true, autoDaily:2, max:2},
   {id:'natto',   name:'納豆',                short:'納豆',         note:'1パック 約8.3g',
    price:32, ruleNote:'不足分から自動計算', p:8.3, unit:'P',
    slots:['s'], lock:true, home:true, autoNatto:true}
@@ -1802,9 +1806,23 @@ function calcEnergy(st, ex){
 /* タンパク質10gあたりの単価（円）。安いほどコスト効率がよい。 */
 const pricePer10g = f => Math.round(f.price / f.p * 10);
 /* その品目をその日あと何個足せるか（1日の上限がある品目は残りの枠まで） */
+/* メニューに含まれる卵の個数（親子丼・ハムエッグ納豆定食など）。
+   卵の1日上限はこれを含めて数える。 */
+const menuEggs = st => FOODS.reduce((a, f) =>
+  a + (f.eggs || 0) * Math.round((st && st.foods && st.foods[f.id]) || 0), 0);
+const menuEggsOfDay = () => {
+  const plan = WEEKLY_PLAN[todayIdx()] || {};
+  return Object.keys(plan).reduce((a, id) => {
+    const f = foodById(id);
+    return a + ((f && f.eggs) || 0) * plan[id];
+  }, 0);
+};
+/* その品目をあと何個足せるか。卵はメニューに含まれる分も上限に数える */
 const roomFor = (f, st) => {
-  const now = Math.round((st && st.foods && st.foods[f.id]) || 0);
-  return f.max === undefined ? 99 : Math.max(0, f.max - now);
+  if(f.max === undefined) return 99;
+  const now  = Math.round((st && st.foods && st.foods[f.id]) || 0);
+  const used = f.id === 'egg' ? menuEggs(st) : 0;
+  return Math.max(0, f.max - now - used);
 };
 
 /* 指定した g 数を最も安く満たす組み合わせを求める（動的計画法）。
@@ -2133,10 +2151,13 @@ function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, pl
 function updateLive(){
   autoFillNatto();                 // 合計gと金額に自動入力分を含めるため、先に確定させる
   // 1日の上限がある食品は、手入力で超えた場合もその場で切り詰める
+  const stNow = readState();
   FOODS.forEach(f => {
     if(f.max === undefined) return;
     const el = $('f_' + f.id);
-    if(el && parseFloat(el.value) > f.max) el.value = f.max;
+    if(!el) return;
+    const cap = Math.max(0, f.max - (f.id === 'egg' ? menuEggs(stNow) : 0));
+    if(parseFloat(el.value) > cap) el.value = cap;
   });
 
   // 筋トレ総負荷量
@@ -2279,13 +2300,13 @@ const WEEK_LABEL = ['日','月','火','水','木','金','土'];
 // LDL対策として牛肉は週3食まで（火・水・金に1食ずつ。同じ日に2食は入れない）。
 // 塩さば朝食を週3回入れて魚を増やし、7メニューすべてを1回以上使う。
 const WEEKLY_PLAN = {
-  0: {ys_hamegg:1,    nk_oyako:1},              // 日
+  0: {ys_hamegg:1,    sk_gyudon:1},             // 日（牛：夕）
   1: {sk_saba:1,      nk_oyako:1},              // 月
-  2: {mt_gyuzara:1,   nk_oyako:1},              // 火（牛：朝）
-  3: {sk_mazenokke:1, sk_light:1},              // 水（牛：夕）
-  4: {sk_saba:1,      nk_oyako:1},              // 木
-  5: {sk_mazenokke:1, mt_gyumeshi:1},           // 金（牛：夕）
-  6: {sk_saba:1,      nk_oyako:1}               // 土
+  2: {sk_mazenokke:1, nk_oyako:1},              // 火
+  3: {sk_saba:1,      ys_butadon:1},            // 水（豚）
+  4: {sk_mazenokke:1, nk_oyako:1},              // 木
+  5: {sk_saba:1,      nk_oyako:1},              // 金
+  6: {mt_gyuzara:1,   mt_gyumeshi:1}            // 土（牛：朝・夕）
 };
 const todayIdx = () => new Date().getDay();
 
@@ -2297,7 +2318,10 @@ const dailyDefault = id => {
   const f = FOODS.find(x => 'f_' + x.id === id);
   if(!f) return 0;
   if(f.autoPerMeal) return (parseInt($('meals').value, 10) === 3 ? 3 : 2) * (f.perMealQty || 1);
-  return (f.autoDaily || 0) + ((WEEKLY_PLAN[todayIdx()] || {})[f.id] || 0);
+  const base = (f.autoDaily || 0) + ((WEEKLY_PLAN[todayIdx()] || {})[f.id] || 0);
+  // 卵はメニューに含まれる分を差し引いて、1日の上限を超えないようにする
+  if(f.id === 'egg' && f.max !== undefined) return Math.max(0, Math.min(base, f.max - menuEggsOfDay()));
+  return base;
 };
 const applyDailyDefaults = () => DAILY_IDS().forEach(id => { if($(id)) $(id).value = dailyDefault(id); });
 const todayKey  = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
