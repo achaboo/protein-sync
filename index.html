@@ -518,7 +518,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.25';
+const APP_VERSION = '2026-09-01.26';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -539,6 +539,7 @@ const SERVE_G   = SPOON_G * PER_SERVE;  // 1回 = 19.5g
 //   max   : 1日に入力できる上限（超える値は入力欄側で切り詰める）
 //   limitNote: 入力欄と早見表に添える制限の注記（時間帯の固定・1日の上限など）
 //   shop  : 店名（入力欄では店名で改行して表示する）
+//   weekName: 1週間の型の表に出す名前（改行位置の指定や、夕食列の店名付きの表記に使う）
 //   slot  : 1週間の型の表で「朝食／夕食」どちらの列に出すか（外食メニュー用）
 //   fixedMenu: 1週間の型で固定しているメニュー（減らす提案の対象にしない）
 //   eggs  : そのメニューに含まれる卵の個数（卵の1日上限に加算する）
@@ -549,19 +550,19 @@ const FOODS = [
   {id:'sk_mazenokke', shop:'すき家',  name:'まぜのっけ朝食',       short:'まぜのっけ朝食',
    note:'1食 約15g（卵1個ぶん）',
    price:330, p:15, unit:'食', sat:3.2, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1},
-  {id:'sk_gyudon',    shop:'すき家',  name:'牛丼（並）',           short:'牛丼',         note:'1食 約21.7g',
+  {id:'sk_gyudon',    shop:'すき家',  name:'牛丼（並）',           short:'牛丼',         weekName:'すき家 牛丼',   note:'1食 約21.7g',
    price:480, p:21.7, unit:'食', sat:9.4, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
   {id:'mt_gyuzara',   shop:'松屋',    name:'得朝牛皿定食',         short:'得朝牛皿定食',   note:'1食 約15g',
    price:400, p:15, unit:'食', sat:9.0, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
-  {id:'mt_gyumeshi',  shop:'松屋',    name:'牛めし（並）',         short:'牛めし',       note:'1食 約17.1g',
+  {id:'mt_gyumeshi',  shop:'松屋',    name:'牛めし（並）',         short:'牛めし',       weekName:'松屋 牛めし',   note:'1食 約17.1g',
    price:460, p:17.1, unit:'食', sat:11.6, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
   {id:'ys_hamegg',    shop:'吉野家',  name:'ハムエッグ納豆定食',   short:'ハムエッグ納豆定食',
    weekName:'ハムエッグ<br>納豆定食', note:'1食 約18g（卵1個ぶん）',
    price:468, p:18, unit:'食', sat:5.8, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1},
-  {id:'ys_butadon',   shop:'吉野家',  name:'豚丼（並）',           short:'豚丼',         note:'1食 約14.4g',
+  {id:'ys_butadon',   shop:'吉野家',  name:'豚丼（並）',           short:'豚丼',         weekName:'吉野家 豚丼',   note:'1食 約14.4g',
    price:465, p:14.4, unit:'食', sat:7.3, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
   {id:'nk_oyako',     shop:'なか卯',  name:'親子丼（並）',         short:'親子丼',
-   note:'1食 約30g（卵1個ぶん）',
+   weekName:'なか卯 親子丼', note:'1食 約30g（卵1個ぶん）',
    price:450, p:30, unit:'食', sat:4.8, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true, eggs:1},
 
   // --- 運動直後 ---
@@ -2277,7 +2278,7 @@ function updateLive(){
     (postDay.length  ? `<br><b>毎日（運動直後）：</b>${postDay.join('・')}` : '') +
     (snackDay.length ? `<br><b>毎日（間食）：</b>${snackDay.join('・')}＋サバ缶（月・火・金）＋納豆（不足分から自動計算）` : '') +
     `<br><b>牛肉は週2食まで</b>（日・水の夕食）。LDLコレステロール対策として鶏（親子丼）と豚（豚丼）に寄せ、魚は間食のサバ缶で摂ります。` +
-    `<br>朝食は飽和脂肪酸の最も少ない<b>まぜのっけ朝食</b>に寄せています（④に1日の合計を表示）。`;
+    `<br>朝食は飽和脂肪酸の最も少ない<b>まぜのっけ朝食</b>を基本にし、余裕のある木曜だけ変えています（④に1日の合計を表示）。`;
 
   // 1週間の型：曜日 × 朝食 / 夕食 / 追加するもの
   // 列幅が狭いので、長い名前は weekName で改行位置を指定する
@@ -2355,15 +2356,16 @@ const DAILY_IDS = () => FOODS.map(f => 'f_' + f.id).concat(['otherP']);
 //   バナナ（運動直後）とトマトジュース（間食）は毎日1つずつ。
 const WEEK_LABEL = ['日','月','火','水','木','金','土'];
 // LDL対策として牛肉は週2食まで（日・水の夕食に1食ずつ）。朝食は飽和脂肪酸の
-// 最も少ないまぜのっけ朝食（3.2g）に寄せ、得朝牛皿定食（9.0g）とハムエッグ納豆定食
-// （5.8g）は型から外している（手で入れれば使える）。
+// 最も少ないまぜのっけ朝食（3.2g）を基本にし、いちばん余裕のある木曜だけ
+// ハムエッグ納豆定食（5.8g）を入れて変化をつけている。
+// 得朝牛皿定食（9.0g）は牛が増えるため型から外している（手で入れれば使える）。
 // 魚はサバ缶を月・火・金の間食に入れる。牛の日（日・水）と脂が重ならないようにずらした。
 const WEEKLY_PLAN = {
   0: {sk_mazenokke:1, sk_gyudon:1},             // 日（牛：夕）
   1: {sk_mazenokke:1, nk_oyako:1,  saba:1},     // 月（魚：サバ缶）
   2: {sk_mazenokke:1, nk_oyako:1,  saba:1},     // 火（魚：サバ缶）
   3: {sk_mazenokke:1, mt_gyumeshi:1},           // 水（牛：夕）
-  4: {sk_mazenokke:1, nk_oyako:1},              // 木
+  4: {ys_hamegg:1,    nk_oyako:1},              // 木（朝：ハムエッグ納豆定食）
   5: {sk_mazenokke:1, nk_oyako:1,  saba:1},     // 金（魚：サバ缶）
   6: {sk_mazenokke:1, ys_butadon:1}             // 土（豚：夕）
 };
