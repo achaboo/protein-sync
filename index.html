@@ -427,6 +427,13 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
       <b>運動は 9:00 までに終える</b>と間に合います。
     </p>
 
+    <div class="row">
+      <div class="name"><b>夕食の時刻</b><small>空欄なら基本の間隔から自動計算</small></div>
+      <div class="qty"><input type="time" id="dinnerTime" value="18:00" step="300"></div>
+      <div class="unit">時刻</div>
+    </div>
+    <p class="hint" id="dinnerNote" style="margin-top:0"></p>
+
     <h3>有酸素運動</h3>
     <div class="row">
       <div class="name"><b>ウォーキング</b><small>歩いた距離</small></div>
@@ -506,7 +513,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.3';
+const APP_VERSION = '2026-09-01.4';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -1363,15 +1370,24 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
     return (d > 0 ? '翌' : '') + String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
   };
 
+  const dinnerAt = (() => {                   // 夕食の時刻（空欄なら基本の間隔で自動計算）
+    const v = ($('dinnerTime') && $('dinnerTime').value) || '';
+    const m = v.match(/^(\d{1,2}):(\d{2})$/);
+    return m ? (+m[1]) * 60 + (+m[2]) : null;
+  })();
+  const MAX_GAP = 5;                          // これ以上空いたら間に「間食」を挟む（時間）
+
   const gaps  = {};                           // 表に出す「○時間後」（直前の行から）
   const times = {};                           // 各行の時刻（分）
-  const split = {};                           // 回し分 {at, g}
+  const split = {};                           // 回し分・間食 {at, g, move, reason}
   // 起点からの経過時間（時間）で組み立て、時刻は入力があるときだけ添える
   const clock = off => anchor === null ? null : anchor + off * 60;
   let prevRow  = null;                        // 直前の行の経過時間
   let nextFrom = null;                        // 次の食事を数える起点（回し分があればその時刻）
   let started  = false;                       // 起点となる摂取が済んだか
   let afterSplit = false;                     // 直前が「回し分」だったか
+  const offOf = {};                           // 各食事の経過時間（間食の判定に使う）
+  const MEAL_NAME = {b:'朝食', l:'昼食', d:'夕食'};
   if(dosed){ times.p = clock(0); prevRow = 0; nextFrom = 0; started = true; }
 
   [['b', bins.b, mBreak], ['l', bins.l, mLunch], ['d', bins.d, mDinner]].forEach(([k, bin, t]) => {
@@ -1379,6 +1395,10 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
     let off;
     if(!started){                             // 運動していない日の1食目＝起点そのもの
       off = 0; started = true;
+    }else if(k === 'd' && dinnerAt !== null && anchor !== null){
+      // 夕食の時刻が指定されていればそれを使う（前の摂取より前にはしない）
+      off = Math.max(nextFrom + SPLIT_GAP, r1((dinnerAt - anchor) / 60));
+      gaps[k] = r1(off - prevRow);
     }else{
       // 直前が回し分ならそこから3時間、通常の食事なら基本の間隔をあける
       off = nextFrom + (afterSplit ? SPLIT_GAP : BASE_GAP[k]);
@@ -1389,12 +1409,30 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
     nextFrom = off;
     if(overBin(bin, t)){                      // 入りきらない分は3時間後に回す
       const need = overG(bin, t);
-      split[k] = {at:clock(off + SPLIT_GAP), g:need, move:pickMove(bin, need)};
+      split[k] = {at:clock(off + SPLIT_GAP), g:need, move:pickMove(bin, need), reason:'over'};
       nextFrom = off + SPLIT_GAP;
       afterSplit = true;
     }else{
       afterSplit = false;
     }
+    offOf[k] = off;
+  });
+
+  /* 次の食事まで MAX_GAP 時間以上空く食事があれば、その中間に「間食」を挟む。
+     食後に高まった筋タンパク合成は3時間ほどで戻るため、5時間以上あくと
+     その後は材料が入らない時間になる。分ける品目はその食事から選ぶ。 */
+  const ORDER_T = ['b','l','d'].filter(s => s !== st.skip);
+  ORDER_T.forEach((k, i) => {
+    const next = ORDER_T[i + 1];
+    if(!next || split[k] || offOf[k] === undefined || offOf[next] === undefined) return;
+    const span = r1(offOf[next] - offOf[k]);
+    if(span < MAX_GAP) return;
+    const bin = k === 'b' ? bins.b : k === 'l' ? bins.l : bins.d;
+    const half = r1((k === 'b' ? mBreak : k === 'l' ? mLunch : mDinner) / 2);
+    const move = pickMove(bin, half);         // その食事の半分ぐらいを後ろへ回す
+    if(!move) return;
+    split[k] = {at:clock(r1(offOf[k] + span / 2)), g:move.g, move, reason:'gap',
+                span, from:MEAL_NAME[k], to:MEAL_NAME[next]};
   });
 
   const timeLabel = k => {
@@ -1405,7 +1443,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
     if(g) parts.push(`${g}時間後`);
     return parts.length ? `<br><small>（${parts.join('・')}）</small>` : '';
   };
-  const MEAL_NAME = {b:'朝食', l:'昼食', d:'夕食'};
+
 
   /* 牛丼チェーンの朝食メニューは11:00までしか注文できない。
      朝食の時刻がそれを過ぎる日は、運動を何時までに終えればよいかを示す。 */
@@ -1465,9 +1503,15 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
     if(!s) return null;
     const at   = (s.at !== null && s.at !== undefined) ? s.at : null;
     const late = at !== null && at >= LATE_HHMM;
-    const head = `${MEAL_NAME[k]}の回し分` +
-      `<br><small>（${(at !== null ? hhmm(at) + '・' : '')}${SPLIT_GAP}時間後）</small>`;
-    const body = s.move
+    const gapH = s.reason === 'gap' ? r1(s.span / 2) : SPLIT_GAP;
+    const head = (s.reason === 'gap' ? '間食' : `${MEAL_NAME[k]}の回し分`) +
+      `<br><small>（${(at !== null ? hhmm(at) + '・' : '')}${gapH}時間後）</small>`;
+    const body = s.reason === 'gap' && s.move
+      ? `<b>${s.move.label}</b>` +
+        `<br><small>${s.from}から${s.to}まで${s.span}時間空くため、その中間に置いています。` +
+        `食後に高まった筋タンパク合成は3時間ほどで元に戻るので、` +
+        `間を空けすぎるとタンパク質が入らない時間が長くなります。</small>`
+      : s.move
       ? `<b>${s.move.label}</b>`
       : `<b>回せる品目がありません。</b>${MEAL_NAME[k]}の超過分は` +
         `ご飯・ミックスサラダ・その他（自由入力）によるもので、いずれも回し分には出しません。` +
@@ -1537,7 +1581,9 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
           '—',
           `昼食を摂らない設定のため、この枠には配分していません。` +
           `朝食から夕食まで間隔が空くので、<b>その間にタンパク質を切らさない</b>ことが重要です。` +
-          `朝食が目安を超えている場合は、下の「朝食の回し分」を昼の時間帯に回してください。`
+          (split.b
+            ? `上の<b>「${split.b.reason === 'gap' ? '間食' : '朝食の回し分'}」がこの時間帯を埋めます</b>。`
+            : `朝食が目安を超えている場合は、上の「朝食の回し分」を昼の時間帯に回してください。`)
         ]
       : [
           '昼食' + timeLabel('l'),
@@ -2018,6 +2064,12 @@ function updateLive(){
       ? `運動しなかった日は<b>起床後</b>に、不足分があるときだけ摂ります。`
       : `運動していない日はSAVASを摂らず、目標分はすべて食事から確保します。`);
 
+  // 夕食の時刻
+  $('dinnerNote').innerHTML = ($('dinnerTime').value || '')
+    ? `夕食をこの時刻に置きます。朝食から5時間以上空く場合は、その中間に「間食」の行を出して` +
+      `納豆などを回します（タンパク質が入らない時間を作らないため）。`
+    : `空欄のときは基本の間隔（昼食を抜く型なら朝食の8時間後）で置きます。`;
+
   // SAVASを1日2回まで
   $('twoNote').innerHTML = st.twoDoses
     ? `<b>オンです。</b>不足が1回分（最大${MAX_PER_SERVE}杯・${r1(MAX_PER_SERVE * SPOON_G)}g）で埋まらないときに、` +
@@ -2100,7 +2152,7 @@ const DEFAULTS_VER = 7;
 // v7：食事回数の選択肢を作り直したため（2食が「朝食・夕食」既定に）、meals も初期値へ戻す
 const RESET_IDS = () =>
   EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]).concat(['baseFactor', 'weight', 'meals']);
-const ALL_IDS = () => ['weight','baseFactor','meals','savasShare','walk','cycle','otherP','startTime','fixSpoons']
+const ALL_IDS = () => ['weight','baseFactor','meals','savasShare','walk','cycle','otherP','startTime','dinnerTime','fixSpoons']
   .concat(FOODS.map(f => 'f_' + f.id))
   .concat(EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]));
 
@@ -2182,7 +2234,7 @@ function load(){
    前日以前のリンクなら設定だけを反映し、食事はその日の型に戻す
    （この端末の localStorage が日付をまたぐと食事を 0 に戻すのと同じ扱い）。
    ------------------------------------------------------------ */
-const SETTING_IDS = () => ['weight','baseFactor','meals','savasShare','startTime','fixSpoons']
+const SETTING_IDS = () => ['weight','baseFactor','meals','savasShare','startTime','dinnerTime','fixSpoons']
   .concat(EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]));
 // 当日の入力（食事＋その他＋有酸素の距離）。実施種目のチェックは d.c で持ち運ぶ。
 const LINK_DAILY_IDS = () => DAILY_IDS().concat(['walk','cycle']);
