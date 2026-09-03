@@ -422,7 +422,9 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
       <div class="unit">時刻</div>
     </div>
     <p class="hint" style="margin-top:0">
-      運動していない日は<b>その日1食目の時刻</b>として使います。
+      運動していない日は<b>その日1食目の時刻</b>として使います。<br>
+      牛丼チェーンの<b>朝食メニューは11:00まで</b>。朝食はその2時間後に置く計算なので、
+      <b>運動は 9:00 までに終える</b>と間に合います。
     </p>
 
     <h3>有酸素運動</h3>
@@ -504,7 +506,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.2';
+const APP_VERSION = '2026-09-01.3';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -1299,6 +1301,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   const BASE_GAP  = {b:2, l:3, d:(st.skip === 'l' ? 8 : 4)};
   const SPLIT_GAP = 3;                        // 回し分をどれだけ後ろに置くか（時間）
   const LATE_HHMM = 20 * 60;                  // これより遅い摂取は就寝前として注意する
+  const BREAKFAST_END = 11 * 60;              // 牛丼チェーンの朝食メニューの注文期限（11:00）
 
   const overBin = (bin, targetG) => {
     const after = r1(bin.total + bin.addTotal);
@@ -1404,6 +1407,25 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   };
   const MEAL_NAME = {b:'朝食', l:'昼食', d:'夕食'};
 
+  /* 牛丼チェーンの朝食メニューは11:00までしか注文できない。
+     朝食の時刻がそれを過ぎる日は、運動を何時までに終えればよいかを示す。 */
+  const breakfastLimitNote = () => {
+    const at = times.b;
+    if(at === null || at === undefined) return '';
+    // その日の朝食枠に外食の朝食メニューが入っていなければ関係ない
+    const hasMenu = bins.b.items.concat(bins.b.adds)
+      .some(u => { const f = foodById(u.key); return f && f.slot === 'b'; });
+    if(!hasMenu) return '';
+    const lastEnd = BREAKFAST_END - BASE_GAP.b * 60;         // 運動を終える時刻の上限
+    return at > BREAKFAST_END
+      ? `<br><span class="warnbox"><b>⚠ ${hhmm(at)} では朝食メニューを注文できません（11:00まで）。</b>` +
+        `この配分どおりに摂るなら、<b>運動は ${hhmm(lastEnd)} までに終える</b>必要があります。` +
+        `間に合わないときは、先に朝食を済ませてから運動してください` +
+        `（その場合はSAVASを朝食の${BASE_GAP.b}時間後に飲むことになります）。</span>`
+      : `<br><small>朝食メニューの注文は11:00まで。いまの設定では ${hhmm(at)} なので間に合います` +
+        `（運動を ${hhmm(lastEnd)} までに終えれば間に合う計算です）。</small>`;
+  };
+
   /* 回し分に出した品目は、もとの食事の行からは差し引いて表示する
      （同じものが2か所に出ていると二重に食べてしまうため） */
   const labelOf = items => {
@@ -1506,7 +1528,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
       : [
           '朝食' + timeLabel('b'),
           `約&nbsp;${mBreak}&nbsp;g`,
-          meal(bins.b, mBreak, '', 'b')
+          meal(bins.b, mBreak, breakfastLimitNote(), 'b')
         ],
     splitRow('b'),
     st.skip === 'l'
