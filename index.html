@@ -513,7 +513,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.7';
+const APP_VERSION = '2026-09-01.8';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -541,9 +541,9 @@ const FOODS = [
    price:390, p:15, unit:'食', slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
   {id:'mt_gyuzara',   name:'松屋「得朝牛皿定食」',     short:'得朝牛皿定食',   note:'1食 約15g',
    price:400, p:15, unit:'食', slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
-  {id:'ys_hamegg',    name:'吉野家「ハムエッグ納豆定食」', short:'ハムエッグ納豆定食', note:'1食 約18g',
+  {id:'ys_hamegg',    name:'吉野家「ハムエッグ納豆定食」', short:'ハムエッグ納豆定食', weekName:'ハムエッグ<br>納豆定食', note:'1食 約18g',
    price:468, p:18, unit:'食', slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
-  {id:'sk_saba',      name:'すき家「塩さばたまかけ朝食」', short:'塩さばたまかけ朝食', note:'1食 約22g',
+  {id:'sk_saba',      name:'すき家「塩さばたまかけ朝食」', short:'塩さばたまかけ朝食', weekName:'塩さば<br>たまかけ朝食', note:'1食 約22g',
    price:490, p:22, unit:'食', slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
 
   // --- 夕食（牛丼チェーン。1食＝1単位、夕食の枠にだけ配分する） ---
@@ -551,7 +551,7 @@ const FOODS = [
    price:450, p:30, unit:'食', slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
   {id:'sk_light',     name:'すき家「牛丼ライト（お肉並盛）」', short:'牛丼ライト', note:'1食 約25g',
    price:530, p:25, unit:'食', slots:['d'], lock:true, slot:'d', fixedMenu:true},
-  {id:'mt_gyumeshi',  name:'松屋「牛めし（並盛）＋生玉子」', short:'牛めし＋生玉子', note:'1食 約23g',
+  {id:'mt_gyumeshi',  name:'松屋「牛めし（並盛）＋生玉子」', short:'牛めし＋生玉子', weekName:'牛めし<br>＋生玉子', note:'1食 約23g',
    price:490, p:23, unit:'食', slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
 
   // --- 自宅の食材（外食には持ち込めないので「間食」の枠にまとめる） ---
@@ -2132,26 +2132,31 @@ function updateLive(){
 
   // 食事合計
   // 毎日の品目と、曜日ごとの型
-  const perDay = FOODS.filter(f => f.autoDaily).map(f => `${f.short} ${f.autoDaily}${f.unit}`);
+  const nameQty  = f => `${f.short}（${f.autoDaily}${f.unit}）`;
+  const postDay  = FOODS.filter(f => f.autoDaily && f.post).map(nameQty);
+  const snackDay = FOODS.filter(f => f.autoDaily && f.home).map(nameQty);
   $('dailyNote').innerHTML =
     `<b>朝食・夕食は牛丼チェーンの固定メニュー</b>です（下表）。曜日に応じて毎日自動で入ります。` +
-    (perDay.length ? `<br><b>毎日：</b>${perDay.join('・')}（運動直後）` : '') +
+    (postDay.length  ? `<br><b>毎日（運動直後）：</b>${postDay.join('・')}` : '') +
+    (snackDay.length ? `<br><b>毎日（間食）：</b>${snackDay.join('・')}＋納豆（不足分から自動計算）` : '') +
     `<br><b>牛肉は週3食まで</b>（火・水・金）。LDLコレステロール対策として、鶏（親子丼）と魚（塩さば朝食）に寄せています。`;
 
   // 1週間の型：曜日 × 朝食 / 夕食 / 追加するもの
+  // 列幅が狭いので、長い名前は weekName で改行位置を指定する
   const menuOf = (plan, slot) => Object.keys(plan)
     .map(foodById).filter(f => f && f.slot === slot)
-    .map(f => `${f.short}<br><small>${f.p}g ／ ${f.price}円</small>`).join('<br>') || '—';
-  // 品目名と数量は行を分ける（列幅が狭いので途中で折り返さないように）
+    .map(f => `${f.weekName || f.short}<br><small>${f.p}g ／ ${f.price}円</small>`).join('<br>') || '—';
+  // 品目名と数量は行を分け、数量は（）で囲む
+  const qtyLine = (f, n) => `${f.weekName || f.short}<br>（${n}${f.unit}）`;
   const extraOf = plan => Object.keys(plan)
     .map(id => ({f:foodById(id), n:plan[id]})).filter(x => x.f && !x.f.slot)
-    .map(x => `${x.f.short}<br>${x.n}${x.f.unit}`).join('<br>');
+    .map(x => qtyLine(x.f, x.n)).join('<br>');
   $('weekPlan').innerHTML =
     `<thead><tr><th>曜日</th><th>朝食</th><th>夕食</th><th>追加</th></tr></thead>` +
     `<tbody>` + WEEK_LABEL.map((w, i) => {
       const plan  = WEEKLY_PLAN[i] || {};
-      const extra = [...perDay.map(t => t.replace(' ', '<br>')), extraOf(plan)]
-        .filter(Boolean).join('<br>');
+      const extra = [...FOODS.filter(f => f.autoDaily).map(f => qtyLine(f, f.autoDaily)),
+                     extraOf(plan)].filter(Boolean).join('<br>');
       return `<tr${i === todayIdx() ? ' class="today"' : ''}>` +
         `<td class="time">${w}${i === todayIdx() ? '<br><small>（今日）</small>' : ''}</td>` +
         `<td>${menuOf(plan, 'b')}</td><td>${menuOf(plan, 'd')}</td>` +
