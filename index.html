@@ -513,7 +513,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.16';
+const APP_VERSION = '2026-09-01.17';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -2216,8 +2216,11 @@ function updateLive(){
     `<thead><tr><th>曜日</th><th>朝食</th><th>夕食</th><th>追加</th></tr></thead>` +
     `<tbody>` + WEEK_LABEL.map((w, i) => {
       const plan  = WEEKLY_PLAN[i] || {};
-      const extra = [...FOODS.filter(f => f.autoDaily).map(f => qtyLine(f, f.autoDaily)),
-                     extraOf(plan)].filter(Boolean).join('<br>');
+      // 毎日の品目。自動計算の納豆は数量が日によって変わるので、最後の行に続けて添える
+      const day  = FOODS.filter(f => f.autoDaily).map(f => qtyLine(f, f.autoDaily));
+      const auto = FOODS.filter(f => f.autoNatto).map(f => `${f.short}（自動）`);
+      if(day.length && auto.length) day[day.length - 1] += '・' + auto.join('・');
+      const extra = [...day, extraOf(plan)].filter(Boolean).join('<br>');
       return `<tr${i === todayIdx() ? ' class="today"' : ''}>` +
         `<td class="time">${w}${i === todayIdx() ? '<br><small>（今日）</small>' : ''}</td>` +
         `<td>${menuOf(plan, 'b')}</td><td>${menuOf(plan, 'd')}</td>` +
