@@ -513,7 +513,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.11';
+const APP_VERSION = '2026-09-01.12';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -1698,9 +1698,11 @@ function renderAltFoods(toFoodG, sv, st, plan){
   // 曜日で固定している外食メニューも、増減させる前提ではないので出さない。
   const ALT_MIN_P = 5;
   // タンパク質10gあたりの単価が安い順に並べる（コスト効率が一目で分かるように）
-  const shown = FOODS.filter(f => !f.first && !f.fixedMenu && f.p >= ALT_MIN_P)
+  // 自動計算の品目（納豆）は不足量から数が決まるので、ここで増やす提案はしない
+  const shown = FOODS.filter(f => !f.first && !f.fixedMenu && !f.autoNatto && f.p >= ALT_MIN_P)
+                     .filter(f => roomFor(f, st) > 0)
                      .slice().sort((a, b) => pricePer10g(a) - pricePer10g(b));
-  const hidden = FOODS.filter(f => !f.first && !f.fixedMenu && f.p < ALT_MIN_P);
+  const hidden = FOODS.filter(f => !f.first && !f.fixedMenu && !f.autoNatto && f.p < ALT_MIN_P);
   if(!shown.length){
     box.innerHTML =
       `<div class="alt"><h4>残り ${toFoodG}g をどうするか` +
@@ -1714,7 +1716,8 @@ function renderAltFoods(toFoodG, sv, st, plan){
     return;
   }
   const rows = shown.map(f => {
-    const n = Math.ceil(toFoodG / f.p);
+    // 1日の上限がある品目は、その日にあと何個足せるかまで
+    const n = Math.min(roomFor(f, st), Math.ceil(toFoodG / f.p));
     return `<tr>
       <td class="food">${f.name}<br><small>1${f.unit} ${f.price}円` +
         `${f.ruleNote ? ` ／ ${f.ruleNote}` : ''}${f.limitNote ? ` ／ ${f.limitNote}` : ''}</small></td>
@@ -1729,12 +1732,20 @@ function renderAltFoods(toFoodG, sv, st, plan){
         <small>（上のSAVAS ${sv.spoons}杯・${sv.totalG}g を摂った前提）</small></h4>
       <div class="table-wrap"><table><tbody>${rows}</tbody></table></div>
       <div class="combo">
-        <b>栄養バランス重視：</b>${formatPlan(plan)}　<b>${planCost(plan).toLocaleString()}円</b>
+        <b>これで補うなら：</b>${formatPlan(plan)}　<b>${planCost(plan).toLocaleString()}円</b>
+        ${(() => {
+          const got  = r1((plan || []).reduce((acc, id) => acc + pOf(id), 0));
+          const left = r1(toFoodG - got);
+          return left >= DEVIATION_OK
+            ? `<br><b>これでも ${left}g 残ります。</b>固定メニュー以外に食べたものを` +
+              `<b>「その他（自由入力）」</b>に入れるか、「SAVASで賄う上限」を上げて調整してください。`
+            : '';
+        })()}
         <br><small>この組み合わせを「⑤ 時間帯別の摂取スケジュール」の各食事に割り振っています。${(() => {
           const used = [...usedCategories(st)];
           return used.length
             ? `今日すでに摂っている <b>${used.join('・')}</b> を避け、まだ摂っていないタンパク源から選んでいます。`
-            : `まだタンパク源の入力がないため、肉・魚・大豆・卵にばらして選んでいます。`;
+            : '';
         })()}</small>
         ${(() => {
           const cheap = cheapestPlan(toFoodG);
@@ -1771,6 +1782,11 @@ function calcEnergy(st, ex){
 
 /* タンパク質10gあたりの単価（円）。安いほどコスト効率がよい。 */
 const pricePer10g = f => Math.round(f.price / f.p * 10);
+/* その品目をその日あと何個足せるか（1日の上限がある品目は残りの枠まで） */
+const roomFor = (f, st) => {
+  const now = Math.round((st && st.foods && st.foods[f.id]) || 0);
+  return f.max === undefined ? 99 : Math.max(0, f.max - now);
+};
 
 /* 指定した g 数を最も安く満たす組み合わせを求める（動的計画法）。
    ルールで固定している食品（固定メニュー・バナナ・トマトジュース）は対象外。 */
@@ -1883,7 +1899,7 @@ const label    = (id, n) => { const f = foodById(id); return `${f.short} ${n}${f
    その日まだ摂っていないカテゴリを優先して提案する。 */
 // 不足を補う候補（固定メニュー・野菜・運動直後固定のものは除く）。
 // 現在は朝食と夕食を曜日で固定しているため、提案できる品目はない。
-const SUGGEST_ORDER = FOODS.filter(f => !f.fixedMenu && !f.first && !f.post && f.p >= 5)
+const SUGGEST_ORDER = FOODS.filter(f => !f.fixedMenu && !f.first && !f.post && !f.autoNatto && f.p >= 5)
                            .map(f => f.id);
 const FOOD_CAT = {};
 
@@ -1923,20 +1939,27 @@ function suggestPlan(g, st){
   const pool = SUGGEST_ORDER.map(foodById).filter(Boolean);
   const cats = usedCategories(st);
   const picks = [];
+  // 1日の上限がある品目は、その日の残り枠までしか提案しない
+  const room = {};
+  pool.forEach(f => room[f.id] = roomFor(f, st));
   let rest = g, guard = 0;
 
   while(rest >= 0.05 && guard++ < 30){
-    const fit = pool.filter(f => f.p <= rest + 0.05 && groupAllowed(f));
+    const fit = pool.filter(f => room[f.id] > 0 && f.p <= rest + 0.05 && groupAllowed(f));
     if(!fit.length) break;
     fit.sort((a, b) => (cats.has(FOOD_CAT[a.id]) - cats.has(FOOD_CAT[b.id])) || (b.p - a.p));
     const f = fit[0];
     picks.push(f.id);
+    room[f.id] -= 1;
     cats.add(FOOD_CAT[f.id]);
     useKind(f);
     rest = r1(rest - f.p);
   }
-  // 端数は最小単位で切り上げて必ず不足を満たす（候補が無い日は何も足さない）
-  if(rest > 0.05 && pool.length) picks.push(pool[pool.length - 1].id);
+  // 端数は最小単位で切り上げて必ず不足を満たす（枠が残っている品目が無ければ足さない）
+  if(rest > 0.05){
+    const last = pool.filter(f => room[f.id] > 0).pop();
+    if(last) picks.push(last.id);
+  }
   return picks;                            // 食品idの配列（1単位ごと）
 }
 
