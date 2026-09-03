@@ -513,7 +513,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.14';
+const APP_VERSION = '2026-09-01.15';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -533,39 +533,41 @@ const SERVE_G   = SPOON_G * PER_SERVE;  // 1回 = 19.5g
 //   autoPerMeal: 食事回数と同じ数を毎日の初期値にする（例：昼食と夕食で毎回ご飯0.5合）
 //   max   : 1日に入力できる上限（超える値は入力欄側で切り詰める）
 //   limitNote: 入力欄と早見表に添える制限の注記（時間帯の固定・1日の上限など）
+//   shop  : 店名（入力欄では店名で改行して表示する）
 //   slot  : 1週間の型の表で「朝食／夕食」どちらの列に出すか（外食メニュー用）
 //   fixedMenu: 1週間の型で固定しているメニュー（減らす提案の対象にしない）
 const FOODS = [
-  // --- 朝食（牛丼チェーン。1食＝1単位、朝食の枠にだけ配分する） ---
-  {id:'sk_mazenokke', name:'すき家「まぜのっけ朝食」', short:'まぜのっけ朝食', note:'1食 約15g',
-   price:390, p:15, unit:'食', slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
-  {id:'mt_gyuzara',   name:'松屋「得朝牛皿定食」',     short:'得朝牛皿定食',   note:'1食 約15g',
-   price:400, p:15, unit:'食', slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
-  {id:'ys_hamegg',    name:'吉野家「ハムエッグ納豆定食」', short:'ハムエッグ納豆定食', weekName:'ハムエッグ<br>納豆定食', note:'1食 約18g',
-   price:468, p:18, unit:'食', slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
-  {id:'sk_saba',      name:'すき家「塩さばたまかけ朝食」', short:'塩さばたまかけ朝食', weekName:'塩さば<br>たまかけ朝食', note:'1食 約22g',
+  // --- 牛丼チェーン（1食＝1単位。朝食メニューは朝食、夕食メニューは夕食の枠にだけ配分する） ---
+  {id:'sk_saba',      shop:'すき家',  name:'塩さばたまかけ朝食',   short:'塩さばたまかけ朝食',
+   weekName:'塩さば<br>たまかけ朝食', note:'1食 約22g',
    price:490, p:22, unit:'食', slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
-
-  // --- 夕食（牛丼チェーン。1食＝1単位、夕食の枠にだけ配分する） ---
-  {id:'nk_oyako',     name:'なか卯「親子丼（並盛）」',   short:'親子丼',       note:'1食 約30g',
-   price:450, p:30, unit:'食', slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
-  {id:'sk_light',     name:'すき家「牛丼ライト（お肉並盛）」', short:'牛丼ライト', note:'1食 約25g',
+  {id:'sk_mazenokke', shop:'すき家',  name:'まぜのっけ朝食',       short:'まぜのっけ朝食', note:'1食 約15g',
+   price:390, p:15, unit:'食', slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
+  {id:'sk_light',     shop:'すき家',  name:'牛丼ライト（お肉並盛）', short:'牛丼ライト', note:'1食 約25g',
    price:530, p:25, unit:'食', slots:['d'], lock:true, slot:'d', fixedMenu:true},
-  {id:'mt_gyumeshi',  name:'松屋「牛めし（並盛）＋生玉子」', short:'牛めし＋生玉子', weekName:'牛めし<br>＋生玉子', note:'1食 約23g',
+  {id:'mt_gyuzara',   shop:'松屋',    name:'得朝牛皿定食',         short:'得朝牛皿定食',   note:'1食 約15g',
+   price:400, p:15, unit:'食', slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
+  {id:'mt_gyumeshi',  shop:'松屋',    name:'牛めし（並盛）＋生玉子', short:'牛めし＋生玉子',
+   weekName:'牛めし<br>＋生玉子', note:'1食 約23g',
    price:490, p:23, unit:'食', slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
+  {id:'ys_hamegg',    shop:'吉野家',  name:'ハムエッグ納豆定食',   short:'ハムエッグ納豆定食',
+   weekName:'ハムエッグ<br>納豆定食', note:'1食 約18g',
+   price:468, p:18, unit:'食', slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
+  {id:'nk_oyako',     shop:'なか卯',  name:'親子丼（並盛）',       short:'親子丼',       note:'1食 約30g',
+   price:450, p:30, unit:'食', slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
 
   // --- 自宅の食材（外食には持ち込めないので「間食」の枠にまとめる） ---
-  {id:'natto',   name:'納豆',                short:'納豆',         note:'1パック 約8.3g',
-   price:32, ruleNote:'間食でまとめて・不足分から自動計算', p:8.3, unit:'P',
-   slots:['s'], lock:true, home:true, autoNatto:true},
-  {id:'egg',     name:'卵',                  short:'卵',           note:'1個 約6g',
-   price:27, ruleNote:'間食でまとめて・1日2個まで', p:6, unit:'個',
-   slots:['s'], lock:true, home:true, autoDaily:1, max:2},
   {id:'tomato',  name:'トマトジュース（200ml）', short:'トマトジュース', note:'200ml 約1.8g（食塩無添加）',
-   price:40, ruleNote:'間食でまとめて・毎日1杯（カリウム補給）', p:1.8, unit:'杯',
+   price:40, ruleNote:'毎日1杯（カリウム補給）', p:1.8, unit:'杯',
    slots:['s'], lock:true, home:true, autoDaily:1},
+  {id:'egg',     name:'卵',                  short:'卵',           note:'1個 約6g',
+   price:27, ruleNote:'1日2個まで', p:6, unit:'個',
+   slots:['s'], lock:true, home:true, autoDaily:1, max:2},
+  {id:'natto',   name:'納豆',                short:'納豆',         note:'1パック 約8.3g',
+   price:32, ruleNote:'不足分から自動計算', p:8.3, unit:'P',
+   slots:['s'], lock:true, home:true, autoNatto:true},
 
-  // --- 毎日 ---
+  // --- 運動直後 ---
   {id:'banana',  name:'バナナ',              short:'バナナ',       note:'1本 約1g',
    price:34, ruleNote:'運動直後に必ず1本', p:1, unit:'本', slots:['b','l','d'], post:true, autoDaily:1}
 ];
@@ -613,7 +615,7 @@ const serveText = n => n === 1 ? '1回で摂取' : `${n}回に分けて摂取`;
    ============================================================ */
 $('foods').innerHTML = FOODS.map(f => `
   <div class="row">
-    <div class="name"><b>${f.name}</b><small>${f.note} <b>${f.price}円</b>` +
+    <div class="name"><b>${f.shop ? f.shop + '<br>' : ''}${f.name}</b><small>${f.note} <b>${f.price}円</b>` +
       `${f.ruleNote ? ` ／ ${f.ruleNote}` : ''}${f.limitNote ? ` ／ <b>${f.limitNote}</b>` : ''}` +
       // 自動計算する品目は、手で書き換えたときに自動へ戻せるようにする
       `${f.autoNatto ? `<br><span id="autoNote_${f.id}"></span>` +
@@ -687,7 +689,7 @@ function calcFood(st){
       const g = q * f.p;
       total += g;
       cost  += q * (f.price || 0);
-      list.push(`${f.name} ${r1(q)}${f.unit}（${r1(g)}g）`);
+      list.push(`${f.shop ? f.shop + ' ' : ''}${f.name} ${r1(q)}${f.unit}（${r1(g)}g）`);
     }
   });
   if(st.otherP > 0) list.push(`その他（${r1(st.otherP)}g）`);
@@ -1736,7 +1738,7 @@ function renderAltFoods(toFoodG, sv, st, plan){
     // 1日の上限がある品目は、その日にあと何個足せるかまで
     const n = Math.min(roomFor(f, st), Math.ceil(toFoodG / f.p));
     return `<tr>
-      <td class="food">${f.name}<br><small>1${f.unit} ${f.price}円` +
+      <td class="food">${f.shop ? f.shop + '<br>' : ''}${f.name}<br><small>1${f.unit} ${f.price}円` +
         `${f.ruleNote ? ` ／ ${f.ruleNote}` : ''}${f.limitNote ? ` ／ ${f.limitNote}` : ''}</small></td>
       <td class="num">${n} ${f.unit}<br><small>${r1(n * f.p)}g ／ ${(n * f.price).toLocaleString()}円</small></td>
       <td class="num">${pricePer10g(f)}円<br><small>10gあたり</small></td>
