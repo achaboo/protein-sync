@@ -9,7 +9,8 @@
    1. このファイル (index.html) をダブルクリックしてブラウザで開くだけで動きます。
       （サーバー不要・通信不要・スマホにコピーしても動作します）
    2. 「① 基本設定」で体重を確認します（初期値 74kg）。
-   3. 「② 今日の食事」で食べたもの（食べる予定のもの）の個数を入力します。
+   3. 「② 今日の食事」は曜日ごとの固定メニュー（朝食・夕食＝牛丼チェーン）が自動で入ります。
+      違うものを食べた日は数量を書き換えてください。
       リストにないものは「その他（自由入力）」にタンパク質 g を直接入力してください。
    4. 「③ 今日の運動」で有酸素の距離を入力します。筋トレは全8種目に最初からチェックが
       入っているので、やらなかった種目だけチェックを外します。
@@ -39,8 +40,8 @@
      ただし「① 基本設定」の「運動しなかった日もSAVASを摂る」をオンにすると、
      休養日も不足分があるときだけ起床後に1回摂る計算になります（回復期向け）。
    ・食品のタンパク質量はスクリプト内の FOODS で一元管理しています
-     （サバ缶16.7g、ツナ缶12.7g、ご飯0.5合4.5g、納豆8.3g、ヨーグルト200g8g、
-     豆腐7.2g、卵6g、ミックスサラダ2g、バナナ1g）。
+     （牛丼チェーンの朝食15〜22g、夕食23〜30g、バナナ1g、ミックスサラダ1/2袋1g）。
+     朝食・夕食は曜日ごとに固定したメニューを WEEKLY_PLAN で管理しています。
    ※数値は目安です。商品リニューアル等で変わる場合は FOODS の p の値を修正すれば、
      入力欄・計算・スケジュール・早見表のすべてに反映されます。
 ================================================================================
@@ -281,7 +282,8 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
       <div>
         <label for="meals">1日の食事回数</label>
         <select id="meals">
-          <option value="2" selected>2食（朝食を抜く）</option>
+          <option value="2l" selected>2食（朝食・夕食／昼食を抜く）</option>
+          <option value="2b">2食（昼食・夕食／朝食を抜く）</option>
           <option value="3">3食</option>
         </select>
       </div>
@@ -502,7 +504,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-08-26.68';
+const APP_VERSION = '2026-09-01.1';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -522,16 +524,32 @@ const SERVE_G   = SPOON_G * PER_SERVE;  // 1回 = 19.5g
 //   autoPerMeal: 食事回数と同じ数を毎日の初期値にする（例：昼食と夕食で毎回ご飯0.5合）
 //   max   : 1日に入力できる上限（超える値は入力欄側で切り詰める）
 //   limitNote: 入力欄と早見表に添える制限の注記（時間帯の固定・1日の上限など）
+//   slot  : 1週間の型の表で「朝食／夕食」どちらの列に出すか（外食メニュー用）
+//   fixedMenu: 1週間の型で固定しているメニュー（減らす提案の対象にしない）
 const FOODS = [
-  {id:'rice',    name:'ご飯（0.5合）',      short:'ご飯',         note:'0.5合 約4.5g',        price:33,  ruleNote:'昼食・夕食に毎回0.5合', p:4.5, unit:'杯', slots:['l','d','b'], carb:true, group:'staple', slotLimit:1, autoPerMeal:true},
-  {id:'natto',   name:'納豆',               short:'納豆',         note:'1パック 約8.3g',       price:32,  p:8.3,  unit:'P',  slots:['b','d','l'], autoPerMeal:true},
-  {id:'tofu',    name:'豆腐',               short:'豆腐',         note:'1パック（150g） 約7.2g', price:35, p:7.2, unit:'P',  slots:['b','d','l'], autoPerMeal:true},
-  {id:'tuna',    name:'ツナ缶',             short:'ツナ缶',       note:'1缶 約12.7g',          price:133, p:12.7, unit:'缶', slots:['l','d','b'], autoPerMeal:true},
-  {id:'saba',    name:'サバ缶',             short:'サバ缶',       note:'1缶 約16.7g',          price:268, p:16.7, unit:'缶', slots:['d','l','b']},
-  {id:'egg',     name:'卵',                 short:'卵',           note:'1個 約6g',             price:27,  p:6,    unit:'個', slots:['b','l','d'], autoPerMeal:true},
-  {id:'yogurt',  name:'無脂肪ヨーグルト（200g）', short:'ヨーグルト', note:'200g 約8g（カルシウム 約260mg）', price:70, p:8, unit:'杯', slots:['l','d','b']},
-  {id:'banana',  name:'バナナ',             short:'バナナ',       note:'1本 約1g',             price:34,  ruleNote:'運動直後に必ず1本', p:1, unit:'本', slots:['b','l','d'], post:true, autoDaily:1},
-  {id:'salad',   name:'ミックスサラダ',      short:'ミックスサラダ', note:'1袋 約2g',           price:106, p:2,    unit:'袋', slots:['l','d','b'], first:true, autoPerMeal:true}
+  // --- 朝食（牛丼チェーン。1食＝1単位、朝食の枠にだけ配分する） ---
+  {id:'sk_mazenokke', name:'すき家「まぜのっけ朝食」', short:'まぜのっけ朝食', note:'1食 約15g',
+   price:390, p:15, unit:'食', slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
+  {id:'mt_gyuzara',   name:'松屋「得朝牛皿定食」',     short:'得朝牛皿定食',   note:'1食 約15g',
+   price:400, p:15, unit:'食', slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
+  {id:'ys_hamegg',    name:'吉野家「ハムエッグ納豆定食」', short:'ハムエッグ納豆定食', note:'1食 約18g',
+   price:468, p:18, unit:'食', slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
+  {id:'sk_saba',      name:'すき家「塩さばたまかけ朝食」', short:'塩さばたまかけ朝食', note:'1食 約22g',
+   price:490, p:22, unit:'食', slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
+
+  // --- 夕食（牛丼チェーン。1食＝1単位、夕食の枠にだけ配分する） ---
+  {id:'nk_oyako',     name:'なか卯「親子丼（並盛）」',   short:'親子丼',       note:'1食 約30g',
+   price:450, p:30, unit:'食', slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
+  {id:'sk_light',     name:'すき家「牛丼ライト（お肉並盛）」', short:'牛丼ライト', note:'1食 約25g',
+   price:530, p:25, unit:'食', slots:['d'], lock:true, slot:'d', fixedMenu:true},
+  {id:'mt_gyumeshi',  name:'松屋「牛めし（並盛）＋生玉子」', short:'牛めし＋生玉子', note:'1食 約23g',
+   price:490, p:23, unit:'食', slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
+
+  // --- 毎日・曜日ごとに足すもの ---
+  {id:'banana',  name:'バナナ',              short:'バナナ',       note:'1本 約1g',
+   price:34, ruleNote:'運動直後に必ず1本', p:1, unit:'本', slots:['b','l','d'], post:true, autoDaily:1},
+  {id:'salad',   name:'ミックスサラダ（1/2袋）', short:'ミックスサラダ', note:'1/2袋（約67.5g） 約1g',
+   price:53, p:1, unit:'皿', slots:['b','d','l'], first:true}
 ];
 
 // SAVASは水のみで溶かす（乳類は摂らない前提）。水にタンパク質は含まれないため加算はない。
@@ -613,8 +631,12 @@ function readState(){
   st.liquid     = WATER;
   st.liquidMl   = WATER_ML;
   st.liqP       = 0;
-  st.meals       = parseInt($('meals').value, 10) === 3 ? 3 : 2;
-  st.skipB       = st.meals === 2;                    // 朝食を摂らない
+  // 食事回数。2食は「朝食・夕食（昼食を抜く）」と「昼食・夕食（朝食を抜く）」を選べる
+  const mealsVal = $('meals').value;
+  st.meals       = mealsVal === '3' ? 3 : 2;
+  st.skip        = st.meals === 3 ? '' : (mealsVal === '2b' ? 'b' : 'l');  // 抜く食事
+  st.skipB       = st.skip === 'b';                   // 朝食を摂らない（旧設定）
+  st.slots       = ['b','l','d'].filter(s => s !== st.skip);
   st.savasShare  = Math.min(100, num('savasShare')) / 100;   // SAVASで賄う上限（目標比）
   st.restSavas   = $('restSavas').checked;                    // 運動しなかった日もSAVASを摂るか
   st.twoDoses    = $('twoDoses').checked;                     // 夕方の2回目を許可するか
@@ -914,8 +936,8 @@ function render(opts){
   }else if(lack > 0){
     $('oSavas').innerHTML = `SAVASは不要です<span style="font-size:1rem">（不足 ${lack}g）</span>`;
     $('oSavasSub').innerHTML = (st.liqP > 0
-      ? `1回分（スプーン1杯＋${liqName}${st.liquidMl}ml＝約${r1(SPOON_G + st.liqP)}g）を飲むと逆に摂りすぎになります。${label('egg', 1)}など少量の食品で調整してください。`
-      : `残り ${lack}g は少量なので、${label('egg', 1)}などの食品で調整するほうが確実です。`) +
+      ? `1回分（スプーン1杯＋${liqName}${st.liquidMl}ml＝約${r1(SPOON_G + st.liqP)}g）を飲むと逆に摂りすぎになります。「その他（自由入力）」に少量を足して調整してください。`
+      : `残り ${lack}g は少量なので、「その他（自由入力）」に少量を足して調整するほうが確実です。`) +
       (liquidCutSuggestion(st, lack) ? `<br>${liquidCutSuggestion(st, lack)}` : '');
   }else{
     $('oSavas').innerHTML = 'SAVASの追加摂取は不要です 👍';
@@ -971,10 +993,12 @@ function render(opts){
    「その食品に適した時間帯」のうち最も不足している枠へ入れていく。
    ------------------------------------------------------------ */
 function distributeFoods(st, mealTargets, planIds, trained){
-  // 朝食を摂らない設定のときは、朝食枠に割り当てようとする食品を昼食に回す
-  const mapSlots = s => [...new Set(s.map(x => (st.skipB && x === 'b') ? 'l' : x))];
+  // 抜く食事に割り当てようとする食品は、残っている枠へ回す
+  //   朝食を抜く設定 → 昼食へ／昼食を抜く設定 → 朝食へ
+  const moveTo   = st.skip === 'b' ? 'l' : 'b';
+  const mapSlots = s => [...new Set(s.map(x => (st.skip && x === st.skip) ? moveTo : x))];
   // 配分先として使える食事の枠（p＝運動直後は食事ではないので含めない）
-  const ORDER = st.skipB ? ['l','d'] : ['b','l','d'];
+  const ORDER = st.slots;
   const units = [];
 
   const firstUnits  = [];  // ミックスサラダなど「最初に食べる」もの。他の配分が済んでから割り当てる
@@ -1184,8 +1208,10 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   // 食事で摂るべき量 = 目標 − SAVASで補う量（粉＋液体）を 朝30% / 昼35% / 晩35% に配分（1回40g上限）
   const byMeal  = Math.max(0, target - sv.totalG);
   const cap     = g => Math.min(40, Math.round(g));
-  // 朝食を抜く場合は昼・夕で半分ずつ
-  const share   = st.skipB ? {b:0, l:0.5, d:0.5} : {b:0.30, l:0.35, d:0.35};
+  // 2食のときは残る2枠で半分ずつ
+  const share   = st.skip === 'b' ? {b:0,   l:0.5, d:0.5}
+                : st.skip === 'l' ? {b:0.5, l:0,   d:0.5}
+                :                   {b:0.30, l:0.35, d:0.35};
   const mBreak  = cap(byMeal * share.b);
   const mLunch  = cap(byMeal * share.l);
   const mDinner = cap(byMeal * share.d);
@@ -1207,7 +1233,8 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
      そこから 朝食+2h / 昼食+3h / 夕食+4h を基本の間隔として並べる。
      1食が目安（1回40g）を超えている時間帯は、その3時間後に「回し分」を置き、
      次の食事はさらに3時間後にずらす。こうすると全部が3時間以上空く。      */
-  const BASE_GAP  = {b:2, l:3, d:4};
+  // 昼食を抜く設定では朝食から夕食まで間隔が空くため、その分を長めに取る
+  const BASE_GAP  = {b:2, l:3, d:(st.skip === 'l' ? 8 : 4)};
   const SPLIT_GAP = 3;                        // 回し分をどれだけ後ろに置くか（時間）
   const LATE_HHMM = 20 * 60;                  // これより遅い摂取は就寝前として注意する
 
@@ -1283,7 +1310,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   if(dosed){ times.p = clock(0); prevRow = 0; nextFrom = 0; started = true; }
 
   [['b', bins.b, mBreak], ['l', bins.l, mLunch], ['d', bins.d, mDinner]].forEach(([k, bin, t]) => {
-    if(k === 'b' && st.skipB) return;         // 抜く朝食は起点にならない
+    if(k === st.skip) return;                 // 抜く食事は起点にならない
     let off;
     if(!started){                             // 運動していない日の1食目＝起点そのもの
       off = 0; started = true;
@@ -1406,7 +1433,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
             ? `<b>運動しなかった日もSAVASを摂る</b>設定ですが、今日は食事だけで目標に届いているため0杯です。`
             : `運動していない日はSAVASを摂りません。目標分はすべて食事から確保してください。`
     ],
-    st.skipB
+    st.skip === 'b'
       ? [
           '朝食<br><small>（抜く）</small>',
           '—',
@@ -1417,14 +1444,22 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
       : [
           '朝食' + timeLabel('b'),
           `約&nbsp;${mBreak}&nbsp;g`,
-          meal(bins.b, mBreak, '<br>朝は最も不足しやすい時間帯です。', 'b')
+          meal(bins.b, mBreak, '', 'b')
         ],
     splitRow('b'),
-    [
-      '昼食' + timeLabel('l'),
-      `約&nbsp;${mLunch}&nbsp;g`,
-      meal(bins.l, mLunch, '', 'l')
-    ],
+    st.skip === 'l'
+      ? [
+          '昼食<br><small>（抜く）</small>',
+          '—',
+          `昼食を摂らない設定のため、この枠には配分していません。` +
+          `朝食から夕食まで間隔が空くので、<b>その間にタンパク質を切らさない</b>ことが重要です。` +
+          `朝食が目安を超えている場合は、下の「朝食の回し分」を昼の時間帯に回してください。`
+        ]
+      : [
+          '昼食' + timeLabel('l'),
+          `約&nbsp;${mLunch}&nbsp;g`,
+          meal(bins.l, mLunch, '', 'l')
+        ],
     splitRow('l'),
     [
       '夕食' + timeLabel('d'),
@@ -1469,12 +1504,25 @@ function renderAltFoods(toFoodG, sv, st, plan){
   const box = $('altFoods');
   if(toFoodG < DEVIATION_OK){ box.innerHTML = ''; return; }
 
-  // 最初に食べる野菜（血糖値対策の位置づけ）と、単品では非現実的な低密度の食品は除外する
+  // 最初に食べる野菜（血糖値対策の位置づけ）と、単品では非現実的な低密度の食品は除外する。
+  // 曜日で固定している外食メニューも、増減させる前提ではないので出さない。
   const ALT_MIN_P = 5;
   // タンパク質10gあたりの単価が安い順に並べる（コスト効率が一目で分かるように）
-  const shown = FOODS.filter(f => !f.first && f.p >= ALT_MIN_P)
+  const shown = FOODS.filter(f => !f.first && !f.fixedMenu && f.p >= ALT_MIN_P)
                      .slice().sort((a, b) => pricePer10g(a) - pricePer10g(b));
-  const hidden = FOODS.filter(f => !f.first && f.p < ALT_MIN_P);
+  const hidden = FOODS.filter(f => !f.first && !f.fixedMenu && f.p < ALT_MIN_P);
+  if(!shown.length){
+    box.innerHTML =
+      `<div class="alt"><h4>残り ${toFoodG}g をどうするか` +
+      `<small>（上のSAVAS ${sv.spoons}杯・${sv.totalG}g を摂った前提）</small></h4>` +
+      `<p class="hint" style="margin:0">朝食・夕食は曜日ごとの固定メニューなので、この表では増減させません。` +
+      `残りは` + (st.twoDoses ? '' : `<b>「SAVASを1日2回まで摂る」をオンにする</b>か、`) +
+      `固定メニュー以外に食べたものを<b>「その他（自由入力）」</b>にg数で入れて調整してください。` +
+      (st.savasShare < 1
+        ? `<br>「SAVASで賄う上限」を上げると、粉で補える量（現在 目標の${Math.round(st.savasShare * 100)}%）を増やせます。`
+        : '') + `</p></div>`;
+    return;
+  }
   const rows = shown.map(f => {
     const n = Math.ceil(toFoodG / f.p);
     return `<tr>
@@ -1586,7 +1634,7 @@ function fixedSavas(spoons){
 /* SAVASを足すと目標を超える場合に、食事のどれを減らすとよいかを提案する。
    ルールで固定している食品（ご飯・バナナ・ミックスサラダ）は対象外とし、
    タンパク源が偏っているカテゴリから優先して減らす。 */
-const REDUCE_EXCLUDE = ['rice','banana','salad'];
+const REDUCE_EXCLUDE = FOODS.filter(f => f.fixedMenu || f.first || f.post).map(f => f.id);
 function suggestReduce(overG, st){
   const qty = {};
   FOODS.forEach(f => qty[f.id] = Math.round((st.foods && st.foods[f.id]) || 0));
@@ -1643,11 +1691,11 @@ const label    = (id, n) => { const f = foodById(id); return `${f.short} ${n}${f
 /* 提案に使う食品と、そのタンパク源のカテゴリ。
    同じ供給源に偏るとアミノ酸組成やビタミン・ミネラルが偏るため、
    その日まだ摂っていないカテゴリを優先して提案する。 */
-const SUGGEST_ORDER = ['saba','tuna','natto','yogurt','tofu','egg'];
-const FOOD_CAT = {
-  saba:'魚', tuna:'魚', natto:'大豆', tofu:'大豆',
-  egg:'卵', yogurt:'乳製品'
-};
+// 不足を補う候補（固定メニュー・野菜・運動直後固定のものは除く）。
+// 現在は朝食と夕食を曜日で固定しているため、提案できる品目はない。
+const SUGGEST_ORDER = FOODS.filter(f => !f.fixedMenu && !f.first && !f.post && f.p >= 5)
+                           .map(f => f.id);
+const FOOD_CAT = {};
 
 /* その日すでに摂っているタンパク源のカテゴリ */
 function usedCategories(st){
@@ -1697,7 +1745,8 @@ function suggestPlan(g, st){
     useKind(f);
     rest = r1(rest - f.p);
   }
-  if(rest > 0.05) picks.push('egg');      // 端数は最小単位で切り上げ、必ず不足を満たす
+  // 端数は最小単位で切り上げて必ず不足を満たす（候補が無い日は何も足さない）
+  if(rest > 0.05 && pool.length) picks.push(pool[pool.length - 1].id);
   return picks;                            // 食品idの配列（1単位ごと）
 }
 
@@ -1709,6 +1758,18 @@ function formatPlan(ids){
 }
 
 function suggestFoods(g, st){ return formatPlan(suggestPlan(g, st)); }
+
+/* 不足分をどう埋めるかの案内。提案できる品目が無い（固定メニューのみ）ときは、
+   SAVASの2回目か「その他（自由入力）」へ誘導する。 */
+function addAdvice(g, st){
+  const plan = suggestPlan(g, st);
+  if(plan.length) return `例：<b>${formatPlan(plan)}</b> を「② 今日の食事」に追加すると、この指摘は消えます。`;
+  return `朝食・夕食は固定メニューなので、` +
+    (st.twoDoses
+      ? `固定メニュー以外に食べたものを<b>「その他（自由入力）」</b>にg数で入れてください。`
+      : `<b>「① 基本設定」の「SAVASを1日2回まで摂る」をオンにする</b>か、` +
+        `固定メニュー以外に食べたものを<b>「その他（自由入力）」</b>にg数で入れてください。`);
+}
 
 /* 食事・栄養のポイント */
 function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, planned, reduceG, cut){
@@ -1724,7 +1785,7 @@ function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, pl
     tips.push(['alert', `<b>⚠ まず最低ライン ${floor}g を目指してください（現在の見込み ${planned}g）。</b>` +
       `あと ${r1(floor - planned)}g です。目標 ${target}g が難しい日でも、` +
       `この水準を下回る日が続くと筋肉が落ちやすくなります。` +
-      `<br>例：<b>${suggestFoods(r1(floor - planned), st)}</b> で届きます。`]);
+      `<br>${addAdvice(r1(floor - planned), st)}`]);
   }
 
   // --- 不足の状態表示：追加すべき量を明示し、満たせば「解消」に切り替わる ---
@@ -1745,7 +1806,7 @@ function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, pl
         : sv.spoons > 0
           ? `SAVAS ${sv.spoons}杯（合計 ${sv.totalG}g）では、不足 ${lack}g のうち ${more}g が残ります。`
           : `不足 ${lack}g に対しSAVAS1回分（スプーン1杯＋${st.liquid.name}で約${r1(SPOON_G + st.liqP)}g）は多すぎるため、食品で補うほうが正確です。`) +
-      `<br>例：<b>${suggestFoods(more, st)}</b> を「② 今日の食事」に追加すると、この指摘は消えます。` +
+      `<br>${addAdvice(more, st)}` +
       (sv.spoons === 0 && liquidCutSuggestion(st, lack) ? `<br>${liquidCutSuggestion(st, lack)}` : '')]);
   }else if(lack > 0 && sv.spoons > 0){
     tips.push(['done',
@@ -1757,7 +1818,7 @@ function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, pl
   }else if(lack > 0){
     tips.push(['done',
       `<b>✅ 不足は ${lack}g だけです。</b>SAVASを1回飲むと摂りすぎになるため、` +
-      `そのままか、${label('egg', 1)}程度で調整してください。`]);
+      `そのままで構いません（気になる場合は「その他（自由入力）」で微調整してください）。`]);
   }else{
     tips.push(['done',
       `<b>✅ 今日の目標 ${target}g を食事だけで達成しています。</b>` +
@@ -1775,11 +1836,12 @@ function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, pl
   }
 
   tips.push(['', `<b>① 1回の摂取は30〜40gまで。</b>1度に吸収・利用できるタンパク質は 30〜40g 程度が上限です。今日の目標 ${target}g は一気に摂らず、` +
-    (st.skipB ? `<b>昼・夕の2食＋SAVAS</b>` : `<b>朝・昼・晩＋補食</b>`) +
+    (st.meals === 3 ? `<b>朝・昼・晩＋補食</b>`
+      : st.skip === 'b' ? `<b>昼・夕の2食＋SAVAS</b>` : `<b>朝・夕の2食＋SAVAS</b>`) +
     `に分散してください。まとめ摂りした余剰分は筋肉に回らず、エネルギーや脂肪として処理されるだけになります。` +
-    (st.skipB ? `2食だと1食あたりが増えやすいので、超えた分はSAVASの回に回すほうが無駄になりません。` : '')]);
+    (st.meals === 2 ? `2食だと1食あたりが増えやすいので、超えた分はSAVASの回に回すほうが無駄になりません。` : '')]);
 
-  tips.push(['', `<b>② 食べる順番を守る（ベジ／ソイファースト）。</b>ご飯など糖質を摂るときは、必ず先に<b>ミックスサラダ・冷奴・納豆などの大豆製品</b>を食べてから。血糖値の急上昇（血糖値スパイク）を抑え、内臓脂肪の蓄積を防げます。特に<b>ご飯</b>は糖質量が大きいので、サラダと大豆製品の先食べを徹底しましょう。`]);
+  tips.push(['', `<b>② 食べる順番を守る（ベジファースト）。</b>丼ものなど糖質の多い食事のときは、必ず先に<b>ミックスサラダ</b>を食べてから。血糖値の急上昇（血糖値スパイク）を抑え、内臓脂肪の蓄積を防げます。牛丼・親子丼はご飯の量が多いので、サラダの先食べを徹底しましょう（サラダが無い日は、汁物や卵から先に口を付けるだけでも違います）。`]);
 
   tips.push(['', `<b>③ カルシウムは別枠で。</b>「② 今日の食事」の品目には乳製品が含まれていないため、` +
     `<b>カルシウムはこのツールでは追えません</b>。牛乳・ヨーグルト・小魚・豆腐などで別途確保してください。` +
@@ -1892,22 +1954,28 @@ function updateLive(){
 
   // 食事合計
   // 毎日の品目と、曜日ごとの型
-  const perMeal = FOODS.filter(f => f.autoPerMeal).map(f => `${f.short} ${f.perMealQty || 1}${f.unit}`);
-  const perDay  = FOODS.filter(f => f.autoDaily).map(f => `${f.short} ${f.autoDaily}${f.unit}`);
+  const perDay = FOODS.filter(f => f.autoDaily).map(f => `${f.short} ${f.autoDaily}${f.unit}`);
   $('dailyNote').innerHTML =
-    `<b>毎食（${st.meals}食なので各${st.meals}）：</b>${perMeal.join('・')}` +
-    (perDay.length ? `<br><b>毎日：</b>${perDay.join('・')}` : '') +
-    `<br><b>曜日ごと：</b>下表のとおり1品だけ足します。` +
-    `サバ缶は骨ごとでカルシウムが多いため、その日はヨーグルトを置いていません。`;
+    `<b>朝食・夕食は牛丼チェーンの固定メニュー</b>です（下表）。曜日に応じて毎日自動で入ります。` +
+    (perDay.length ? `<br><b>毎日：</b>${perDay.join('・')}（運動直後）` : '') +
+    `<br><b>ミックスサラダ：</b>火・木・土に1皿（1/2袋）。丼ものの前に食べて血糖値の急上昇を抑えます。`;
 
-  // ローテーションに登場する品目だけを列にする
-  const rotIds = [...new Set(Object.keys(WEEKLY_PLAN).flatMap(k => Object.keys(WEEKLY_PLAN[k])))];
+  // 1週間の型：曜日 × 朝食 / 夕食 / 追加するもの
+  const menuOf = (plan, slot) => Object.keys(plan)
+    .map(foodById).filter(f => f && f.slot === slot)
+    .map(f => `${f.short}<br><small>${f.p}g ／ ${f.price}円</small>`).join('<br>') || '—';
+  const extraOf = plan => Object.keys(plan)
+    .map(id => ({f:foodById(id), n:plan[id]})).filter(x => x.f && !x.f.slot)
+    .map(x => `${x.f.short} ${x.n}${x.f.unit}`).join('<br>');
   $('weekPlan').innerHTML =
-    `<thead><tr><th>曜日</th>` + rotIds.map(id => `<th>${foodById(id).short}</th>`).join('') + `</tr></thead>` +
+    `<thead><tr><th>曜日</th><th>朝食</th><th>夕食</th><th>追加</th></tr></thead>` +
     `<tbody>` + WEEK_LABEL.map((w, i) => {
-      const plan = WEEKLY_PLAN[i] || {};
-      const cells = rotIds.map(id => `<td class="amt">${plan[id] ? plan[id] + foodById(id).unit : '—'}</td>`).join('');
-      return `<tr${i === todayIdx() ? ' class="today"' : ''}><td class="time">${w}${i === todayIdx() ? '（今日）' : ''}</td>${cells}</tr>`;
+      const plan  = WEEKLY_PLAN[i] || {};
+      const extra = [...(perDay.length ? ['バナナ 1本'] : []), extraOf(plan)].filter(Boolean).join('<br>');
+      return `<tr${i === todayIdx() ? ' class="today"' : ''}>` +
+        `<td class="time">${w}${i === todayIdx() ? '（今日）' : ''}</td>` +
+        `<td>${menuOf(plan, 'b')}</td><td>${menuOf(plan, 'd')}</td>` +
+        `<td><small>${extra || '—'}</small></td></tr>`;
     }).join('') + `</tbody>`;
 
   const fc = calcFood(st);
@@ -1940,12 +2008,13 @@ function updateLive(){
 const KEY = 'savas-calc-v3';
 // 入力欄の既定値を変更したら上げる。番号が違う保存データでは、
 // 下記の欄だけ復元せず新しい既定値に戻す（体重や食事回数などの他の設定は保持）。
-const DEFAULTS_VER = 6;
+const DEFAULTS_VER = 7;
 // v6：体重の初期値を 75kg → 74kg に変更。
 // 次に既定値を変えるときは、実際に変えた欄だけをこの一覧に残すこと
 // （体重を入れたままにすると、以後の更新で入力済みの体重まで戻ってしまう）。
+// v7：食事回数の選択肢を作り直したため（2食が「朝食・夕食」既定に）、meals も初期値へ戻す
 const RESET_IDS = () =>
-  EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]).concat(['baseFactor', 'weight']);
+  EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]).concat(['baseFactor', 'weight', 'meals']);
 const ALL_IDS = () => ['weight','baseFactor','meals','savasShare','walk','cycle','otherP','startTime','fixSpoons']
   .concat(FOODS.map(f => 'f_' + f.id))
   .concat(EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]));
@@ -1954,19 +2023,17 @@ const ALL_IDS = () => ['weight','baseFactor','meals','savasShare','walk','cycle'
 // （同じ日のうちに開き直した場合は、入力し直さずに済むよう復元する）
 const DAILY_IDS = () => FOODS.map(f => 'f_' + f.id).concat(['otherP']);
 
-// 1週間の型。毎食の品目に加えて、曜日ごとに1品だけ足す。
-//   サバ缶 週3回（火木土）／ヨーグルト 週4回（日月水金）
-//   サバ缶は骨ごとでカルシウムが多いため、その日はヨーグルトを置かない。
-//   ツナ缶は毎食に入るためローテーションからは外している。
+// 1週間の型（固定メニュー）。曜日ごとに 朝食・夕食・追加するもの を決めておく。
+//   バナナは毎日1本（運動直後）、ミックスサラダは火・木・土に1皿（1/2袋）。
 const WEEK_LABEL = ['日','月','火','水','木','金','土'];
 const WEEKLY_PLAN = {
-  0: {yogurt:1},
-  1: {yogurt:1},
-  2: {saba:1},
-  3: {yogurt:1},
-  4: {saba:1},
-  5: {yogurt:1},
-  6: {saba:1}
+  0: {ys_hamegg:1,    sk_light:1},              // 日
+  1: {sk_mazenokke:1, nk_oyako:1},              // 月
+  2: {mt_gyuzara:1,   sk_light:1,   salad:1},   // 火
+  3: {ys_hamegg:1,    nk_oyako:1},              // 水
+  4: {sk_saba:1,      mt_gyumeshi:1, salad:1},  // 木
+  5: {sk_mazenokke:1, nk_oyako:1},              // 金
+  6: {mt_gyuzara:1,   nk_oyako:1,   salad:1}    // 土
 };
 const todayIdx = () => new Date().getDay();
 
@@ -2183,8 +2250,8 @@ $('copyLink').addEventListener('click', copySettingsLink);
 $('reset').addEventListener('click', () => {
   const msg =
     '入力内容をすべて初期状態に戻します。\n\n' +
-    '・体重 74kg / 基本係数 1.5 / 2食（朝食を抜く）\n' +
-    '・「今日の食事」の数量とその他入力 → すべて 0\n' +
+    '・体重 74kg / 基本係数 1.5 / 2食（朝食・夕食）\n' +
+    '・「今日の食事」→ その日の曜日の固定メニューに戻ります\n' +
     '・ウォーキング / サイクリングの距離 → 0\n' +
     '・筋トレのチェック → 全種目オン（重量・回数・セット数も既定値に戻ります）\n' +
     '・「運動しなかった日もSAVASを摂る」→ オフ\n' +
