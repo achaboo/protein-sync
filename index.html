@@ -193,6 +193,10 @@ button{font:inherit;border:none;border-radius:11px;padding:13px 18px;cursor:poin
 .stat strong{display:block;font-size:1.42rem;line-height:1.25;margin-top:2px}
 .stat.lack strong{color:var(--warn)}
 .stat.ok strong{color:var(--ok)}
+.satbox{background:#f5f8fc;border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:.86rem;line-height:1.7}
+.satbox.over{background:#fff6f2;border-color:#f3c4b2}
+.satbox .big{font-size:1.1rem}
+.satbox.over .big{color:var(--warn)}
 .savas{
   background:linear-gradient(135deg,#fff7ed,#ffedd5); border:2px solid var(--accent);
   border-radius:12px; padding:14px; text-align:center; margin-bottom:14px;
@@ -479,6 +483,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
         <span class="big" id="oSavas">-</span>
         <span class="sub" id="oSavasSub">-</span>
       </div>
+      <div class="satbox" id="oSatBox"></div>
       <div id="altFoods"></div>
       <div class="note" id="oReason"></div>
     </section>
@@ -513,7 +518,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.24';
+const APP_VERSION = '2026-09-01.25';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -537,42 +542,44 @@ const SERVE_G   = SPOON_G * PER_SERVE;  // 1回 = 19.5g
 //   slot  : 1週間の型の表で「朝食／夕食」どちらの列に出すか（外食メニュー用）
 //   fixedMenu: 1週間の型で固定しているメニュー（減らす提案の対象にしない）
 //   eggs  : そのメニューに含まれる卵の個数（卵の1日上限に加算する）
+//   sat   : 1単位あたりの飽和脂肪酸（g・推定値）。各社の公表脂質量に
+//           日本食品標準成分表の脂肪酸比率を当てて算出した目安。
 const FOODS = [
   // --- 牛丼チェーン（1食＝1単位。朝食メニューは朝食、夕食メニューは夕食の枠にだけ配分する） ---
   {id:'sk_mazenokke', shop:'すき家',  name:'まぜのっけ朝食',       short:'まぜのっけ朝食',
    note:'1食 約15g（卵1個ぶん）',
-   price:330, p:15, unit:'食', slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1},
+   price:330, p:15, unit:'食', sat:3.2, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1},
   {id:'sk_gyudon',    shop:'すき家',  name:'牛丼（並）',           short:'牛丼',         note:'1食 約21.7g',
-   price:480, p:21.7, unit:'食', slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
+   price:480, p:21.7, unit:'食', sat:9.4, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
   {id:'mt_gyuzara',   shop:'松屋',    name:'得朝牛皿定食',         short:'得朝牛皿定食',   note:'1食 約15g',
-   price:400, p:15, unit:'食', slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
+   price:400, p:15, unit:'食', sat:9.0, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
   {id:'mt_gyumeshi',  shop:'松屋',    name:'牛めし（並）',         short:'牛めし',       note:'1食 約17.1g',
-   price:460, p:17.1, unit:'食', slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
+   price:460, p:17.1, unit:'食', sat:11.6, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
   {id:'ys_hamegg',    shop:'吉野家',  name:'ハムエッグ納豆定食',   short:'ハムエッグ納豆定食',
    weekName:'ハムエッグ<br>納豆定食', note:'1食 約18g（卵1個ぶん）',
-   price:468, p:18, unit:'食', slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1},
+   price:468, p:18, unit:'食', sat:5.8, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1},
   {id:'ys_butadon',   shop:'吉野家',  name:'豚丼（並）',           short:'豚丼',         note:'1食 約14.4g',
-   price:465, p:14.4, unit:'食', slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
+   price:465, p:14.4, unit:'食', sat:7.3, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
   {id:'nk_oyako',     shop:'なか卯',  name:'親子丼（並）',         short:'親子丼',
    note:'1食 約30g（卵1個ぶん）',
-   price:450, p:30, unit:'食', slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true, eggs:1},
+   price:450, p:30, unit:'食', sat:4.8, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true, eggs:1},
 
   // --- 運動直後 ---
   {id:'banana',  name:'バナナ',              short:'バナナ',       note:'1本 約1g',
-   price:34, ruleNote:'運動直後に必ず1本', p:1, unit:'本', slots:['b','l','d'], post:true, autoDaily:1},
+   price:34, ruleNote:'運動直後に必ず1本', p:1, unit:'本', sat:0.1, slots:['b','l','d'], post:true, autoDaily:1},
 
   // --- 自宅の食材（外食には持ち込めないので「間食」の枠にまとめる） ---
   {id:'tomato',  name:'トマトジュース',        short:'トマトジュース', note:'200ml 約1.8g（食塩無添加）',
-   price:40, ruleNote:'毎日2杯（カリウム補給）', p:1.8, unit:'杯',
+   price:40, ruleNote:'毎日2杯（カリウム補給）', p:1.8, unit:'杯', sat:0,
    slots:['s'], lock:true, home:true, autoDaily:2},
   {id:'egg',     name:'卵',                  short:'卵',           note:'1個 約6g',
-   price:27, ruleNote:'1日2個まで<br>（メニューに含まれる卵も数える）', p:6, unit:'個',
+   price:27, ruleNote:'1日2個まで<br>（メニューに含まれる卵も数える）', p:6, unit:'個', sat:1.6,
    slots:['s'], lock:true, home:true, autoDaily:2, max:2},
   {id:'saba',    name:'サバ缶',                short:'サバ缶',       note:'1缶 約31.7g',
-   price:268, ruleNote:'（DHA+EPA 約2,850mg）<br>月・水・金に1缶', p:31.7, unit:'缶',
+   price:268, ruleNote:'（DHA+EPA 約2,850mg）<br>月・火・金に1缶', p:31.7, unit:'缶', sat:4.2,
    slots:['s'], lock:true, home:true, fixedMenu:true},
   {id:'natto',   name:'納豆',                short:'納豆',         note:'1パック 約8.3g',
-   price:32, ruleNote:'不足分から自動計算', p:8.3, unit:'P',
+   price:32, ruleNote:'不足分から自動計算', p:8.3, unit:'P', sat:0.8,
    slots:['s'], lock:true, home:true, autoNatto:true}
 ];
 
@@ -603,6 +610,13 @@ const FLOOR_FACTOR  = 1.2;    // 最低ライン（これを超えていれば�
 const STRENGTH_FULL = 6500;   // この総負荷量(kg)で筋トレ側の加算が満点になる
                               // （8種目の初期値＝6,300kg でちょうど満点手前になる値）
 const CARDIO_FULL   = 10;     // ウォーキング換算 10km で有酸素側の加算が満点になる
+
+// 飽和脂肪酸（LDLコレステロールを上げる脂）の1日の目安。
+// 「総エネルギーの7%以下」が目標値で、2,200kcal ならおよそ 17g にあたる。
+const SAT_LIMIT     = 17;
+// SAVAS 1杯（付属スプーン1杯＝粉 約9.3g）に含まれる飽和脂肪酸(g)。
+// 1食分28g（＝3杯）で脂質2.0g、乳脂肪とココアバターは飽和が約6割なので 2.0×0.6÷3。
+const SAT_PER_SPOON = 0.4;
 
 // エネルギー消費の概算。タンパク質の必要量は運動量に比例せず頭打ちになるが、
 // エネルギー（主に糖質）の必要量は運動量に比例して増えるため、こちらは上限を設けない。
@@ -698,6 +712,21 @@ function calcFood(st){
   });
   if(st.otherP > 0) list.push(`その他（${r1(st.otherP)}g）`);
   return {total: r1(total), cost: Math.round(cost), list};
+}
+
+// 食事とSAVASから摂る飽和脂肪酸の合計（推定値）。
+// 「その他（自由入力）」はタンパク質量しか分からないので数えない。
+function calcSat(st, sv){
+  const items = [];
+  let food = 0;
+  FOODS.forEach(f => {
+    const q = st.foods[f.id];
+    if(q > 0 && f.sat){ const g = q * f.sat; food += g; items.push({name:f.short, g:r1(g)}); }
+  });
+  const savas = (sv ? sv.spoons : 0) * SAT_PER_SPOON;
+  if(savas > 0) items.push({name:'SAVAS', g:r1(savas)});
+  items.sort((a, b) => b.g - a.g);
+  return {food:r1(food), savas:r1(savas), total:r1(food + savas), items};
 }
 
 // 運動量から目標係数（g/kg）を決定
@@ -960,6 +989,28 @@ function render(opts){
   $('oTarget').textContent = target + ' g';
   $('oFood').textContent   = food.total + ' g';
   $('oLack').textContent   = lack > 0 ? lack + ' g' : '達成 ✓';
+
+  // ---- 飽和脂肪酸（LDL対策） ----
+  const sat  = calcSat(st, sv);
+  const satOver = r1(sat.total - SAT_LIMIT);
+  const top  = sat.items.slice(0, 3).map(x => `${x.name} ${x.g}g`).join('、');
+  // 超過している場合は、いちばん多い外食メニューと、同じ枠でより少ないメニューを示す
+  const satTop  = sat.items.length
+    ? FOODS.find(f => f.slot && f.short === sat.items[0].name && st.foods[f.id] > 0) : null;
+  const satAlts = satTop
+    ? FOODS.filter(f => f.slot === satTop.slot && f.sat < satTop.sat)
+           .sort((x, y) => x.sat - y.sat).map(f => `${f.short} ${f.sat}g`) : [];
+  $('oSatBox').className = 'satbox' + (satOver > 0 ? ' over' : '');
+  $('oSatBox').innerHTML =
+    `<b>飽和脂肪酸 <span class="big">${sat.total} g</span></b>／1日の目安 ${SAT_LIMIT}g` +
+    (satOver > 0
+      ? `　<b>+${satOver}g 超過</b><br>多い順：${top || '—'}。` +
+        (satAlts.length
+          ? `${satTop.short}（${satTop.sat}g）を${satAlts.join('／')}に替えると下がります。`
+          : `外食メニューはすでに少ないものです。卵の個数やSAVASの杯数で調整してください。`)
+      : `（残り ${r1(SAT_LIMIT - sat.total)}g）<br>多い順：${top || '—'}`) +
+    `<br><small>食事 ${sat.food}g ＋ SAVAS ${sat.savas}g。各社の公表脂質量から推定した目安で、` +
+    `「その他（自由入力）」は数えていません。目安の17gは2,200kcalの7%です。</small>`;
 
   const badge = $('lvBadge');
   badge.textContent = ex.level.t;
@@ -2224,8 +2275,9 @@ function updateLive(){
   $('dailyNote').innerHTML =
     `<b>朝食・夕食は牛丼チェーンの固定メニュー</b>です（下表）。曜日に応じて毎日自動で入ります。` +
     (postDay.length  ? `<br><b>毎日（運動直後）：</b>${postDay.join('・')}` : '') +
-    (snackDay.length ? `<br><b>毎日（間食）：</b>${snackDay.join('・')}＋サバ缶（月・水・金）＋納豆（不足分から自動計算）` : '') +
-    `<br><b>牛肉は週3食まで</b>（日・水・土）。LDLコレステロール対策として鶏（親子丼）と豚（豚丼）に寄せ、魚は間食のサバ缶で摂ります。`;
+    (snackDay.length ? `<br><b>毎日（間食）：</b>${snackDay.join('・')}＋サバ缶（月・火・金）＋納豆（不足分から自動計算）` : '') +
+    `<br><b>牛肉は週2食まで</b>（日・水の夕食）。LDLコレステロール対策として鶏（親子丼）と豚（豚丼）に寄せ、魚は間食のサバ缶で摂ります。` +
+    `<br>朝食は飽和脂肪酸の最も少ない<b>まぜのっけ朝食</b>に寄せています（④に1日の合計を表示）。`;
 
   // 1週間の型：曜日 × 朝食 / 夕食 / 追加するもの
   // 列幅が狭いので、長い名前は weekName で改行位置を指定する
@@ -2302,16 +2354,18 @@ const DAILY_IDS = () => FOODS.map(f => 'f_' + f.id).concat(['otherP']);
 // 1週間の型（固定メニュー）。曜日ごとに 朝食・夕食・追加するもの を決めておく。
 //   バナナ（運動直後）とトマトジュース（間食）は毎日1つずつ。
 const WEEK_LABEL = ['日','月','火','水','木','金','土'];
-// LDL対策として牛肉は週3食まで（日・水・土に1食ずつ。同じ日に2食は入れない）。
-// 魚はサバ缶を月・水・金の間食に入れて確保する。
+// LDL対策として牛肉は週2食まで（日・水の夕食に1食ずつ）。朝食は飽和脂肪酸の
+// 最も少ないまぜのっけ朝食（3.2g）に寄せ、得朝牛皿定食（9.0g）とハムエッグ納豆定食
+// （5.8g）は型から外している（手で入れれば使える）。
+// 魚はサバ缶を月・火・金の間食に入れる。牛の日（日・水）と脂が重ならないようにずらした。
 const WEEKLY_PLAN = {
-  0: {ys_hamegg:1,    sk_gyudon:1},             // 日（牛：夕）
+  0: {sk_mazenokke:1, sk_gyudon:1},             // 日（牛：夕）
   1: {sk_mazenokke:1, nk_oyako:1,  saba:1},     // 月（魚：サバ缶）
-  2: {sk_mazenokke:1, nk_oyako:1},              // 火
-  3: {sk_mazenokke:1, mt_gyumeshi:1, saba:1},   // 水（牛：夕／魚：サバ缶）
+  2: {sk_mazenokke:1, nk_oyako:1,  saba:1},     // 火（魚：サバ缶）
+  3: {sk_mazenokke:1, mt_gyumeshi:1},           // 水（牛：夕）
   4: {sk_mazenokke:1, nk_oyako:1},              // 木
   5: {sk_mazenokke:1, nk_oyako:1,  saba:1},     // 金（魚：サバ缶）
-  6: {mt_gyuzara:1,   ys_butadon:1}             // 土（牛：朝／豚：夕）
+  6: {sk_mazenokke:1, ys_butadon:1}             // 土（豚：夕）
 };
 const todayIdx = () => new Date().getDay();
 
