@@ -513,7 +513,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.23';
+const APP_VERSION = '2026-09-01.24';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -562,14 +562,14 @@ const FOODS = [
    price:34, ruleNote:'運動直後に必ず1本', p:1, unit:'本', slots:['b','l','d'], post:true, autoDaily:1},
 
   // --- 自宅の食材（外食には持ち込めないので「間食」の枠にまとめる） ---
-  {id:'tomato',  name:'トマトジュース（200ml）', short:'トマトジュース', note:'200ml 約1.8g（食塩無添加）',
+  {id:'tomato',  name:'トマトジュース',        short:'トマトジュース', note:'200ml 約1.8g（食塩無添加）',
    price:40, ruleNote:'毎日2杯（カリウム補給）', p:1.8, unit:'杯',
    slots:['s'], lock:true, home:true, autoDaily:2},
   {id:'egg',     name:'卵',                  short:'卵',           note:'1個 約6g',
-   price:27, ruleNote:'1日2個まで（メニューに含まれる卵も数える）', p:6, unit:'個',
+   price:27, ruleNote:'1日2個まで<br>（メニューに含まれる卵も数える）', p:6, unit:'個',
    slots:['s'], lock:true, home:true, autoDaily:2, max:2},
-  {id:'saba',    name:'サバ缶（190g・水煮）',   short:'サバ缶',       note:'1缶 約31.7g（DHA+EPA 約2,850mg）',
-   price:268, ruleNote:'月・水・金に1缶（n-3系脂肪酸）', p:31.7, unit:'缶',
+  {id:'saba',    name:'サバ缶',                short:'サバ缶',       note:'1缶 約31.7g',
+   price:268, ruleNote:'（DHA+EPA 約2,850mg）<br>月・水・金に1缶', p:31.7, unit:'缶',
    slots:['s'], lock:true, home:true, fixedMenu:true},
   {id:'natto',   name:'納豆',                short:'納豆',         note:'1パック 約8.3g',
    price:32, ruleNote:'不足分から自動計算', p:8.3, unit:'P',
@@ -2215,14 +2215,17 @@ function updateLive(){
 
   // 食事合計
   // 毎日の品目と、曜日ごとの型
-  const nameQty  = f => `${f.short}（${f.autoDaily}${f.unit}）`;
+  // 卵はメニューに含まれる分を差し引くので、固定の個数ではなく上限で書く
+  const nameQty  = f => f.id === 'egg'
+    ? `${f.short}（1日${f.max}${f.unit}まで・メニューの卵を差し引く）`
+    : `${f.short}（${f.autoDaily}${f.unit}）`;
   const postDay  = FOODS.filter(f => f.autoDaily && f.post).map(nameQty);
   const snackDay = FOODS.filter(f => f.autoDaily && f.home).map(nameQty);
   $('dailyNote').innerHTML =
     `<b>朝食・夕食は牛丼チェーンの固定メニュー</b>です（下表）。曜日に応じて毎日自動で入ります。` +
     (postDay.length  ? `<br><b>毎日（運動直後）：</b>${postDay.join('・')}` : '') +
-    (snackDay.length ? `<br><b>毎日（間食）：</b>${snackDay.join('・')}＋納豆（不足分から自動計算）` : '') +
-    `<br><b>牛肉は週3食まで</b>（火・水・金）。LDLコレステロール対策として、鶏（親子丼）と魚（塩さば朝食）に寄せています。`;
+    (snackDay.length ? `<br><b>毎日（間食）：</b>${snackDay.join('・')}＋サバ缶（月・水・金）＋納豆（不足分から自動計算）` : '') +
+    `<br><b>牛肉は週3食まで</b>（日・水・土）。LDLコレステロール対策として鶏（親子丼）と豚（豚丼）に寄せ、魚は間食のサバ缶で摂ります。`;
 
   // 1週間の型：曜日 × 朝食 / 夕食 / 追加するもの
   // 列幅が狭いので、長い名前は weekName で改行位置を指定する
@@ -2233,19 +2236,20 @@ function updateLive(){
   const qtyLine = (f, n) => `${f.weekName || f.short}${n > 1 ? `（${n}${f.unit}）` : ''}`;
   const extraOf = plan => Object.keys(plan)
     .map(id => ({f:foodById(id), n:plan[id]})).filter(x => x.f && !x.f.slot)
-    .map(x => qtyLine(x.f, x.n)).join('<br>');
+    .map(x => qtyLine(x.f, x.n)).join('・');
   $('weekPlan').innerHTML =
     `<thead><tr><th>曜日</th><th>朝食</th><th>夕食</th><th>追加</th></tr></thead>` +
     `<tbody>` + WEEK_LABEL.map((w, i) => {
       const plan  = WEEKLY_PLAN[i] || {};
-      // 毎日の品目。自動計算の納豆は数量が日によって変わるので、最後の行に続けて添える
-      // 表には数量を書かず品目名だけ（数量は表の上の案内に出す）
+      // 表には数量を書かず品目名だけ（数量は表の上の案内に出す）。
+      // 最後の行に、その日だけ足すもの（サバ缶）と自動計算の納豆を続けて並べる。
       const day  = FOODS.filter(f => f.autoDaily).map(f => f.weekName || f.short);
-      const auto = FOODS.filter(f => f.autoNatto).map(f => `${f.short}（自動）`);
-      if(day.length && auto.length) day[day.length - 1] += '・' + auto.join('・');
-      const extra = [...day, extraOf(plan)].filter(Boolean).join('<br>');
+      const auto = FOODS.filter(f => f.autoNatto).map(f => `（${f.short}）`);
+      const tail = [...(day.length ? [day.pop()] : []), extraOf(plan), ...auto]
+        .filter(Boolean).join('・');
+      const extra = [...day, tail].filter(Boolean).join('<br>');
       return `<tr${i === todayIdx() ? ' class="today"' : ''}>` +
-        `<td class="time">${w}${i === todayIdx() ? '<br><small>（今日）</small>' : ''}</td>` +
+        `<td class="time">${w}</td>` +
         `<td>${menuOf(plan, 'b')}</td><td>${menuOf(plan, 'd')}</td>` +
         `<td><small>${extra || '—'}</small></td></tr>`;
     }).join('') + `</tbody>`;
@@ -2298,16 +2302,16 @@ const DAILY_IDS = () => FOODS.map(f => 'f_' + f.id).concat(['otherP']);
 // 1週間の型（固定メニュー）。曜日ごとに 朝食・夕食・追加するもの を決めておく。
 //   バナナ（運動直後）とトマトジュース（間食）は毎日1つずつ。
 const WEEK_LABEL = ['日','月','火','水','木','金','土'];
-// LDL対策として牛肉は週3食まで（火・水・金に1食ずつ。同じ日に2食は入れない）。
-// 塩さば朝食を週3回入れて魚を増やし、7メニューすべてを1回以上使う。
+// LDL対策として牛肉は週3食まで（日・水・土に1食ずつ。同じ日に2食は入れない）。
+// 魚はサバ缶を月・水・金の間食に入れて確保する。
 const WEEKLY_PLAN = {
   0: {ys_hamegg:1,    sk_gyudon:1},             // 日（牛：夕）
   1: {sk_mazenokke:1, nk_oyako:1,  saba:1},     // 月（魚：サバ缶）
   2: {sk_mazenokke:1, nk_oyako:1},              // 火
-  3: {sk_mazenokke:1, ys_butadon:1, saba:1},    // 水（豚／魚：サバ缶）
+  3: {sk_mazenokke:1, mt_gyumeshi:1, saba:1},   // 水（牛：夕／魚：サバ缶）
   4: {sk_mazenokke:1, nk_oyako:1},              // 木
   5: {sk_mazenokke:1, nk_oyako:1,  saba:1},     // 金（魚：サバ缶）
-  6: {mt_gyuzara:1,   mt_gyumeshi:1}            // 土（牛：朝・夕）
+  6: {mt_gyuzara:1,   ys_butadon:1}             // 土（牛：朝／豚：夕）
 };
 const todayIdx = () => new Date().getDay();
 
