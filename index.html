@@ -180,6 +180,7 @@ button{font:inherit;border:none;border-radius:11px;padding:13px 18px;cursor:poin
   border-radius:999px;padding:5px 12px;font-size:.74rem;font-weight:700;
 }
 .mini-btn:active{background:#dce9fb}
+.inline-btn{margin:6px 0 0}   /* 注記の中に置くとき用。見出し用の右寄せを打ち消す */
 .sub-btn{background:#eef3fa;color:var(--brand-d);border:1px solid #cddffb;padding:10px 16px;font-size:.86rem}
 .sub-btn:active{background:#dce9fb}
 #linkBox{margin-top:6px;font-size:.75rem;color:var(--sub)}
@@ -432,7 +433,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
     </p>
 
     <div class="row">
-      <div class="name"><b>夕食の時刻</b><small>空欄なら基本の間隔から自動計算</small></div>
+      <div class="name"><b>夕食の時刻</b><small>空欄なら基本の間隔から自動計算<br><button type="button" id="clearDinner" class="mini-btn inline-btn" hidden>自動計算にする</button></small></div>
       <div class="qty"><input type="time" id="dinnerTime" value="18:00" step="300"></div>
       <div class="unit">時刻</div>
     </div>
@@ -518,7 +519,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.30';
+const APP_VERSION = '2026-09-01.31';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -2241,6 +2242,8 @@ function updateLive(){
       : `運動していない日はSAVASを摂らず、目標分はすべて食事から確保します。`);
 
   // 夕食の時刻
+  // iPhoneの時刻ピッカーには「クリア」がないので、空欄に戻すボタンを添える
+  $('clearDinner').hidden = !$('dinnerTime').value;
   $('dinnerNote').innerHTML = ($('dinnerTime').value || '')
     ? `夕食をこの時刻に置きます。朝食から5時間以上空く場合は、その中間に「間食」の行を出して` +
       `納豆などを回します（タンパク質が入らない時間を作らないため）。`
@@ -2581,6 +2584,7 @@ const sectionOf = id => { const el = $(id); return el ? el.closest('section') : 
 
 $('calc').addEventListener('click', () => render({scroll:true}));
 $('clearFoods').addEventListener('click', clearFoods);
+$('clearDinner').addEventListener('click', () => { $('dinnerTime').value = ''; onInputChanged(); });
 
 // 自動計算する品目（納豆）を手で書き換えたら、その日は手入力を優先する
 FOODS.filter(f => f.autoNatto).forEach(f => {
