@@ -518,7 +518,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.29';
+const APP_VERSION = '2026-09-01.30';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -549,9 +549,9 @@ const FOODS = [
   // --- 牛丼チェーン（1食＝1単位。朝食メニューは朝食、夕食メニューは夕食の枠にだけ配分する） ---
   {id:'sk_mazenokke', shop:'すき家',  name:'まぜのっけ朝食',       short:'まぜのっけ朝食',
    weekName:'すき家<br>まぜのっけ朝食', note:'1食 約15g（卵1個ぶん）',
-   price:330, p:15, unit:'食', sat:3.2, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1},
+   price:270, p:15, unit:'食', sat:3.2, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1},
   {id:'sk_gyudon',    shop:'すき家',  name:'牛丼（並）',           short:'牛丼',         weekName:'すき家<br>牛丼',   note:'1食 約21.7g',
-   price:480, p:21.7, unit:'食', sat:9.4, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
+   price:430, p:21.7, unit:'食', sat:9.4, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
   {id:'mt_gyuzara',   shop:'松屋',    name:'得朝牛皿定食',         short:'得朝牛皿定食',   weekName:'松屋<br>得朝牛皿定食', note:'1食 約15g',
    price:400, p:15, unit:'食', sat:9.0, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
   {id:'mt_gyumeshi',  shop:'松屋',    name:'牛めし（並）',         short:'牛めし',       weekName:'松屋<br>牛めし',   note:'1食 約17.1g',
@@ -592,7 +592,7 @@ const WATER_ML = 300;   // 1回あたりに溶かす水の量（表示用）
 const EXERCISES = [
   {id:'lat',      name:'ラットプルダウン',     w:25, r:15, s:3},
   {id:'row',      name:'シーテッドローイング', w:20, r:15, s:3},
-  {id:'chest',    name:'チェストプレス',       w:30, r:15, s:3},
+  {id:'chest',    name:'チェストプレス',       w:20, r:15, s:3},
   {id:'shoulder', name:'ショルダープレス',     w:10, r:15, s:3},
   {id:'dips',     name:'ディップス',           w:35, r:15, s:3},
   {id:'curl',     name:'バイセップスカール',   w:10, r:15, s:3},
@@ -609,7 +609,7 @@ const BONUS_MAX     = 0.30;
 const CAP_BASE      = 1.80;
 const FLOOR_FACTOR  = 1.2;    // 最低ライン（これを超えていればその日は十分とみなす）g/kg
 const STRENGTH_FULL = 6500;   // この総負荷量(kg)で筋トレ側の加算が満点になる
-                              // （8種目の初期値＝6,300kg でちょうど満点手前になる値）
+                              // （8種目の初期値＝5,625kg でスコア87%になる値）
 const CARDIO_FULL   = 10;     // ウォーキング換算 10km で有酸素側の加算が満点になる
 
 // 飽和脂肪酸（LDLコレステロールを上げる脂）の1日の目安。
@@ -2337,13 +2337,15 @@ function updateLive(){
 const KEY = 'savas-calc-v3';
 // 入力欄の既定値を変更したら上げる。番号が違う保存データでは、
 // 下記の欄だけ復元せず新しい既定値に戻す（体重や食事回数などの他の設定は保持）。
-const DEFAULTS_VER = 8;
+const DEFAULTS_VER = 9;
 // v6：体重の初期値を 75kg → 74kg に変更。
 // 次に既定値を変えるときは、実際に変えた欄だけをこの一覧に残すこと
 // （体重を入れたままにすると、以後の更新で入力済みの体重まで戻ってしまう）。
 // v7：食事回数の選択肢を作り直したため（2食が「朝食・夕食」既定に）、meals も初期値へ戻す
+// v9：チェストプレスの初期重量を 30kg → 20kg に変更。変えたのは筋トレの欄だけなので、
+//     体重・基本係数・食事回数は一覧から外し、入力済みの値をそのまま残す。
 const RESET_IDS = () =>
-  EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]).concat(['baseFactor', 'weight', 'meals']);
+  EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]);
 const ALL_IDS = () => ['weight','baseFactor','meals','savasShare','walk','cycle','otherP','startTime','dinnerTime','fixSpoons']
   .concat(FOODS.map(f => 'f_' + f.id))
   .concat(EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]));
