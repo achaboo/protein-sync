@@ -150,6 +150,12 @@ input[type=checkbox]:focus-visible{outline:2px solid #bfd7ff;outline-offset:2px}
 .qty{flex:0 0 92px;display:flex;align-items:center;gap:6px}
 .qty input{text-align:center}
 .unit{font-size:.8rem;color:var(--sub);flex:none;width:2.2em}
+/* 何を食べたかを書き留める欄。数量の入力欄と違い、行いっぱいに広げる */
+.warn-inline{color:var(--warn)}
+.memo{
+  display:block;width:100%;margin-top:5px;padding:6px 9px;font-size:.8rem;
+  border:1px solid var(--line);border-radius:8px;background:#fff;
+}
 
 /* 筋トレカード */
 .ex{
@@ -401,7 +407,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
     <h2>② 今日の食事<button type="button" id="clearFoods" class="mini-btn">食事をリセット</button></h2>
     <div id="foods"></div>
     <div class="row">
-      <div class="name"><b>その他（自由入力）</b><small>上記以外で摂ったタンパク質の合計</small></div>
+      <div class="name"><b>その他（自由入力）</b><small>上記以外で摂ったタンパク質の合計</small><input type="text" id="otherNote" class="memo" maxlength="60" placeholder="例：ゆで卵2個・ヨーグルト1個"></div>
       <div class="qty"><input type="number" inputmode="decimal" id="otherP" value="0" min="0" step="0.1"></div>
       <div class="unit">g</div>
     </div>
@@ -519,7 +525,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.32';
+const APP_VERSION = '2026-09-01.33';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -663,12 +669,15 @@ $('exercises').innerHTML = EXERCISES.map(e => `
    入力値の取得
    ============================================================ */
 const num = id => { const v = parseFloat($(id).value); return (isNaN(v) || v < 0) ? 0 : v; };
+// 手書きの文字列をそのまま innerHTML に混ぜないための最低限の処理
+const esc = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 function readState(){
   const st = {
     weight: num('weight') || 73.5,
     baseFactor: num('baseFactor') || 1.5,
     walk: num('walk'), cycle: num('cycle'), otherP: num('otherP'),
+    otherNote: ($('otherNote').value || '').trim(),
     foods: {}, ex: {}
   };
   // SAVASは水で溶かす固定。液体からのタンパク質は 0。
@@ -712,7 +721,9 @@ function calcFood(st){
       list.push(`${f.shop ? f.shop + ' ' : ''}${f.name} ${r1(q)}${f.unit}（${r1(g)}g）`);
     }
   });
-  if(st.otherP > 0) list.push(`その他（${r1(st.otherP)}g）`);
+  if(st.otherP > 0) list.push(st.otherNote
+    ? `その他：${esc(st.otherNote)}（${r1(st.otherP)}g）`
+    : `その他（${r1(st.otherP)}g）`);
   return {total: r1(total), cost: Math.round(cost), list};
 }
 
@@ -2317,7 +2328,11 @@ function updateLive(){
   const fc = calcFood(st);
   $('foodNote').innerHTML =
     `現在の食事合計：<b>${fc.total} g</b>　／　合計金額：<b>${fc.cost.toLocaleString()} 円</b>` +
-    `<br><small>「その他（自由入力）」は金額に含まれません。</small>`;
+    `<br><small>「その他（自由入力）」は金額に含まれません。</small>` +
+    (st.otherNote && st.otherP <= 0
+      ? `<br><small class="warn-inline">「その他」に「${esc(st.otherNote)}」と書かれていますが、` +
+        `タンパク質が 0g のため計算には入っていません。右の欄にg数を入れてください。</small>`
+      : '');
 
   // 基本係数の目安表（体重に合わせて目標gを再計算）
   const w = st.weight;
@@ -2353,13 +2368,13 @@ const DEFAULTS_VER = 9;
 //     体重・基本係数・食事回数は一覧から外し、入力済みの値をそのまま残す。
 const RESET_IDS = () =>
   EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]);
-const ALL_IDS = () => ['weight','baseFactor','meals','savasShare','walk','cycle','otherP','startTime','dinnerTime','fixSpoons']
+const ALL_IDS = () => ['weight','baseFactor','meals','savasShare','walk','cycle','otherP','otherNote','startTime','dinnerTime','fixSpoons']
   .concat(FOODS.map(f => 'f_' + f.id))
   .concat(EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]));
 
 // 「② 今日の食事」はその日限りの入力。日付が変わったら復元せず 0 から始める。
 // （同じ日のうちに開き直した場合は、入力し直さずに済むよう復元する）
-const DAILY_IDS = () => FOODS.map(f => 'f_' + f.id).concat(['otherP']);
+const DAILY_IDS = () => FOODS.map(f => 'f_' + f.id).concat(['otherP', 'otherNote']);
 
 // 1週間の型（固定メニュー）。曜日ごとに 朝食・夕食・追加するもの を決めておく。
 //   バナナ（運動直後）とトマトジュース（間食）は毎日1つずつ。
@@ -2385,6 +2400,7 @@ const todayIdx = () => new Date().getDay();
 //   autoDaily          … 毎日欠かさない品目の数
 //   WEEKLY_PLAN        … 曜日ごとに割り振る品目の数
 const dailyDefault = id => {
+  if(id === 'otherNote') return '';      // 文字列の欄。0 を入れないようにする
   const f = FOODS.find(x => 'f_' + x.id === id);
   if(!f) return 0;
   if(f.autoPerMeal) return (parseInt($('meals').value, 10) === 3 ? 3 : 2) * (f.perMealQty || 1);
@@ -2457,12 +2473,23 @@ const SETTING_IDS = () => ['weight','baseFactor','meals','savasShare','startTime
 // 当日の入力（食事＋その他＋有酸素の距離）。実施種目のチェックは d.c で持ち運ぶ。
 const LINK_DAILY_IDS = () => DAILY_IDS().concat(['walk','cycle']);
 
+// btoa/atob は Latin1 しか扱えない。日本語のメモを載せられるよう UTF-8 を経由する。
+// ASCII だけの古いリンクは変換しても同じ文字列になるので、そのまま読める。
+const b64enc = obj => {
+  const bytes = new TextEncoder().encode(JSON.stringify(obj));
+  let bin = '';
+  bytes.forEach(b => bin += String.fromCharCode(b));
+  return btoa(bin);
+};
+const b64dec = str =>
+  JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(str), c => c.charCodeAt(0))));
+
 function buildSettingsLink(){
   const d = {v:{}, c:{}, date:todayKey(), rest:$('restSavas').checked, two:$('twoDoses').checked};
   SETTING_IDS().concat(LINK_DAILY_IDS()).forEach(id => { if($(id)) d.v[id] = $(id).value; });
   EXERCISES.forEach(e => d.c[e.id] = $('c_' + e.id).checked);
   // クエリ（キャッシュ回避用の ?v= など）は引き継がず、素のURLに設定だけを付ける
-  return location.href.split(/[?#]/)[0] + '#s=' + btoa(JSON.stringify(d));
+  return location.href.split(/[?#]/)[0] + '#s=' + b64enc(d);
 }
 
 // 戻り値: false（リンクなし・壊れている）／'all'（当日分も反映）／'settings'（設定のみ）
@@ -2471,7 +2498,7 @@ function applySettingsFromHash(hash){
   const m = (hash === undefined ? location.hash : hash).match(/[#&]s=([^&]+)/);
   if(!m) return false;
   try{
-    const d = JSON.parse(atob(m[1]));
+    const d = b64dec(m[1]);
     if(!d.v) return false;
     const put = id => { if(d.v[id] !== undefined && $(id)) $(id).value = d.v[id]; };
     SETTING_IDS().forEach(put);
