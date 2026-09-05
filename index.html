@@ -526,7 +526,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.35';
+const APP_VERSION = '2026-09-01.36';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -551,6 +551,8 @@ const SERVE_G   = SPOON_G * PER_SERVE;  // 1回 = 19.5g
 //   slot  : 1週間の型の表で「朝食／夕食」どちらの列に出すか（外食メニュー用）
 //   fixedMenu: 1週間の型で固定しているメニュー（減らす提案の対象にしない）
 //   eggs  : そのメニューに含まれる卵の個数（卵の1日上限に加算する）
+//   home  : 外食に持ち込めない自宅の食材
+//   homeMeal: 自宅で夕食をとる日は「夕食」の枠に置く（サバ缶・ご飯）
 //   sat   : 1単位あたりの飽和脂肪酸（g・推定値）。各社の公表脂質量に
 //           日本食品標準成分表の脂肪酸比率を当てて算出した目安。
 const FOODS = [
@@ -571,6 +573,7 @@ const FOODS = [
    price:465, p:14.4, unit:'食', sat:7.3, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
   {id:'nk_oyako',     shop:'なか卯',  name:'親子丼（並）',         short:'親子丼',
    weekName:'なか卯<br>親子丼', note:'1食 約30g（卵1個ぶん）',
+   ruleNote:'店が遠いため1週間の型からは外しています<br>（行ける日は手で1を入れてください）',
    price:450, p:30, unit:'食', sat:4.8, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true, eggs:1},
 
   // --- 運動直後 ---
@@ -585,8 +588,16 @@ const FOODS = [
    price:27, ruleNote:'1日2個まで<br>（メニューに含まれる卵も数える）', p:6, unit:'個', sat:1.6,
    slots:['s'], lock:true, home:true, autoDaily:2, max:2},
   {id:'saba',    name:'サバ缶',                short:'サバ缶',       note:'1缶 約31.7g',
-   price:268, ruleNote:'（DHA+EPA 約2,850mg）<br>月・火・金に1缶', p:31.7, unit:'缶', sat:4.2,
-   slots:['s'], lock:true, home:true, fixedMenu:true},
+   weekName:'自宅<br>サバ缶',
+   ruleNote:'（DHA+EPA 約2,850mg）<br>自宅で夕食をとる日の主菜<br>' +
+            '<b>マヨネーズ大さじ1で飽和脂肪酸+1.4g</b>（ノンオイルのドレッシングならほぼ0）',
+   price:268, p:31.7, unit:'缶', sat:4.2,
+   slots:['s'], lock:true, slot:'d', home:true, homeMeal:true, fixedMenu:true},
+  {id:'rice',    name:'ご飯（0.5合）',        short:'ご飯',         note:'0.5合 約4.5g',
+   weekName:'ご飯<br>（0.5合）', ruleNote:'自宅で夕食をとる日に0.5合',
+   price:33, p:4.5, unit:'杯', sat:0.1,
+   slots:['d'], lock:true, slot:'d', home:true, homeMeal:true, fixedMenu:true,
+   carb:true, group:'staple', slotLimit:1},
   {id:'natto',   name:'納豆',                short:'納豆',         note:'1パック 約8.3g',
    price:32, ruleNote:'不足分から自動計算', p:8.3, unit:'P', sat:0.8,
    slots:['s'], lock:true, home:true, autoNatto:true}
@@ -1177,7 +1188,7 @@ function distributeFoods(st, mealTargets, planIds, trained){
     const q = Math.round(st.foods[f.id]);
     for(let i = 0; i < q; i++){
       const u = {key:f.id, short:f.short, unit:f.unit, g:f.p,
-                 slots:mapSlots(f.slots), carb:f.carb, first:f.first, lock:f.lock,
+                 slots:mapSlots(slotsOf(f, st)), carb:f.carb, first:f.first, lock:f.lock,
                  group:f.group, slotLimit:f.slotLimit,
                  // 「毎食◯個」の品目は、各食事にその数ずつ配る
                  perSlotMax:f.autoPerMeal ? (f.perMealQty || 1) : 0};
@@ -1335,7 +1346,7 @@ const DEXTRIN_NOTE =
   '<span class="order"><b>食事の前に難消化性デキストリンを。</b>' +
   '糖の吸収が穏やかになり、丼もののご飯による血糖値の急上昇を抑えられます。</span>';
 
-function orderNote(bin){
+function orderNote(bin, home){
   const veg = FOODS.find(f => f.first);
   if(veg && bin.first){
     return `<span class="order"><b>まず、下線の${veg.short}から。</b>` +
@@ -1344,8 +1355,11 @@ function orderNote(bin){
   if(bin.carb){
     // 外食では自宅の野菜を持ち込めないので、店で頼めるもので順番を作る
     return `<span class="order"><b>ご飯は最後に回す。</b>` +
-           `この食事には糖質メニュー（丼・定食のご飯）があります。` +
-           `みそ汁の具・卵・肉から先に食べるだけでも血糖値の急上昇は抑えられます。</span>`;
+           (home
+             ? `サバ缶を先に食べてからご飯にすると、血糖値の急上昇を抑えられます。`
+             : `この食事には糖質メニュー（丼・定食のご飯）があります。` +
+               `みそ汁の具・卵・肉から先に食べるだけでも血糖値の急上昇は抑えられます。`) +
+           `</span>`;
   }
   return '';
 }
@@ -1382,9 +1396,10 @@ function mealAdvice(bin, target, st, dayCovered){
 function renderSchedule(st, ex, target, sv, plan, dayCovered){
   const trained = ex.done > 0 || ex.cardio > 0;
 
-  // 自宅の食材（納豆・卵・サラダ）は外食に持ち込めないので「間食」でまとめて摂る。
+  // 自宅の食材（納豆・卵・トマトジュース）は外食に持ち込めないので「間食」でまとめて摂る。
   // その分は食事の枠から差し引いてから 朝／昼／晩 に配分する。
-  const snackG  = r1(FOODS.filter(f => f.home)
+  // 自宅で夕食をとる日のサバ缶とご飯は夕食の枠に入るので、ここでは差し引かない。
+  const snackG  = r1(FOODS.filter(f => inSnack(f, st))
                           .reduce((a, f) => a + (st.foods[f.id] || 0) * f.p, 0));
   // 食事で摂るべき量 = 目標 − SAVAS − 間食 を 朝30% / 昼35% / 晩35% に配分（1回40g上限）
   const byMeal  = Math.max(0, target - sv.totalG - snackG);
@@ -1653,7 +1668,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
       `間食<br><small>（${(at !== null && at !== undefined ? hhmm(at) + '・' : '')}自宅）</small>`,
       `約&nbsp;${snack.bin.total}&nbsp;g`,
       `<b>${snack.bin.label}</b>` +
-      `<br><small>${FOODS.filter(f => f.home).map(f => f.short).join('・')}は外食に持ち込めないため、この時間にまとめて摂ります。` +
+      `<br><small>${FOODS.filter(f => inSnack(f, st)).map(f => f.short).join('・')}は外食に持ち込めないため、この時間にまとめて摂ります。` +
       (snack.span
         ? `${snack.from}から${snack.to}まで${snack.span}時間空くので、その中間に置いています。`
         : '') +
@@ -1668,7 +1683,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   const meal = (raw, targetG, tail, k) => {
     const bin = viewOf(raw, k);
     // 食前のデキストリンを先に、店での食べる順番をそのあとに置く
-    const head = DEXTRIN_NOTE + orderNote(bin);
+    const head = DEXTRIN_NOTE + orderNote(bin, k === 'd' && homeDinnerDay(st));
     if(empty && !bin.addTotal){
       return `<b>「② 今日の食事」が未入力です。</b>食べたもの（納豆・豆腐・サバ缶など）を入力すると、ここに ${targetG}g 分の配分が自動表示されます。`;
     }
@@ -1859,6 +1874,17 @@ function renderAltFoods(toFoodG, sv, st, plan){
       </p>
     </div>`;
 }
+
+/* 自宅で夕食をとる日か（外食の夕食メニューが入っていない日）。
+   その日は homeMeal の食材（サバ缶・ご飯）を夕食の枠に置く。
+   納豆・卵・トマトジュースは間食のまま残す。朝食から夕食まで8時間空くので、
+   その間をタンパク質が入らない時間にしないため。 */
+const homeDinnerDay = st =>
+  !FOODS.some(f => f.slot === 'd' && !f.home && Math.round((st.foods[f.id] || 0)) > 0);
+// その日この食材を置ける時間帯
+const slotsOf = (f, st) => (f.homeMeal && homeDinnerDay(st)) ? ['d'] : f.slots;
+// 間食に残る自宅の食材か
+const inSnack = (f, st) => f.home && !(f.homeMeal && homeDinnerDay(st));
 
 /* 運動によるエネルギー消費の概算と、補うべき糖質量 */
 function calcEnergy(st, ex){
@@ -2292,12 +2318,19 @@ function updateLive(){
     : `${f.short}（${f.autoDaily}${f.unit}）`;
   const postDay  = FOODS.filter(f => f.autoDaily && f.post).map(nameQty);
   const snackDay = FOODS.filter(f => f.autoDaily && f.home).map(nameQty);
+  const homeDay = homeDinnerDay(st);
   $('dailyNote').innerHTML =
-    `<b>朝食・夕食は牛丼チェーンの固定メニュー</b>です（下表）。曜日に応じて毎日自動で入ります。` +
+    `<b>朝食は牛丼チェーンの固定メニュー、夕食は外食3日・自宅4日</b>です（下表）。曜日に応じて毎日自動で入ります。` +
     (postDay.length  ? `<br><b>毎日（運動直後）：</b>${postDay.join('・')}` : '') +
-    (snackDay.length ? `<br><b>毎日（間食）：</b>${snackDay.join('・')}＋サバ缶（月・火・金）＋納豆（不足分から自動計算）` : '') +
-    `<br><b>牛肉は週2食まで</b>（日・水の夕食）。LDLコレステロール対策として鶏（親子丼）と豚（豚丼）に寄せ、魚は間食のサバ缶で摂ります。` +
-    `<br>朝食は飽和脂肪酸の最も少ない<b>まぜのっけ朝食</b>を基本にし、余裕のある木曜だけ変えています（④に1日の合計を表示）。`;
+    (snackDay.length ? `<br><b>毎日（間食）：</b>${snackDay.join('・')}＋納豆（不足分から自動計算）` : '') +
+    `<br><b>月・火・木・金の夕食は自宅</b>（サバ缶＋ご飯0.5合）。なか卯が遠いため親子丼を型から外しました。` +
+    `<br><b>牛肉は週2食まで</b>（日・水の夕食）。土曜は豚丼、魚は自宅の夕食のサバ缶で週4回摂ります。` +
+    `<br>朝食は飽和脂肪酸の最も少ない<b>まぜのっけ朝食</b>を基本にし、余裕のある木曜だけ変えています（④に1日の合計を表示）。` +
+    `<br><small>親子丼は食材の一覧に残してあります。なか卯へ行ける日は手で <b>1</b> を入れてください` +
+    `（その日はサバ缶が間食に回ります。丼にご飯が付くので「ご飯」は0にしてください）。</small>` +
+    (homeDay
+      ? `<br><small><b>今日は自宅の夕食です。</b>サバ缶とご飯は⑤の「夕食」の行に出ます。</small>`
+      : `<br><small>今日は外食の夕食です。自宅の食材は「間食」の行にまとめます。</small>`);
 
   // 1週間の型：曜日 × 朝食 / 夕食 / 追加するもの
   // 列幅が狭いので、長い名前は weekName で改行位置を指定する
@@ -2333,6 +2366,10 @@ function updateLive(){
     (st.otherNote && st.otherP <= 0
       ? `<br><small class="warn-inline">「その他」に「${esc(st.otherNote)}」と書かれていますが、` +
         `タンパク質が 0g のため計算には入っていません。右の欄にg数を入れてください。</small>`
+      : '') +
+    (!homeDinnerDay(st) && Math.round(st.foods.rice || 0) > 0
+      ? `<br><small class="warn-inline">今日は外食の夕食です。丼・定食にはご飯が付くので、` +
+        `「ご飯」は 0 にしてください。</small>`
       : '');
 
   // 基本係数の目安表（体重に合わせて目標gを再計算）
@@ -2384,15 +2421,18 @@ const WEEK_LABEL = ['日','月','火','水','木','金','土'];
 // 最も少ないまぜのっけ朝食（3.2g）を基本にし、いちばん余裕のある木曜だけ
 // ハムエッグ納豆定食（5.8g）を入れて変化をつけている。
 // 得朝牛皿定食（9.0g）は牛が増えるため型から外している（手で入れれば使える）。
-// 魚はサバ缶を月・火・金の間食に入れる。牛の日（日・水）と脂が重ならないようにずらした。
+//
+// なか卯が自宅から遠いため、親子丼を使っていた4日（月・火・木・金）の夕食は
+// 自宅にしている。サバ缶＋ご飯0.5合が主菜で、これで魚は週4回になる。
+// 親子丼は FOODS に残してあるので、行ける日は手で1を入れれば使える。
 const WEEKLY_PLAN = {
-  0: {sk_mazenokke:1, sk_gyudon:1},             // 日（牛：夕）
-  1: {sk_mazenokke:1, nk_oyako:1,  saba:1},     // 月（魚：サバ缶）
-  2: {sk_mazenokke:1, nk_oyako:1,  saba:1},     // 火（魚：サバ缶）
-  3: {sk_mazenokke:1, mt_gyumeshi:1},           // 水（牛：夕）
-  4: {ys_hamegg:1,    nk_oyako:1},              // 木（朝：ハムエッグ納豆定食）
-  5: {sk_mazenokke:1, nk_oyako:1,  saba:1},     // 金（魚：サバ缶）
-  6: {sk_mazenokke:1, ys_butadon:1}             // 土（豚：夕）
+  0: {sk_mazenokke:1, sk_gyudon:1},                   // 日（牛：夕）
+  1: {sk_mazenokke:1, saba:1, rice:1},                // 月（自宅：サバ缶＋ご飯）
+  2: {sk_mazenokke:1, saba:1, rice:1},                // 火（自宅）
+  3: {sk_mazenokke:1, mt_gyumeshi:1},                 // 水（牛：夕）
+  4: {ys_hamegg:1,    saba:1, rice:1},                // 木（朝：ハムエッグ納豆定食／自宅）
+  5: {sk_mazenokke:1, saba:1, rice:1},                // 金（自宅）
+  6: {sk_mazenokke:1, ys_butadon:1}                   // 土（豚：夕）
 };
 const todayIdx = () => new Date().getDay();
 
