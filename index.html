@@ -526,7 +526,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.37';
+const APP_VERSION = '2026-09-01.38';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -552,7 +552,8 @@ const SERVE_G   = SPOON_G * PER_SERVE;  // 1回 = 19.5g
 //   fixedMenu: 1週間の型で固定しているメニュー（減らす提案の対象にしない）
 //   eggs  : そのメニューに含まれる卵の個数（卵の1日上限に加算する）
 //   home  : 外食に持ち込めない自宅の食材
-//   homeMeal: 自宅で夕食をとる日は「夕食」の枠に置く（サバ缶・ご飯）
+//   homeMeal: 自宅で食事をとる日は「間食」ではなく食事の枠に置く（サバ缶・ご飯）
+//   homeBreakfast: そのうち朝食の枠にも置けるもの（ご飯）
 //   sat   : 1単位あたりの飽和脂肪酸（g・推定値）。各社の公表脂質量に
 //           日本食品標準成分表の脂肪酸比率を当てて算出した目安。
 const FOODS = [
@@ -594,7 +595,7 @@ const FOODS = [
   {id:'rice',    name:'ご飯（0.5合）',        short:'ご飯',         note:'0.5合 約4.5g',
    weekName:'ご飯（0.5合）', ruleNote:'自宅で夕食をとる日に0.5合',
    price:33, p:4.5, unit:'杯', sat:0.1,
-   slots:['d'], lock:true, slot:'d', home:true, homeMeal:true, fixedMenu:true,
+   slots:['d'], lock:true, slot:'d', home:true, homeMeal:true, homeBreakfast:true, fixedMenu:true,
    carb:true, group:'staple', slotLimit:1},
   {id:'natto',   name:'納豆',                short:'納豆',         note:'1パック 約8.3g',
    price:32, ruleNote:'不足分から自動計算', p:8.3, unit:'P', sat:0.8,
@@ -1183,10 +1184,11 @@ function distributeFoods(st, mealTargets, planIds, trained){
   const lockedUnits = [];  // 時間帯が固定された食品。最初に枠を確保する
 
   FOODS.forEach(f => {
-    const q = Math.round(st.foods[f.id]);
+    const q  = Math.round(st.foods[f.id]);
+    const bq = bQuota(f, st);            // 先頭のこの数だけは朝食の枠へ
     for(let i = 0; i < q; i++){
       const u = {key:f.id, short:f.short, unit:f.unit, g:f.p,
-                 slots:mapSlots(slotsOf(f, st)), carb:f.carb, first:f.first, lock:f.lock,
+                 slots:mapSlots(i < bq ? ['b'] : slotsOf(f, st)), carb:f.carb, first:f.first, lock:f.lock,
                  group:f.group, slotLimit:f.slotLimit,
                  // 「毎食◯個」の品目は、各食事にその数ずつ配る
                  perSlotMax:f.autoPerMeal ? (f.perMealQty || 1) : 0};
@@ -1354,7 +1356,7 @@ function orderNote(bin, home){
     // 外食では自宅の野菜を持ち込めないので、店で頼めるもので順番を作る
     return `<span class="order"><b>ご飯は最後に回す。</b>` +
            (home
-             ? `サバ缶を先に食べてからご飯にすると、血糖値の急上昇を抑えられます。`
+             ? `おかずを先に食べてからご飯にすると、血糖値の急上昇を抑えられます。`
              : `この食事には糖質メニュー（丼・定食のご飯）があります。` +
                `みそ汁の具・卵・肉から先に食べるだけでも血糖値の急上昇は抑えられます。`) +
            `</span>`;
@@ -1397,8 +1399,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   // 自宅の食材（納豆・卵・トマトジュース）は外食に持ち込めないので「間食」でまとめて摂る。
   // その分は食事の枠から差し引いてから 朝／昼／晩 に配分する。
   // 自宅で夕食をとる日のサバ缶とご飯は夕食の枠に入るので、ここでは差し引かない。
-  const snackG  = r1(FOODS.filter(f => inSnack(f, st))
-                          .reduce((a, f) => a + (st.foods[f.id] || 0) * f.p, 0));
+  const snackG  = r1(FOODS.reduce((a, f) => a + snackQty(f, st) * f.p, 0));
   // 食事で摂るべき量 = 目標 − SAVAS − 間食 を 朝30% / 昼35% / 晩35% に配分（1回40g上限）
   const byMeal  = Math.max(0, target - sv.totalG - snackG);
   const cap     = g => Math.min(40, Math.round(g));
@@ -1681,7 +1682,8 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   const meal = (raw, targetG, tail, k) => {
     const bin = viewOf(raw, k);
     // 食前のデキストリンを先に、店での食べる順番をそのあとに置く
-    const head = DEXTRIN_NOTE + orderNote(bin, k === 'd' && homeDinnerDay(st));
+    const head = DEXTRIN_NOTE + orderNote(bin,
+      (k === 'd' && homeDinnerDay(st)) || (k === 'b' && homeBreakfastDay(st)));
     if(empty && !bin.addTotal){
       return `<b>「② 今日の食事」が未入力です。</b>食べたもの（納豆・豆腐・サバ缶など）を入力すると、ここに ${targetG}g 分の配分が自動表示されます。`;
     }
@@ -1873,16 +1875,40 @@ function renderAltFoods(toFoodG, sv, st, plan){
     </div>`;
 }
 
-/* 自宅で夕食をとる日か（外食の夕食メニューが入っていない日）。
-   その日は homeMeal の食材（サバ缶・ご飯）を夕食の枠に置く。
-   納豆・卵・トマトジュースは間食のまま残す。朝食から夕食まで8時間空くので、
-   その間をタンパク質が入らない時間にしないため。 */
-const homeDinnerDay = st =>
-  !FOODS.some(f => f.slot === 'd' && !f.home && Math.round((st.foods[f.id] || 0)) > 0);
+/* 自宅で食事をとる日か（その枠に外食メニューが入っていない日）。
+   自宅の食材を「間食」に固定しているのは外食に持ち込めないからで、
+   その食事を自宅で摂る日にはこの前提が当てはまらない。 */
+const homeMealDay = (slot, st) =>
+  st.skip !== slot &&
+  !FOODS.some(f => f.slot === slot && !f.home && Math.round((st.foods[f.id] || 0)) > 0);
+const homeBreakfastDay = st => homeMealDay('b', st);
+const homeDinnerDay    = st => homeMealDay('d', st);
+
+/* 朝食も自宅の日は、まぜのっけ朝食と同じ構成（ご飯・卵・納豆1パック）を朝食の枠へ回す。
+   残りの納豆とトマトジュースは間食に残す。間食は朝食から夕食までの空白を埋める行なので、
+   全部を朝食に寄せて空にしてしまわないため。 */
+const HOME_B_QUOTA = {egg:2, natto:1};            // 朝食の枠へ回す単位数の上限
+const bQuota = (f, st) => homeBreakfastDay(st) ? (HOME_B_QUOTA[f.id] || 0) : 0;
+
+// homeMeal の食材（サバ缶・ご飯）が、その日どの食事の枠に入るか
+const mealSlotsOf = (f, st) => {
+  const at = [];
+  if(f.homeBreakfast && homeBreakfastDay(st)) at.push('b');
+  if(homeDinnerDay(st)) at.push('d');
+  return at;
+};
+const atMeal = (f, st) => !!(f.homeMeal && mealSlotsOf(f, st).length);
 // その日この食材を置ける時間帯
-const slotsOf = (f, st) => (f.homeMeal && homeDinnerDay(st)) ? ['d'] : f.slots;
-// 間食に残る自宅の食材か
-const inSnack = (f, st) => f.home && !(f.homeMeal && homeDinnerDay(st));
+const slotsOf = (f, st) => atMeal(f, st) ? mealSlotsOf(f, st) : f.slots;
+// 自宅の食材のうち「間食」に残る数量
+const snackQty = (f, st) => {
+  if(!f.home || atMeal(f, st)) return 0;
+  const q = Math.round(st.foods[f.id] || 0);
+  return Math.max(0, q - bQuota(f, st));
+};
+const inSnack = (f, st) => snackQty(f, st) > 0;
+// 自宅で摂る食事の数＝必要なご飯の杯数（1食につき0.5合）
+const riceNeed = st => (homeBreakfastDay(st) ? 1 : 0) + (homeDinnerDay(st) ? 1 : 0);
 
 /* 運動によるエネルギー消費の概算と、補うべき糖質量 */
 function calcEnergy(st, ex){
@@ -2365,9 +2391,17 @@ function updateLive(){
       ? `<br><small class="warn-inline">「その他」に「${esc(st.otherNote)}」と書かれていますが、` +
         `タンパク質が 0g のため計算には入っていません。右の欄にg数を入れてください。</small>`
       : '') +
-    (!homeDinnerDay(st) && Math.round(st.foods.rice || 0) > 0
-      ? `<br><small class="warn-inline">今日は外食の夕食です。丼・定食にはご飯が付くので、` +
+    (!homeDinnerDay(st) && !homeBreakfastDay(st) && Math.round(st.foods.rice || 0) > 0
+      ? `<br><small class="warn-inline">今日は朝食も夕食も外食です。丼・定食にはご飯が付くので、` +
         `「ご飯」は 0 にしてください。</small>`
+      : '') +
+    (homeBreakfastDay(st)
+      ? `<br><small><b>今日は朝食も自宅です。</b>ご飯・卵・納豆1パックを朝食の枠に回します` +
+        `（まぜのっけ朝食と同じ構成）。残りの納豆とトマトジュースは間食のままです。` +
+        (Math.round(st.foods.rice || 0) < riceNeed(st)
+          ? ` <span class="warn-inline">ご飯は <b>${riceNeed(st)}</b> 杯必要です（朝食ぶんを足してください）。</span>`
+          : '') +
+        `</small>`
       : '');
 
   // 基本係数の目安表（体重に合わせて目標gを再計算）
