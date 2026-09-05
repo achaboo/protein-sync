@@ -519,7 +519,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.31';
+const APP_VERSION = '2026-09-01.32';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -956,7 +956,9 @@ function autoFillNatto(){
 let calculated = false;   // 一度でも計算したか（以降は入力変更で自動再計算する）
 
 function render(opts){
-  const scroll = !!(opts && opts.scroll);
+  const scroll  = !!(opts && opts.scroll);
+  // 起動時の復元。結果は出すが、更新したわけではないのでハイライトはしない
+  const restore = !!(opts && opts.restore);
   autoFillNatto();                     // 不足分から納豆のパック数を決めて入力欄へ書き戻す
   const st   = readState();
   const food = calcFood(st);
@@ -1132,8 +1134,10 @@ function render(opts){
   el.style.display = 'block';
   $('stamp').textContent = '最終更新 ' + new Date().toLocaleTimeString('ja-JP');
   el.classList.remove('flash');
-  void el.offsetWidth;              // アニメーションを再開させるための強制リフロー
-  el.classList.add('flash');
+  if(!restore){
+    void el.offsetWidth;            // アニメーションを再開させるための強制リフロー
+    el.classList.add('flash');
+  }
 
   // 「計算する」を押したときは「④ 計算結果」を開いてそこへ移動する
   if(scroll) openSection(sectionOf('oTarget'), {scroll:true});
@@ -2393,11 +2397,15 @@ const applyDailyDefaults = () => DAILY_IDS().forEach(id => { if($(id)) $(id).val
 const todayKey  = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
 
 function save(){
-  const d = {v:{}, c:{}, date:todayKey(), dv:DEFAULTS_VER, rest:$('restSavas').checked, two:$('twoDoses').checked, ao:autoOverride};
+  const d = {v:{}, c:{}, date:todayKey(), dv:DEFAULTS_VER, rest:$('restSavas').checked, two:$('twoDoses').checked, ao:autoOverride, calc:calculated};
   ALL_IDS().forEach(id => d.v[id] = $(id).value);
   EXERCISES.forEach(e => d.c[e.id] = $('c_' + e.id).checked);
   try{ localStorage.setItem(KEY, JSON.stringify(d)); }catch(err){}
 }
+
+// 一度でも計算していれば、次に開いたときも結果を出したままにする。
+// （iOSはスリープ中にタブを破棄することがあり、戻るとページが読み込み直される）
+let wasCalculated = false;
 
 function load(){
   let d = null;
@@ -2430,6 +2438,7 @@ function load(){
     if(d.two  !== undefined) $('twoDoses').checked  = !!d.two;
     // 手入力への切り替えはその日限り
     setAutoOverride(sameDay && !!d.ao);
+    wasCalculated = !!d.calc;
   }catch(err){}
 }
 
@@ -2634,6 +2643,8 @@ if(fromLink){
       'この端末にも保存したので、次回からは通常のURLで開いて構いません。';
 }
 updateLive();
+// 前回すでに計算していたなら結果も出しておく（スリープ復帰で消えたように見えるのを防ぐ）
+if(wasCalculated) render({restore:true});
 
 /* 開閉式にして、前回開いていたセクションを復元する（既定は「① 基本設定」） */
 setupAccordion();
