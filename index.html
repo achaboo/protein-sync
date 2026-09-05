@@ -526,7 +526,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.39';
+const APP_VERSION = '2026-09-01.40';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -656,7 +656,9 @@ const serveText = n => n === 1 ? '1回で摂取' : `${n}回に分けて摂取`;
    ============================================================ */
 $('foods').innerHTML = FOODS.map(f => `
   <div class="row">
-    <div class="name"><b>${f.shop ? f.shop + '<br>' : ''}${f.name}</b><small>${f.note} <b>${f.price}円</b>` +
+    <div class="name"><b>${f.shop ? f.shop + '<br>' : ''}${f.name}</b>` +
+      // 全角の「）」で終わる注記は、そのあとに半角スペースを足すと空きすぎて見える
+      `<small>${f.note}${/）$/.test(f.note) ? '' : ' '}<b>${f.price}円</b>` +
       `${f.ruleNote ? `<br>${f.ruleNote}` : ''}${f.limitNote ? `<br><b>${f.limitNote}</b>` : ''}` +
       // 自動計算する品目は、手で書き換えたときに自動へ戻せるようにする
       `${f.autoNatto ? `<br><span id="autoNote_${f.id}"></span>` +
