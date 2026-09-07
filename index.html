@@ -165,6 +165,14 @@ input[type=checkbox]:focus-visible{outline:2px solid #bfd7ff;outline-offset:2px}
 .other-body div{display:flex;flex-direction:column}
 .other-body span{font-size:.72rem;color:var(--sub);margin-bottom:3px}
 .other-body input{text-align:center}
+/* 飽和脂肪酸の推定表。ふだんは畳んでおく */
+details.ratio{margin-top:10px;font-size:.78rem}
+details.ratio summary{cursor:pointer;color:var(--brand-d);font-weight:600}
+details.ratio table{width:100%;border-collapse:collapse;margin:6px 0}
+details.ratio td{padding:3px 6px;border-bottom:1px solid var(--line)}
+details.ratio td:last-child{text-align:right;white-space:nowrap;color:var(--sub)}
+.ratio-calc{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}
+.ratio-calc select{flex:1 1 12em;min-width:0}
 @media (max-width:560px){ .other-body{grid-template-columns:repeat(2,1fr)} }
 
 /* 筋トレカード */
@@ -445,13 +453,23 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
         </div>
         <small>上記以外で摂ったたんぱく質の合計</small>
         <div class="other-body">
+          <div><span>脂質 (g)</span><input type="number" inputmode="decimal" id="otherFat" value="0" min="0" step="0.1"></div>
           <div><span>飽和脂肪酸 (g)</span><input type="number" inputmode="decimal" id="otherSat" value="0" min="0" step="0.1"></div>
           <div><span>食塩相当量 (g)</span><input type="number" inputmode="decimal" id="otherSalt" value="0" min="0" step="0.1"></div>
           <div><span>炭水化物 (g)</span><input type="number" inputmode="decimal" id="otherCarb" value="0" min="0" step="0.1"></div>
           <div><span>食物繊維 (g)</span><input type="number" inputmode="decimal" id="otherFiber" value="0" min="0" step="0.1"></div>
           <div><span>エネルギー (kcal)</span><input type="number" inputmode="numeric" id="otherKcal" value="0" min="0" step="1"></div>
           <div><span>価格 (円)</span><input type="number" inputmode="numeric" id="otherPrice" value="0" min="0" step="1"></div>
-        </div></div>
+        </div>
+        <details class="ratio">
+          <summary>飽和脂肪酸が書かれていないときは（脂質から推定）</summary>
+          <table id="ratioTable"></table>
+          <div class="ratio-calc">
+            <select id="satRatio"></select>
+            <button type="button" id="satCalc" class="mini-btn inline-btn">脂質から計算して入れる</button>
+          </div>
+          <small>上の「脂質」に入れた値へ割合を掛けて、「飽和脂肪酸」の欄に書き込みます。</small>
+        </details></div>
     </div>
     <p class="hint" id="foodNote"></p>
 
@@ -567,7 +585,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.56';
+const APP_VERSION = '2026-09-01.57';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのたんぱく質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -596,6 +614,7 @@ const SERVE_G   = SPOON_G * PER_SERVE;  // 1回 = 19.5g
 //   homeMeal: 自宅で食事をとる日は「間食」ではなく食事の枠に置く（サバ缶・ご飯）
 //   homeBreakfast: そのうち朝食の枠にも置けるもの（ご飯）
 //   salt  : 1単位あたりの食塩相当量（g）。外食メニューは各社の公表値
+//   fat   : 1単位あたりの脂質（g）。飽和脂肪酸(sat)はこの内訳のひとつ
 //   carbG : 1単位あたりの炭水化物（g）。外食メニューは各社の公表値
 //           （carb は「糖質が多いメニュー」の真偽値で別物）
 //   fiber : 1単位あたりの食物繊維（g）。外食は公表がないので、ご飯の量と具材からの推定
@@ -606,58 +625,58 @@ const FOODS = [
   // --- 牛丼チェーン（1食＝1単位。朝食メニューは朝食、夕食メニューは夕食の枠にだけ配分する） ---
   {id:'sk_mazenokke', shop:'すき家',  name:'まぜのっけ朝食',       short:'まぜのっけ朝食',
    weekName:'すき家<br>まぜのっけ朝食', note:'1食 約17.1g（卵1個ぶん）',
-   price:300, p:17.1, unit:'食', sat:2.8, salt:2.4, carbG:96.4, fiber:8.5, kcal:531, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1},
+   price:300, p:17.1, unit:'食', sat:2.8, salt:2.4, carbG:96.4, fiber:8.5, kcal:531, fat:8.6, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1},
   {id:'sk_gyudon',    shop:'すき家',  name:'牛丼（並）',           short:'牛丼',         weekName:'すき家<br>牛丼',   note:'1食 約21.7g',
-   price:430, p:21.7, unit:'食', sat:9.4, salt:2.4, carbG:99.8, fiber:4.3, kcal:695, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
+   price:430, p:21.7, unit:'食', sat:9.4, salt:2.4, carbG:99.8, fiber:4.3, kcal:695, fat:23.4, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
   {id:'mt_gyuzara',   shop:'松屋',    name:'得朝牛皿定食',         short:'得朝牛皿定食',   weekName:'松屋<br>得朝牛皿定食', note:'1食 約13.5g',
-   price:400, p:13.5, unit:'食', sat:6.6, salt:3.2, carbG:88.3, fiber:4.0, kcal:568, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
+   price:400, p:13.5, unit:'食', sat:6.6, salt:3.2, carbG:88.3, fiber:4.0, kcal:568, fat:16.4, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
   {id:'mt_gyumeshi',  shop:'松屋',    name:'牛めし（並）',         short:'牛めし',       weekName:'松屋<br>牛めし',   note:'1食 約17.1g',
-   price:460, p:17.1, unit:'食', sat:11.6, salt:3.0, carbG:85.5, fiber:3.9, kcal:687, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
+   price:460, p:17.1, unit:'食', sat:11.6, salt:3.0, carbG:85.5, fiber:3.9, kcal:687, fat:28.9, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
   {id:'mt_miso',      shop:'松屋',    name:'みそ汁',               short:'みそ汁',       weekName:'松屋<br>みそ汁',
    note:'1杯 約1.8g',
-   price:0, p:1.8, unit:'杯', sat:0.2, salt:1.5, carbG:3.7, fiber:0.8, kcal:35,
+   price:0, p:1.8, unit:'杯', sat:0.2, salt:1.5, carbG:3.7, fiber:0.8, kcal:35, fat:1.3,
    slots:['d'], lock:true, slot:'d', fixedMenu:true},
   {id:'ys_hamegg',    shop:'吉野家',  name:'ハムエッグ納豆定食',   short:'ハムエッグ納豆定食',
    weekName:'吉野家<br>ﾊﾑｴｯｸﾞ納豆定食', note:'1食 約24.1g（卵1個ぶん）',
-   price:468, p:24.1, unit:'食', sat:4.2, salt:2.6, carbG:94.2, fiber:7.6, kcal:581, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1},
+   price:468, p:24.1, unit:'食', sat:4.2, salt:2.6, carbG:94.2, fiber:7.6, kcal:581, fat:13.0, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1},
   {id:'ys_saba',      shop:'吉野家',  name:'塩さば得朝定食',       short:'塩さば得朝定食',
    weekName:'吉野家<br>塩さば得朝定食', note:'1食 約31.9g（卵1個ぶん）',
-   price:630, p:31.9, unit:'食', sat:6.9, salt:3.4, carbG:92.2, fiber:7.9, kcal:744, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1},
+   price:630, p:31.9, unit:'食', sat:6.9, salt:3.4, carbG:92.2, fiber:7.9, kcal:744, fat:27.7, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1},
   {id:'ys_butadon',   shop:'吉野家',  name:'豚丼（並）',           short:'豚丼',         weekName:'吉野家<br>豚丼',   note:'1食 約14.4g',
-   price:465, p:14.4, unit:'食', sat:7.1, salt:2.3, carbG:88.1, fiber:3.9, kcal:576, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
+   price:465, p:14.4, unit:'食', sat:7.1, salt:2.3, carbG:88.1, fiber:3.9, kcal:576, fat:18.6, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
   {id:'nk_oyako',     shop:'なか卯',  name:'親子丼（並）',         short:'親子丼',
    weekName:'なか卯<br>親子丼', note:'1食 約30g（卵1個ぶん）',
    ruleNote:'1週間の型からは外しています<br>（行ける日は手で1を入れてください）',
-   price:450, p:30, unit:'食', sat:4.8, salt:3.0, carbG:99.7, fiber:4.4, kcal:673, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true, eggs:1},
+   price:450, p:30, unit:'食', sat:4.8, salt:3.0, carbG:99.7, fiber:4.4, kcal:673, fat:16.5, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true, eggs:1},
 
   // --- 運動直後 ---
   {id:'banana',  name:'バナナ',              short:'バナナ',       note:'1本 約1g',
-   price:34, ruleNote:'運動直後に2本', p:1, unit:'本', sat:0.1, salt:0, carbG:20.3, fiber:1.0, kcal:77, slots:['b','l','d'], post:true, autoDaily:2},
+   price:34, ruleNote:'運動直後に2本', p:1, unit:'本', sat:0.1, salt:0, carbG:20.3, fiber:1.0, kcal:77, fat:0.2, slots:['b','l','d'], post:true, autoDaily:2},
 
   // --- 自宅の食材（外食には持ち込めないので「間食」の枠にまとめる） ---
   {id:'tomato',  name:'トマトジュース',        short:'トマトジュース', note:'200ml 約1.8g（食塩無添加）',
-   price:40, ruleNote:'毎日2杯（カリウム補給）', p:1.8, unit:'杯', sat:0, salt:0.06, carbG:6.6, fiber:1.4, kcal:34,
+   price:40, ruleNote:'毎日2杯（カリウム補給）', p:1.8, unit:'杯', sat:0, salt:0.06, carbG:6.6, fiber:1.4, kcal:34, fat:0.2,
    slots:['s'], lock:true, home:true, autoDaily:2},
   {id:'dressing',name:'ドレッシング',          short:'ドレッシング',   note:'1ふり 約0.4g',
-   price:25, p:0.4, unit:'ふり', sat:0.5, salt:0.7, carbG:2.4, fiber:0, kcal:53,
+   price:25, p:0.4, unit:'ふり', sat:0.5, salt:0.7, carbG:2.4, fiber:0, kcal:53, fat:4.6,
    slots:['s'], lock:true, home:true, homeMeal:true, homeBreakfast:true},
   {id:'salad',   name:'ミックスサラダ',        short:'ミックスサラダ', note:'0.5袋 約0.65g',
-   price:53, p:0.65, unit:'皿', sat:0, salt:0, carbG:1.9, fiber:0.8, kcal:12,
+   price:53, p:0.65, unit:'皿', sat:0, salt:0, carbG:1.9, fiber:0.8, kcal:12, fat:0.1,
    slots:['s'], lock:true, home:true, homeMeal:true, homeBreakfast:true, first:true},
   {id:'egg',     name:'卵',                  short:'卵',           note:'1個 約6g',
-   price:27, ruleNote:'1日2個まで<br>（メニューに含まれる卵も数える）', p:6, unit:'個', sat:1.6, salt:0.2, carbG:0.2, fiber:0, kcal:71,
+   price:27, ruleNote:'1日2個まで<br>（メニューに含まれる卵も数える）', p:6, unit:'個', sat:1.6, salt:0.2, carbG:0.2, fiber:0, kcal:71, fat:5.2,
    slots:['s'], lock:true, home:true, autoDaily:2, max:2},
   {id:'saba',    name:'サバ缶',                short:'サバ缶',       note:'1缶 約31.7g',
    ruleNote:'（DHA+EPA 約2,850mg）<br>自宅で夕食をとる日の主菜',
-   price:268, p:31.7, unit:'缶', sat:4.2, salt:1.7, carbG:1.5, fiber:0, kcal:268,
+   price:268, p:31.7, unit:'缶', sat:4.2, salt:1.7, carbG:1.5, fiber:0, kcal:268, fat:15.0,
    slots:['s'], lock:true, slot:'d', home:true, homeMeal:true, fixedMenu:true},
   {id:'rice',    name:'ご飯（0.5合）',        short:'ご飯',         note:'0.5合 約4.5g',
    weekName:'ご飯', ruleNote:'自宅の食事に1.5合（0.5合×3杯）',
-   price:33, p:4.5, unit:'杯', sat:0.1, salt:0, carbG:58.0, fiber:2.5, kcal:257,
+   price:33, p:4.5, unit:'杯', sat:0.1, salt:0, carbG:58.0, fiber:2.5, kcal:257, fat:0.7,
    slots:['d'], lock:true, slot:'d', home:true, homeMeal:true, homeBreakfast:true, fixedMenu:true,
    carb:true, group:'staple', slotLimit:3},
   {id:'natto',   name:'納豆',                short:'納豆',         note:'1パック 約8.3g',
-   price:32, ruleNote:'不足分から自動計算', p:8.3, unit:'P', sat:0.8, salt:0.7, carbG:7.3, fiber:3.6, kcal:99,
+   price:32, ruleNote:'不足分から自動計算', p:8.3, unit:'P', sat:0.8, salt:0.7, carbG:7.3, fiber:3.6, kcal:99, fat:4.9,
    slots:['s'], lock:true, home:true, autoNatto:true}
 ];
 
@@ -701,13 +720,29 @@ const SALT_LIMIT     = 7.5;
 // SAVAS 1杯あたりの食塩相当量(g)。1食分28g（＝3杯）で 0.31〜0.76g と幅があるので中間値を使う。
 const SALT_PER_SPOON = 0.18;
 
-// SAVAS 1食分28g（＝3杯）あたり 炭水化物3.7g（うち食物繊維1.4g）・108kcal
+// SAVAS 1食分28g（＝3杯）あたり 脂質2.0g・炭水化物3.7g（うち食物繊維1.4g）・108kcal
+const FAT_PER_SPOON   = 0.67;
 const CARB_PER_SPOON  = 1.23;
 const FIBER_PER_SPOON = 0.47;
 const KCAL_PER_SPOON  = 36;
 
 // 食物繊維の目標量（日本人の食事摂取基準・64歳以下の男性は21g以上）
 const FIBER_TARGET = 21;
+// 脂質の目標範囲（総エネルギーの20〜30%）。脂質は1gあたり9kcal。
+const FAT_MIN_E = 0.20, FAT_MAX_E = 0.30, KCAL_PER_FAT = 9;
+
+/* 栄養成分表示に飽和脂肪酸が載っていない商品のための目安。
+   脂質のうち飽和脂肪酸が占めるおよその割合（日本食品標準成分表より）。 */
+const SAT_RATIO = [
+  ['牛肉・バター・生クリーム', '40〜55%', 0.47],
+  ['乳製品（ヨーグルト・チーズ）', '約60%', 0.60],
+  ['豚肉・加工肉', '35〜40%', 0.375],
+  ['卵', '約32%', 0.32],
+  ['鶏肉', '約29%', 0.29],
+  ['魚', '約26%', 0.26],
+  ['大豆製品（納豆・豆腐）', '約16%', 0.16],
+  ['植物油（サラダ油・オリーブ油）', '7〜15%', 0.11]
+];
 // 基礎代謝にかける身体活動レベル。運動ぶんは別に足すので、座位中心の I（1.50）を使う
 const ACTIVITY = 1.50;
 
@@ -737,6 +772,12 @@ $('foods').innerHTML = FOODS.map(f => `
     <div class="qty"><input type="number" inputmode="numeric" id="f_${f.id}" value="0" min="0" step="1"${f.max ? ` max="${f.max}"` : ''}></div>
     <div class="unit">${f.unit}</div>
   </div>`).join('');
+
+// 飽和脂肪酸の推定表と、脂質から書き込むボタン
+$('ratioTable').innerHTML = SAT_RATIO
+  .map(([name, pct]) => `<tr><td>${name}</td><td>${pct}</td></tr>`).join('');
+$('satRatio').innerHTML = SAT_RATIO
+  .map(([name, pct, r], i) => `<option value="${r}">${name}（${pct}）</option>`).join('');
 
 $('exercises').innerHTML = EXERCISES.map(e => `
   <div class="ex" id="ex_${e.id}">
@@ -768,7 +809,8 @@ function readState(){
     walk: num('walk'), cycle: num('cycle'), otherP: num('otherP'),
     otherNote: ($('otherNote').value || '').trim(),
     // 「その他」の栄養成分。分かる範囲だけ入れてもらう（未入力は0）
-    otherSat:   num('otherSat'),   otherSalt:  num('otherSalt'),
+    otherFat:   num('otherFat'),   otherSat:   num('otherSat'),
+    otherSalt:  num('otherSalt'),
     otherCarb:  num('otherCarb'),  otherFiber: num('otherFiber'),
     otherKcal:  num('otherKcal'),  otherPrice: num('otherPrice'),
     foods: {}, ex: {}
@@ -823,7 +865,7 @@ function calcFood(st){
 // 食事とSAVASから摂る飽和脂肪酸の合計（推定値）。
 // 「その他（自由入力）」はたんぱく質量しか分からないので数えない。
 // 「その他（自由入力）」の欄と FOODS の項目の対応
-const OTHER_KEY = {sat:'otherSat', salt:'otherSalt', carbG:'otherCarb',
+const OTHER_KEY = {fat:'otherFat', sat:'otherSat', salt:'otherSalt', carbG:'otherCarb',
                    fiber:'otherFiber', kcal:'otherKcal'};
 
 // 食事とSAVASから摂る量の合計。key は 'sat' / 'salt' / 'carbG' / 'fiber' / 'kcal'。
@@ -842,6 +884,7 @@ function totalOf(st, sv, key, perSpoon){
   items.sort((a, b) => b.g - a.g);
   return {food:r1(food), savas:r1(savas), total:r1(food + savas), items};
 }
+const calcFat   = (st, sv) => totalOf(st, sv, 'fat',   FAT_PER_SPOON);
 const calcSat   = (st, sv) => totalOf(st, sv, 'sat',   SAT_PER_SPOON);
 const calcSalt  = (st, sv) => totalOf(st, sv, 'salt',  SALT_PER_SPOON);
 const calcCarb  = (st, sv) => totalOf(st, sv, 'carbG', CARB_PER_SPOON);
@@ -1130,6 +1173,7 @@ function render(opts){
   // ---- 食塩・炭水化物・食物繊維・エネルギー ----
   const salt     = calcSalt(st, sv);
   const saltOver = r1(salt.total - SALT_LIMIT);
+  const fat      = calcFat(st, sv);
   const carb     = calcCarb(st, sv);
   const fiber    = calcFiber(st, sv);
   const kcal     = calcKcal(st, sv);
@@ -1143,9 +1187,20 @@ function render(opts){
     `<td class="num"><b>${val}</b> ${unit}</td><td class="lim">${limit}</td>` +
     `<td class="note">${note}</td></tr>`;
 
+  // 脂質は総エネルギーの20〜30%が目標範囲（1gあたり9kcal）
+  const fatMin = Math.round(need * FAT_MIN_E / KCAL_PER_FAT);
+  const fatMax = Math.round(need * FAT_MAX_E / KCAL_PER_FAT);
+  const satPct = fat.total > 0 ? Math.round(sat.total / fat.total * 100) : 0;
+
   $('oSatBox').className = 'satbox' + (satOver > 0 || saltOver > 0 ? ' over' : '');
   $('oSatBox').innerHTML =
     `<table class="nutri"><tbody>` +
+    row('脂質', fat.total, 'g', `${fatMin}〜${fatMax}g`,
+        fat.total < fatMin || fat.total > fatMax,
+        `うち飽和脂肪酸 ${sat.total}g（${satPct}%）／` +
+        (fat.total < fatMin ? `目標の下限まで ${r1(fatMin - fat.total)}g`
+         : fat.total > fatMax ? `目標の上限を ${r1(fat.total - fatMax)}g 超過`
+         : `目標の範囲内`)) +
     row('飽和脂肪酸', sat.total, 'g', `${SAT_LIMIT}g 以下`, satOver > 0,
         satOver > 0 ? `+${satOver}g／${top3(sat)}` : `残り ${r1(-satOver)}g`) +
     row('食塩相当量', salt.total, 'g', `${SALT_LIMIT}g 未満`, saltOver > 0,
@@ -2601,7 +2656,7 @@ const DEFAULTS_VER = 10;
 const RESET_IDS = () =>
   EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]);
 const ALL_IDS = () => ['weight','height','age','baseFactor','meals','savasShare','walk','cycle',
-   'otherP','otherNote','otherSat','otherSalt','otherCarb','otherFiber','otherKcal','otherPrice',
+   'otherP','otherNote','otherFat','otherSat','otherSalt','otherCarb','otherFiber','otherKcal','otherPrice',
    'startTime','dinnerTime','fixSpoons']
   .concat(FOODS.map(f => 'f_' + f.id))
   .concat(EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]));
@@ -2609,7 +2664,7 @@ const ALL_IDS = () => ['weight','height','age','baseFactor','meals','savasShare'
 // 「② 今日の食事」はその日限りの入力。日付が変わったら復元せず 0 から始める。
 // （同じ日のうちに開き直した場合は、入力し直さずに済むよう復元する）
 const DAILY_IDS = () => FOODS.map(f => 'f_' + f.id)
-  .concat(['otherP','otherNote','otherSat','otherSalt','otherCarb','otherFiber','otherKcal','otherPrice']);
+  .concat(['otherP','otherNote','otherFat','otherSat','otherSalt','otherCarb','otherFiber','otherKcal','otherPrice']);
 
 // 1週間の型（固定メニュー）。曜日ごとに 朝食・夕食・追加するもの を決めておく。
 //   バナナ（運動直後）とトマトジュース（間食）は毎日1つずつ。
@@ -2861,6 +2916,11 @@ const sectionOf = id => { const el = $(id); return el ? el.closest('section') : 
 $('calc').addEventListener('click', () => render({scroll:true}));
 $('clearFoods').addEventListener('click', clearFoods);
 $('clearDinner').addEventListener('click', () => { $('dinnerTime').value = ''; onInputChanged(); });
+// 脂質 × 選んだ割合 を「飽和脂肪酸」の欄へ書き込む
+$('satCalc').addEventListener('click', () => {
+  $('otherSat').value = r1(num('otherFat') * parseFloat($('satRatio').value));
+  onInputChanged();
+});
 
 // 自動計算する品目（納豆）を手で書き換えたら、その日は手入力を優先する
 FOODS.filter(f => f.autoNatto).forEach(f => {
