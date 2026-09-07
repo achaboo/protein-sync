@@ -204,7 +204,7 @@ button{font:inherit;border:none;border-radius:11px;padding:13px 18px;cursor:poin
 .satbox{background:#f5f8fc;border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:.86rem;line-height:1.7}
 .satbox.over{background:#fff6f2;border-color:#f3c4b2}
 table.nutri{width:100%;border-collapse:collapse;margin-bottom:6px}
-table.nutri th,table.nutri td{padding:4px 6px;border-bottom:1px solid var(--line);text-align:left;font-weight:400}
+table.nutri th,table.nutri td{padding:6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle;font-weight:400}
 table.nutri tr:last-child th,table.nutri tr:last-child td{border-bottom:none}
 table.nutri th{width:6.5em;color:var(--sub);font-size:.8rem}
 table.nutri .num{width:6em;text-align:right;white-space:nowrap}
@@ -546,7 +546,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.51';
+const APP_VERSION = '2026-09-01.52';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -631,7 +631,7 @@ const FOODS = [
    price:268, p:31.7, unit:'缶', sat:4.2, salt:1.7, carbG:1.5, fiber:0, kcal:268,
    slots:['s'], lock:true, slot:'d', home:true, homeMeal:true, fixedMenu:true},
   {id:'rice',    name:'ご飯（0.5合）',        short:'ご飯',         note:'0.5合 約4.5g',
-   weekName:'ご飯（0.5合）', ruleNote:'自宅の食事に1合（0.5合×2杯）',
+   weekName:'ご飯', ruleNote:'自宅の食事に1合（0.5合×2杯）',
    price:33, p:4.5, unit:'杯', sat:0.1, salt:0, carbG:58.0, fiber:2.5, kcal:257,
    slots:['d'], lock:true, slot:'d', home:true, homeMeal:true, homeBreakfast:true, fixedMenu:true,
    carb:true, group:'staple', slotLimit:2},
@@ -1091,8 +1091,9 @@ function render(opts){
   // 超過している場合は、いちばん多い外食メニューと、同じ枠でより少ないメニューを示す
   const satTop  = sat.items.length
     ? FOODS.find(f => f.slot && f.short === sat.items[0].name && st.foods[f.id] > 0) : null;
+  // 置き換え先はその枠の主菜だけ。みそ汁やご飯・自宅の食材は代わりにならない
   const satAlts = satTop
-    ? FOODS.filter(f => f.slot === satTop.slot && f.sat < satTop.sat)
+    ? FOODS.filter(f => f.slot === satTop.slot && !f.home && f.p >= 10 && f.sat < satTop.sat)
            .sort((x, y) => x.sat - y.sat).map(f => `${f.short} ${f.sat}g`) : [];
   // ---- 食塩・炭水化物・食物繊維・エネルギー ----
   const salt     = calcSalt(st, sv);
@@ -1122,13 +1123,26 @@ function render(opts){
     row('炭水化物', Math.round(carb.total), 'g', '—', false, top3(carb)) +
     row('エネルギー', kcal.total.toLocaleString(), 'kcal', `約${need.toLocaleString()}kcal`,
         Math.abs(kcalGap) > 400,
-        `${kcalGap >= 0 ? '+' : ''}${kcalGap.toLocaleString()}kcal（基礎代謝 ${calcBMR(st).toLocaleString()} × 1.50 ＋ 運動 ${calcEnergy(st, ex).kcal}）`) +
+        `${kcalGap >= 0 ? '+' : ''}${kcalGap.toLocaleString()}kcal` +
+        // 体脂肪1kg ≒ 7,200kcal。差がこのまま続いたときの週あたりの体重変化
+        (Math.abs(kcalGap) > 100
+          ? `／この差が続くと週 約${r1(Math.abs(kcalGap) * 7 / 7200)}kg ${kcalGap < 0 ? '減' : '増'}`
+          : '') +
+        `（基礎代謝 ${calcBMR(st).toLocaleString()} × 1.50 ＋ 運動 ${calcEnergy(st, ex).kcal}）`) +
     `</tbody></table>` +
     (satOver > 0 && satAlts.length
       ? `<div class="advice">飽和脂肪酸：${satTop.short}（${satTop.sat}g）を${satAlts.join('／')}に替えると下がります。</div>`
       : '') +
     (saltOver > 0
-      ? `<div class="advice">食塩：外食が2食入る日は店のメニューだけで5g前後です。納豆のたれを使わないと1パックあたり0.7g減ります。</div>`
+      ? `<div class="warnbox"><b>⚠ 食塩が目標を ${saltOver}g 超えています。</b>` +
+        // その日の入力から、いちばん減らしやすいものを名指しする
+        (Math.round(st.foods.mt_miso || 0) > 0
+          ? `<b>みそ汁を飲まなければ 1.5g 減ります</b>（無料なので外しても損はありません）。`
+          : '') +
+        (Math.round(st.foods.natto || 0) > 0
+          ? `納豆のたれを使わないと1パックあたり0.7g（今日は ${r1(Math.round(st.foods.natto) * 0.7)}g）減ります。`
+          : '') +
+        `外食が2食入る日は、店のメニューだけで5g前後になります。</div>`
       : '') +
     `<small>飽和脂肪酸と外食の食物繊維は推定値、ほかは公表値です` +
     `（SAVASの食塩は1食分0.31〜0.76gと幅があるため中間値）。「その他（自由入力）」は数えていません。` +
@@ -2461,9 +2475,12 @@ function updateLive(){
 
   // 1週間の型：曜日 × 朝食 / 夕食 / 追加するもの
   // 列幅が狭いので、長い名前は weekName で改行位置を指定する
+  // 数量が2以上の品目（自宅のご飯＝0.5合×2杯）は、杯数と合計値を出す
   const menuOf = (plan, slot) => Object.keys(plan)
-    .map(foodById).filter(f => f && f.slot === slot)
-    .map(f => `${f.weekName || f.short}<br><small>${f.p}g ／ ${f.price ? f.price + '円' : '無料'}</small>`)
+    .map(id => ({f:foodById(id), n:plan[id]})).filter(x => x.f && x.f.slot === slot)
+    .map(({f, n}) => `${f.weekName || f.short}<br><small>` +
+      `${n > 1 ? n + f.unit + '・' : ''}${r1(f.p * n)}g ／ ${f.price ? (f.price * n).toLocaleString() + '円' : '無料'}` +
+      `</small>`)
     .join('<br>') || '—';
   // 型としては毎日1つずつなので、追加列は品目名だけを出す（2つ以上のときだけ数量を添える）
   const qtyLine = (f, n) => `${f.weekName || f.short}${n > 1 ? `（${n}${f.unit}）` : ''}`;
