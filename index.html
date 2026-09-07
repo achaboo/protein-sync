@@ -546,7 +546,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.49';
+const APP_VERSION = '2026-09-01.50';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -627,10 +627,10 @@ const FOODS = [
    price:268, p:31.7, unit:'缶', sat:4.2, salt:1.7, carbG:1.5, fiber:0, kcal:268,
    slots:['s'], lock:true, slot:'d', home:true, homeMeal:true, fixedMenu:true},
   {id:'rice',    name:'ご飯（0.5合）',        short:'ご飯',         note:'0.5合 約4.5g',
-   weekName:'ご飯（0.5合）', ruleNote:'自宅で夕食をとる日に0.5合',
+   weekName:'ご飯（0.5合）', ruleNote:'自宅の食事に1合（0.5合×2杯）',
    price:33, p:4.5, unit:'杯', sat:0.1, salt:0, carbG:58.0, fiber:2.5, kcal:257,
    slots:['d'], lock:true, slot:'d', home:true, homeMeal:true, homeBreakfast:true, fixedMenu:true,
-   carb:true, group:'staple', slotLimit:1},
+   carb:true, group:'staple', slotLimit:2},
   {id:'natto',   name:'納豆',                short:'納豆',         note:'1パック 約8.3g',
    price:32, ruleNote:'不足分から自動計算', p:8.3, unit:'P', sat:0.8, salt:0.7, carbG:7.3, fiber:3.6, kcal:99,
    slots:['s'], lock:true, home:true, autoNatto:true}
@@ -1996,8 +1996,10 @@ const snackQty = (f, st) => {
   return Math.max(0, q - bQuota(f, st));
 };
 const inSnack = (f, st) => snackQty(f, st) > 0;
-// 自宅で摂る食事の数＝必要なご飯の杯数（1食につき0.5合）
-const riceNeed = st => (homeBreakfastDay(st) ? 1 : 0) + (homeDinnerDay(st) ? 1 : 0);
+// 自宅で摂る食事1回につきご飯1合（0.5合の欄で2杯）。外食の丼のご飯とほぼ同じ量になる。
+const RICE_PER_MEAL = 2;
+const riceNeed = st =>
+  ((homeBreakfastDay(st) ? 1 : 0) + (homeDinnerDay(st) ? 1 : 0)) * RICE_PER_MEAL;
 
 /* 運動によるエネルギー消費の概算と、補うべき糖質量 */
 function calcEnergy(st, ex){
@@ -2444,7 +2446,7 @@ function updateLive(){
     `<b>朝食は牛丼チェーンの固定メニュー、夕食は外食3日・自宅4日</b>です（下表）。曜日に応じて毎日自動で入ります。` +
     (postDay.length  ? `<br><b>毎日（運動直後）：</b>${postDay.join('・')}` : '') +
     (snackDay.length ? `<br><b>毎日（間食）：</b>${snackDay.join('・')}＋納豆（不足分から自動計算）` : '') +
-    `<br><b>月・火・木・金の夕食は自宅</b>（サバ缶＋ご飯0.5合）。なか卯が遠いため親子丼を型から外しました。` +
+    `<br><b>月・火・木・金の夕食は自宅</b>（サバ缶＋ご飯1合）。なか卯が遠いため親子丼を型から外しました。` +
     `<br><b>牛肉は週2食まで</b>（日・水の夕食）。土曜は豚丼、魚は自宅の夕食のサバ缶で週4回摂ります。` +
     `<br>朝食は飽和脂肪酸の最も少ない<b>まぜのっけ朝食</b>を基本にし、余裕のある木曜だけ変えています（④に1日の合計を表示）。` +
     `<br><small>親子丼は食材の一覧に残してあります。なか卯へ行ける日は手で <b>1</b> を入れてください` +
@@ -2554,15 +2556,17 @@ const WEEK_LABEL = ['日','月','火','水','木','金','土'];
 // 得朝牛皿定食（9.0g）は牛が増えるため型から外している（手で入れれば使える）。
 //
 // なか卯が自宅から遠いため、親子丼を使っていた4日（月・火・木・金）の夕食は
-// 自宅にしている。サバ缶＋ご飯0.5合が主菜で、これで魚は週4回になる。
+// 自宅にしている。サバ缶＋ご飯1合が主菜で、これで魚は週4回になる。
+// ご飯は 0.5合の欄で2杯。外食の丼のご飯（約260g）とほぼ同じ量で、
+// 丼をやめたぶんのエネルギーを埋める。
 // 親子丼は FOODS に残してあるので、行ける日は手で1を入れれば使える。
 const WEEKLY_PLAN = {
   0: {sk_mazenokke:1, sk_gyudon:1},                   // 日（牛：夕）
-  1: {sk_mazenokke:1, saba:1, rice:1},                // 月（自宅：サバ缶＋ご飯）
-  2: {sk_mazenokke:1, saba:1, rice:1},                // 火（自宅）
+  1: {sk_mazenokke:1, saba:1, rice:2},                // 月（自宅：サバ缶＋ご飯1合）
+  2: {sk_mazenokke:1, saba:1, rice:2},                // 火（自宅）
   3: {sk_mazenokke:1, mt_gyumeshi:1},                 // 水（牛：夕）
-  4: {ys_hamegg:1,    saba:1, rice:1},                // 木（朝：ハムエッグ納豆定食／自宅）
-  5: {sk_mazenokke:1, saba:1, rice:1},                // 金（自宅）
+  4: {ys_hamegg:1,    saba:1, rice:2},                // 木（朝：ハムエッグ納豆定食／自宅）
+  5: {sk_mazenokke:1, saba:1, rice:2},                // 金（自宅）
   6: {sk_mazenokke:1, ys_butadon:1}                   // 土（豚：夕）
 };
 const todayIdx = () => new Date().getDay();
