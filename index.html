@@ -203,9 +203,20 @@ button{font:inherit;border:none;border-radius:11px;padding:13px 18px;cursor:poin
 .stat.ok strong{color:var(--ok)}
 .satbox{background:#f5f8fc;border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:.86rem;line-height:1.7}
 .satbox.over{background:#fff6f2;border-color:#f3c4b2}
-.satbox .big{font-size:1.1rem}
-.satbox .over-n{color:var(--warn)}
-.satbox hr{border:none;border-top:1px solid var(--line);margin:8px 0}
+table.nutri{width:100%;border-collapse:collapse;margin-bottom:6px}
+table.nutri th,table.nutri td{padding:4px 6px;border-bottom:1px solid var(--line);text-align:left;font-weight:400}
+table.nutri tr:last-child th,table.nutri tr:last-child td{border-bottom:none}
+table.nutri th{width:6.5em;color:var(--sub);font-size:.8rem}
+table.nutri .num{width:6em;text-align:right;white-space:nowrap}
+table.nutri .num b{font-size:1.05rem}
+table.nutri .lim{width:7em;color:var(--sub);font-size:.78rem;white-space:nowrap}
+table.nutri .note{color:var(--sub);font-size:.76rem}
+table.nutri tr.ng .num b{color:var(--warn)}
+.satbox .advice{margin:4px 0;font-size:.8rem}
+@media (max-width:560px){
+  table.nutri .lim{display:none}                 /* 幅が足りないので目安の列は隠す */
+  table.nutri th{width:5.5em;font-size:.76rem}
+}
 .savas{
   background:linear-gradient(135deg,#fff7ed,#ffedd5); border:2px solid var(--accent);
   border-radius:12px; padding:14px; text-align:center; margin-bottom:14px;
@@ -291,6 +302,14 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
       <div>
         <label for="weight">体重 (kg)</label>
         <input type="number" inputmode="decimal" id="weight" value="73.5" step="0.1" min="30" max="200">
+      </div>
+      <div>
+        <label for="height">身長 (cm)</label>
+        <input type="number" inputmode="decimal" id="height" value="177.4" step="0.1" min="100" max="230">
+      </div>
+      <div>
+        <label for="age">年齢</label>
+        <input type="number" inputmode="numeric" id="age" value="55" step="1" min="15" max="100">
       </div>
       <div>
         <label for="meals">1日の食事回数</label>
@@ -527,7 +546,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.47';
+const APP_VERSION = '2026-09-01.49';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -556,60 +575,64 @@ const SERVE_G   = SPOON_G * PER_SERVE;  // 1回 = 19.5g
 //   homeMeal: 自宅で食事をとる日は「間食」ではなく食事の枠に置く（サバ缶・ご飯）
 //   homeBreakfast: そのうち朝食の枠にも置けるもの（ご飯）
 //   salt  : 1単位あたりの食塩相当量（g）。外食メニューは各社の公表値
+//   carbG : 1単位あたりの炭水化物（g）。外食メニューは各社の公表値
+//           （carb は「糖質が多いメニュー」の真偽値で別物）
+//   fiber : 1単位あたりの食物繊維（g）。外食は公表がないので、ご飯の量と具材からの推定
+//   kcal  : 1単位あたりのエネルギー
 //   sat   : 1単位あたりの飽和脂肪酸（g・推定値）。各社の公表脂質量に
 //           日本食品標準成分表の脂肪酸比率を当てて算出した目安。
 const FOODS = [
   // --- 牛丼チェーン（1食＝1単位。朝食メニューは朝食、夕食メニューは夕食の枠にだけ配分する） ---
   {id:'sk_mazenokke', shop:'すき家',  name:'まぜのっけ朝食',       short:'まぜのっけ朝食',
    weekName:'すき家<br>まぜのっけ朝食', note:'1食 約15g（卵1個ぶん）',
-   price:300, p:17.1, unit:'食', sat:2.8, salt:2.4, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1},
+   price:300, p:17.1, unit:'食', sat:2.8, salt:2.4, carbG:96.4, fiber:8.5, kcal:531, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1},
   {id:'sk_gyudon',    shop:'すき家',  name:'牛丼（並）',           short:'牛丼',         weekName:'すき家<br>牛丼',   note:'1食 約21.7g',
-   price:430, p:21.7, unit:'食', sat:9.4, salt:2.4, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
+   price:430, p:21.7, unit:'食', sat:9.4, salt:2.4, carbG:99.8, fiber:4.3, kcal:695, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
   {id:'mt_gyuzara',   shop:'松屋',    name:'得朝牛皿定食',         short:'得朝牛皿定食',   weekName:'松屋<br>得朝牛皿定食', note:'1食 約15g',
-   price:400, p:13.5, unit:'食', sat:6.6, salt:3.2, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
+   price:400, p:13.5, unit:'食', sat:6.6, salt:3.2, carbG:88.3, fiber:4.0, kcal:568, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
   {id:'mt_gyumeshi',  shop:'松屋',    name:'牛めし（並）',         short:'牛めし',       weekName:'松屋<br>牛めし',   note:'1食 約17.1g',
-   price:460, p:17.1, unit:'食', sat:11.6, salt:3.0, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
+   price:460, p:17.1, unit:'食', sat:11.6, salt:3.0, carbG:85.5, fiber:3.9, kcal:687, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
   {id:'ys_hamegg',    shop:'吉野家',  name:'ハムエッグ納豆定食',   short:'ハムエッグ納豆定食',
    weekName:'吉野家<br>ﾊﾑｴｯｸﾞ納豆定食', note:'1食 約18g（卵1個ぶん）',
-   price:468, p:24.1, unit:'食', sat:4.2, salt:2.6, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1},
+   price:468, p:24.1, unit:'食', sat:4.2, salt:2.6, carbG:94.2, fiber:7.6, kcal:581, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1},
   {id:'ys_saba',      shop:'吉野家',  name:'塩さば得朝定食',       short:'塩さば得朝定食',
    weekName:'吉野家<br>塩さば得朝定食', note:'1食 約31.9g（卵1個ぶん）',
-   price:630, p:31.9, unit:'食', sat:6.9, salt:3.4, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1},
+   price:630, p:31.9, unit:'食', sat:6.9, salt:3.4, carbG:92.2, fiber:7.9, kcal:744, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1},
   {id:'ys_butadon',   shop:'吉野家',  name:'豚丼（並）',           short:'豚丼',         weekName:'吉野家<br>豚丼',   note:'1食 約14.4g',
-   price:465, p:14.4, unit:'食', sat:7.1, salt:2.3, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
+   price:465, p:14.4, unit:'食', sat:7.1, salt:2.3, carbG:88.1, fiber:3.9, kcal:576, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
   {id:'nk_oyako',     shop:'なか卯',  name:'親子丼（並）',         short:'親子丼',
    weekName:'なか卯<br>親子丼', note:'1食 約30g（卵1個ぶん）',
    ruleNote:'1週間の型からは外しています<br>（行ける日は手で1を入れてください）',
-   price:450, p:30, unit:'食', sat:4.8, salt:3.0, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true, eggs:1},
+   price:450, p:30, unit:'食', sat:4.8, salt:3.0, carbG:99.7, fiber:4.4, kcal:673, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true, eggs:1},
 
   // --- 運動直後 ---
   {id:'banana',  name:'バナナ',              short:'バナナ',       note:'1本 約1g',
-   price:34, ruleNote:'運動直後に必ず1本', p:1, unit:'本', sat:0.1, salt:0, slots:['b','l','d'], post:true, autoDaily:1},
+   price:34, ruleNote:'運動直後に必ず1本', p:1, unit:'本', sat:0.1, salt:0, carbG:20.3, fiber:1.0, kcal:77, slots:['b','l','d'], post:true, autoDaily:1},
 
   // --- 自宅の食材（外食には持ち込めないので「間食」の枠にまとめる） ---
   {id:'tomato',  name:'トマトジュース',        short:'トマトジュース', note:'200ml 約1.8g（食塩無添加）',
-   price:40, ruleNote:'毎日2杯（カリウム補給）', p:1.8, unit:'杯', sat:0, salt:0.06,
+   price:40, ruleNote:'毎日2杯（カリウム補給）', p:1.8, unit:'杯', sat:0, salt:0.06, carbG:6.6, fiber:1.4, kcal:34,
    slots:['s'], lock:true, home:true, autoDaily:2},
   {id:'dressing',name:'ドレッシング',          short:'ドレッシング',   note:'1ふり 約0.4g',
-   price:25, p:0.4, unit:'ふり', sat:0.5, salt:0.7,
-   slots:['s'], lock:true, home:true},
+   price:25, p:0.4, unit:'ふり', sat:0.5, salt:0.7, carbG:2.4, fiber:0, kcal:53,
+   slots:['s'], lock:true, home:true, homeMeal:true, homeBreakfast:true},
   {id:'salad',   name:'ミックスサラダ',        short:'ミックスサラダ', note:'0.5袋 約0.65g',
-   price:53, p:0.65, unit:'皿', sat:0, salt:0,
-   slots:['s'], lock:true, home:true},
+   price:53, p:0.65, unit:'皿', sat:0, salt:0, carbG:1.9, fiber:0.8, kcal:12,
+   slots:['s'], lock:true, home:true, homeMeal:true, homeBreakfast:true, first:true},
   {id:'egg',     name:'卵',                  short:'卵',           note:'1個 約6g',
-   price:27, ruleNote:'1日2個まで<br>（メニューに含まれる卵も数える）', p:6, unit:'個', sat:1.6, salt:0.2,
+   price:27, ruleNote:'1日2個まで<br>（メニューに含まれる卵も数える）', p:6, unit:'個', sat:1.6, salt:0.2, carbG:0.2, fiber:0, kcal:71,
    slots:['s'], lock:true, home:true, autoDaily:2, max:2},
   {id:'saba',    name:'サバ缶',                short:'サバ缶',       note:'1缶 約31.7g',
    ruleNote:'（DHA+EPA 約2,850mg）<br>自宅で夕食をとる日の主菜',
-   price:268, p:31.7, unit:'缶', sat:4.2, salt:1.7,
+   price:268, p:31.7, unit:'缶', sat:4.2, salt:1.7, carbG:1.5, fiber:0, kcal:268,
    slots:['s'], lock:true, slot:'d', home:true, homeMeal:true, fixedMenu:true},
   {id:'rice',    name:'ご飯（0.5合）',        short:'ご飯',         note:'0.5合 約4.5g',
    weekName:'ご飯（0.5合）', ruleNote:'自宅で夕食をとる日に0.5合',
-   price:33, p:4.5, unit:'杯', sat:0.1, salt:0,
+   price:33, p:4.5, unit:'杯', sat:0.1, salt:0, carbG:58.0, fiber:2.5, kcal:257,
    slots:['d'], lock:true, slot:'d', home:true, homeMeal:true, homeBreakfast:true, fixedMenu:true,
    carb:true, group:'staple', slotLimit:1},
   {id:'natto',   name:'納豆',                short:'納豆',         note:'1パック 約8.3g',
-   price:32, ruleNote:'不足分から自動計算', p:8.3, unit:'P', sat:0.8, salt:0.7,
+   price:32, ruleNote:'不足分から自動計算', p:8.3, unit:'P', sat:0.8, salt:0.7, carbG:7.3, fiber:3.6, kcal:99,
    slots:['s'], lock:true, home:true, autoNatto:true}
 ];
 
@@ -652,6 +675,16 @@ const SAT_PER_SPOON = 0.4;
 const SALT_LIMIT     = 7.5;
 // SAVAS 1杯あたりの食塩相当量(g)。1食分28g（＝3杯）で 0.31〜0.76g と幅があるので中間値を使う。
 const SALT_PER_SPOON = 0.18;
+
+// SAVAS 1食分28g（＝3杯）あたり 炭水化物3.7g（うち食物繊維1.4g）・108kcal
+const CARB_PER_SPOON  = 1.23;
+const FIBER_PER_SPOON = 0.47;
+const KCAL_PER_SPOON  = 36;
+
+// 食物繊維の目標量（日本人の食事摂取基準・64歳以下の男性は21g以上）
+const FIBER_TARGET = 21;
+// 基礎代謝にかける身体活動レベル。運動ぶんは別に足すので、座位中心の I（1.50）を使う
+const ACTIVITY = 1.50;
 
 // エネルギー消費の概算。タンパク質の必要量は運動量に比例せず頭打ちになるが、
 // エネルギー（主に糖質）の必要量は運動量に比例して増えるため、こちらは上限を設けない。
@@ -704,6 +737,8 @@ const esc = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':
 function readState(){
   const st = {
     weight: num('weight') || 73.5,
+    height: num('height') || 177.4,
+    age:    num('age')    || 55,
     baseFactor: num('baseFactor') || 1.5,
     walk: num('walk'), cycle: num('cycle'), otherP: num('otherP'),
     otherNote: ($('otherNote').value || '').trim(),
@@ -771,8 +806,16 @@ function totalOf(st, sv, key, perSpoon){
   items.sort((a, b) => b.g - a.g);
   return {food:r1(food), savas:r1(savas), total:r1(food + savas), items};
 }
-const calcSat  = (st, sv) => totalOf(st, sv, 'sat',  SAT_PER_SPOON);
-const calcSalt = (st, sv) => totalOf(st, sv, 'salt', SALT_PER_SPOON);
+const calcSat   = (st, sv) => totalOf(st, sv, 'sat',   SAT_PER_SPOON);
+const calcSalt  = (st, sv) => totalOf(st, sv, 'salt',  SALT_PER_SPOON);
+const calcCarb  = (st, sv) => totalOf(st, sv, 'carbG', CARB_PER_SPOON);
+const calcFiber = (st, sv) => totalOf(st, sv, 'fiber', FIBER_PER_SPOON);
+const calcKcal  = (st, sv) => totalOf(st, sv, 'kcal',  KCAL_PER_SPOON);
+
+/* 基礎代謝（Mifflin-St Jeor・男性）と、1日に必要なエネルギー。
+   身体活動レベルは座位中心の I（1.50）とし、運動による消費は別に足す。 */
+const calcBMR  = st => Math.round(10 * st.weight + 6.25 * st.height - 5 * st.age + 5);
+const calcNeed = (st, ex) => Math.round(calcBMR(st) * ACTIVITY) + calcEnergy(st, ex).kcal;
 
 // 運動量から目標係数（g/kg）を決定
 function calcFactor(st){
@@ -1047,31 +1090,45 @@ function render(opts){
   const satAlts = satTop
     ? FOODS.filter(f => f.slot === satTop.slot && f.sat < satTop.sat)
            .sort((x, y) => x.sat - y.sat).map(f => `${f.short} ${f.sat}g`) : [];
-  // ---- 食塩相当量 ----
+  // ---- 食塩・炭水化物・食物繊維・エネルギー ----
   const salt     = calcSalt(st, sv);
   const saltOver = r1(salt.total - SALT_LIMIT);
-  const saltTop  = salt.items.slice(0, 3).map(x => `${x.name} ${x.g}g`).join('、');
+  const carb     = calcCarb(st, sv);
+  const fiber    = calcFiber(st, sv);
+  const kcal     = calcKcal(st, sv);
+  const need     = calcNeed(st, ex);
+  const kcalGap  = Math.round(kcal.total - need);
+  const top3     = t => t.items.slice(0, 3).map(x => `${x.name} ${x.g}g`).join('、') || '—';
+
+  // 目安に対して外れている行だけ色を変える
+  const row = (name, val, unit, limit, over, note) =>
+    `<tr${over ? ' class="ng"' : ''}><th>${name}</th>` +
+    `<td class="num"><b>${val}</b> ${unit}</td><td class="lim">${limit}</td>` +
+    `<td class="note">${note}</td></tr>`;
 
   $('oSatBox').className = 'satbox' + (satOver > 0 || saltOver > 0 ? ' over' : '');
   $('oSatBox').innerHTML =
-    `<b>飽和脂肪酸 <span class="${satOver > 0 ? 'big over-n' : 'big'}">${sat.total} g</span></b>` +
-    `／1日の目安 ${SAT_LIMIT}g` +
-    (satOver > 0
-      ? `　<b>+${satOver}g 超過</b><br>多い順：${top || '—'}。` +
-        (satAlts.length
-          ? `${satTop.short}（${satTop.sat}g）を${satAlts.join('／')}に替えると下がります。`
-          : `外食メニューはすでに少ないものです。卵の個数やSAVASの杯数で調整してください。`)
-      : `（残り ${r1(SAT_LIMIT - sat.total)}g）<br>多い順：${top || '—'}`) +
-    `<hr>` +
-    `<b>食塩相当量 <span class="${saltOver > 0 ? 'big over-n' : 'big'}">${salt.total} g</span></b>` +
-    `／1日の目標 ${SALT_LIMIT}g未満` +
+    `<table class="nutri"><tbody>` +
+    row('飽和脂肪酸', sat.total, 'g', `${SAT_LIMIT}g 以下`, satOver > 0,
+        satOver > 0 ? `+${satOver}g／${top3(sat)}` : `残り ${r1(-satOver)}g`) +
+    row('食塩相当量', salt.total, 'g', `${SALT_LIMIT}g 未満`, saltOver > 0,
+        saltOver > 0 ? `+${saltOver}g／${top3(salt)}` : `残り ${r1(-saltOver)}g`) +
+    row('食物繊維', fiber.total, 'g', `${FIBER_TARGET}g 以上`, fiber.total < FIBER_TARGET,
+        fiber.total < FIBER_TARGET ? `${r1(FIBER_TARGET - fiber.total)}g 不足／${top3(fiber)}` : `${top3(fiber)}`) +
+    row('炭水化物', Math.round(carb.total), 'g', '—', false, top3(carb)) +
+    row('エネルギー', kcal.total.toLocaleString(), 'kcal', `約${need.toLocaleString()}kcal`,
+        Math.abs(kcalGap) > 400,
+        `${kcalGap >= 0 ? '+' : ''}${kcalGap.toLocaleString()}kcal（基礎代謝 ${calcBMR(st).toLocaleString()} × 1.50 ＋ 運動 ${calcEnergy(st, ex).kcal}）`) +
+    `</tbody></table>` +
+    (satOver > 0 && satAlts.length
+      ? `<div class="advice">飽和脂肪酸：${satTop.short}（${satTop.sat}g）を${satAlts.join('／')}に替えると下がります。</div>`
+      : '') +
     (saltOver > 0
-      ? `　<b>+${saltOver}g 超過</b><br>多い順：${saltTop || '—'}。` +
-        `外食が2食入る日は店のメニューだけで5g前後になります。納豆のたれを使わないと1パックあたり0.7g減ります。`
-      : `（残り ${r1(SALT_LIMIT - salt.total)}g）<br>多い順：${saltTop || '—'}`) +
-    `<br><small>飽和脂肪酸は各社の公表脂質量からの推定、食塩相当量は公表値です` +
-    `（SAVASは1食分0.31〜0.76gと幅があるため中間値で計算）。どちらも「その他（自由入力）」は数えていません。` +
-    `目安の${SAT_LIMIT}gは2,200kcalの7%、${SALT_LIMIT}gは成人男性の目標量です。</small>`;
+      ? `<div class="advice">食塩：外食が2食入る日は店のメニューだけで5g前後です。納豆のたれを使わないと1パックあたり0.7g減ります。</div>`
+      : '') +
+    `<small>飽和脂肪酸と外食の食物繊維は推定値、ほかは公表値です` +
+    `（SAVASの食塩は1食分0.31〜0.76gと幅があるため中間値）。「その他（自由入力）」は数えていません。` +
+    `エネルギーは<b>入力した品目だけ</b>の合計なので、ほかに食べたものがあれば実際はもっと多くなります。</small>`;
 
   const badge = $('lvBadge');
   badge.textContent = ex.level.t;
@@ -1374,26 +1431,23 @@ function distributeFoods(st, mealTargets, planIds, trained){
   return bins;
 }
 
-/* 食べる順番の注意。実際に最初に食べるものなので、内容欄の先頭に置く */
-/* 食前の難消化性デキストリン。糖の吸収を穏やかにし、LDLにも弱く低下方向に働く。
-   自宅のサラダを外食に持ち込めないため、ベジファーストの代わりに置いている。 */
-const DEXTRIN_NOTE =
-  '<span class="order"><b>食事の前に難消化性デキストリンを。</b>' +
-  '糖の吸収が穏やかになり、丼もののご飯による血糖値の急上昇を抑えられます。</span>';
-
+/* 食べる順番の注意。実際に最初に食べるものなので、内容欄の先頭に置く。野菜が置ける食事は「ベジファースト」、置けない外食の食事は
+   店で頼めるもので順番を作る。難消化性デキストリンは食物繊維が食事から足りている日は
+   要らないので、常時の指示はやめて「足りない日の手段」として添えるだけにしている。 */
 function orderNote(bin, home){
   const veg = FOODS.find(f => f.first);
   if(veg && bin.first){
     return `<span class="order"><b>まず、下線の${veg.short}から。</b>` +
-           `食べ終えてから他のものへ進んでください。</span>`;
+           `食べ終えてからおかず、ご飯は最後に回してください。` +
+           `この順番だとインクレチンが出て、血糖値の急上昇を抑えられます。</span>`;
   }
   if(bin.carb){
     // 外食では自宅の野菜を持ち込めないので、店で頼めるもので順番を作る
     return `<span class="order"><b>ご飯は最後に回す。</b>` +
            (home
              ? `おかずを先に食べてからご飯にすると、血糖値の急上昇を抑えられます。`
-             : `この食事には糖質メニュー（丼・定食のご飯）があります。` +
-               `みそ汁の具・卵・肉から先に食べるだけでも血糖値の急上昇は抑えられます。`) +
+             : `野菜を持ち込めないので、みそ汁の具・卵・肉から先に食べてください。` +
+               `それだけでも血糖値の急上昇は抑えられます。`) +
            `</span>`;
   }
   return '';
@@ -1717,7 +1771,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   const meal = (raw, targetG, tail, k) => {
     const bin = viewOf(raw, k);
     // 食前のデキストリンを先に、店での食べる順番をそのあとに置く
-    const head = DEXTRIN_NOTE + orderNote(bin,
+    const head = orderNote(bin,
       (k === 'd' && homeDinnerDay(st)) || (k === 'b' && homeBreakfastDay(st)));
     if(empty && !bin.addTotal){
       return `<b>「② 今日の食事」が未入力です。</b>食べたもの（納豆・豆腐・サバ缶など）を入力すると、ここに ${targetG}g 分の配分が自動表示されます。`;
@@ -2246,34 +2300,42 @@ function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, pl
     `に分散してください。まとめ摂りした余剰分は筋肉に回らず、エネルギーや脂肪として処理されるだけになります。` +
     (st.meals === 2 ? `2食だと1食あたりが増えやすいので、超えた分はSAVASの回に回すほうが無駄になりません。` : '')]);
 
-  tips.push(['', `<b>② 食前に難消化性デキストリン、ご飯は最後に。</b>丼ものはご飯の量が多く、血糖値が急に上がりやすい食事です。食前に難消化性デキストリン（1回5g程度）を摂り、店ではみそ汁の具・卵・肉から先に食べてご飯を最後に回すと、血糖値の急上昇（血糖値スパイク）と内臓脂肪の蓄積を抑えられます。自宅の野菜は持ち込めないため、この2つで代えています。`]);
+  // 食物繊維が食事から足りていれば、難消化性デキストリンは要らない
+  const fb = calcFiber(st, sv);
+  tips.push(['', `<b>② 食べる順番で血糖値を抑える。</b>丼ものはご飯の量が多く、血糖値が急に上がりやすい食事です。` +
+    `<b>野菜 → おかず → ご飯</b>の順で食べるとインクレチンが出て、血糖値の急上昇（血糖値スパイク）と内臓脂肪の蓄積を抑えられます。` +
+    `自宅の食事はミックスサラダを先に。外食では野菜を持ち込めないので、みそ汁の具・卵・肉から先に食べてご飯を最後に回してください。`]);
+  tips.push(['', `<b>③ 食物繊維は今日 ${fb.total}g（目標${FIBER_TARGET}g以上）。</b>` +
+    (fb.total >= FIBER_TARGET
+      ? `食事だけで足りているので、難消化性デキストリンを足す必要はありません。摂りすぎると腹部膨満や下痢の原因になります。`
+      : `${r1(FIBER_TARGET - fb.total)}g 足りません。サラダを1皿足すか、足りない日だけ難消化性デキストリン（1回5g程度・ご飯の前）で補ってください。`)]);
 
-  tips.push(['', `<b>③ カルシウムは別枠で。</b>「② 今日の食事」の品目には乳製品が含まれていないため、` +
+  tips.push(['', `<b>④ カルシウムは別枠で。</b>「② 今日の食事」の品目には乳製品が含まれていないため、` +
     `<b>カルシウムはこのツールでは追えません</b>。牛乳・ヨーグルト・小魚・豆腐などで別途確保してください。` +
     `55歳では骨密度の維持が課題になり、納豆のビタミンK2はカルシウムを骨に定着させる働きがあるため、` +
     `納豆とカルシウム源はセットで考えると効果的です。`]);
 
-  tips.push(['', `<b>④ 水分補給を十分に。</b>タンパク質の代謝では老廃物（尿素窒素）の排出に水が必要で、腎臓の負担軽減にもつながります。<b>1日 1.5〜2L</b>を目安に、運動中・運動後はこまめに。` +
+  tips.push(['', `<b>⑤ 水分補給を十分に。</b>タンパク質の代謝では老廃物（尿素窒素）の排出に水が必要で、腎臓の負担軽減にもつながります。<b>1日 1.5〜2L</b>を目安に、運動中・運動後はこまめに。` +
     (st.liqP > 0
       ? `${st.liquid.name}で溶かす場合、それ自体は水分補給になりますが、別に水も摂ってください。`
       : `SAVASも水 ${st.liquidMl}ml でしっかり溶かして飲んでください。`)]);
 
   if(ex.done > 0){
-    tips.push(['', `<b>⑤ 今日は筋トレ ${ex.done}種目 / 総負荷量 ${ex.volume.toLocaleString()}kg。</b>筋線維の修復は48時間程度続くため、<b>翌日もタンパク質量を落とさない</b>ことが重要です。負荷を上げるときは、重量を増やすより先に「セット数を1つ増やす」「回数を15→20回にする」ほうが関節への負担が少なく安全です。`]);
+    tips.push(['', `<b>⑥ 今日は筋トレ ${ex.done}種目 / 総負荷量 ${ex.volume.toLocaleString()}kg。</b>筋線維の修復は48時間程度続くため、<b>翌日もタンパク質量を落とさない</b>ことが重要です。負荷を上げるときは、重量を増やすより先に「セット数を1つ増やす」「回数を15→20回にする」ほうが関節への負担が少なく安全です。`]);
   }else{
-    tips.push(['', `<b>⑤ 今日は筋トレなし。</b>休養日こそ筋肉が作られる日です。最低でも 体重×1.5g（${r1(st.weight * 1.5)}g）は確保し、タンパク質を切らさないようにしましょう。`]);
+    tips.push(['', `<b>⑥ 今日は筋トレなし。</b>休養日こそ筋肉が作られる日です。最低でも 体重×1.5g（${r1(st.weight * 1.5)}g）は確保し、タンパク質を切らさないようにしましょう。`]);
   }
 
   // 運動量に比例して増えるのはタンパク質ではなくエネルギー（糖質）
   const en = calcEnergy(st, ex);
   if(en.kcal > 0){
-    tips.push(['', `<b>⑥ 今日の運動での推定消費は 約${en.kcal} kcal です</b>` +
+    tips.push(['', `<b>⑦ 今日の運動での推定消費は 約${en.kcal} kcal です</b>` +
       `（筋トレ ${en.strength}kcal ／ 有酸素 ${en.cardio}kcal・概算）。<br>` +
       `タンパク質の必要量は運動量に比例せず <b>体重×1.8g で頭打ち</b>になりますが、` +
       `<b>エネルギーは運動量に比例して増えます</b>。ここが不足すると、せっかく摂ったタンパク質が` +
       `エネルギー源として使われ、筋肉の材料に回りません。<br>` +
       `運動の前後に <b>糖質 約${en.carbG}g（ご飯茶碗 約${(en.carbG / RICE_BOWL_CARB).toFixed(1)}杯分）</b>` +
-      `を補ってください。糖質を摂る際は、食前の難消化性デキストリンとご飯を最後に回す順番で血糖値の急上昇は抑えられます。`]);
+      `を補ってください。野菜・おかずを先に食べてご飯を最後に回せば、血糖値の急上昇は抑えられます。`]);
   }
 
   // 普段より極端に負荷が高い日の注意
@@ -2288,7 +2350,7 @@ function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, pl
 
   // 粉への依存が大きいときの注意
   if(sv.totalG > 0 && sv.totalG >= target * 0.45){
-    tips.push(['', `<b>⑦ 今日は目標 ${target}g のうち ${sv.totalG}g（約${Math.round(sv.totalG / target * 100)}%）をSAVASで賄う計算です。</b>` +
+    tips.push(['', `<b>⑧ 今日は目標 ${target}g のうち ${sv.totalG}g（約${Math.round(sv.totalG / target * 100)}%）をSAVASで賄う計算です。</b>` +
       `プロテインは不足を埋める補助であって主役ではありません。ビタミン・ミネラル・食物繊維は粉からは摂れないため、` +
       `<b>サバ缶や納豆・豆腐を1〜2品増やして、粉の比率を4割以下に下げる</b>ほうが望ましい状態です。`]);
   }
@@ -2475,7 +2537,7 @@ const DEFAULTS_VER = 10;
 //      小数を入れられるよう、重量欄は step="any" にしてある。
 const RESET_IDS = () =>
   EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]);
-const ALL_IDS = () => ['weight','baseFactor','meals','savasShare','walk','cycle','otherP','otherNote','startTime','dinnerTime','fixSpoons']
+const ALL_IDS = () => ['weight','height','age','baseFactor','meals','savasShare','walk','cycle','otherP','otherNote','startTime','dinnerTime','fixSpoons']
   .concat(FOODS.map(f => 'f_' + f.id))
   .concat(EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]));
 
@@ -2578,7 +2640,7 @@ function load(){
    前日以前のリンクなら設定だけを反映し、食事はその日の型に戻す
    （この端末の localStorage が日付をまたぐと食事を 0 に戻すのと同じ扱い）。
    ------------------------------------------------------------ */
-const SETTING_IDS = () => ['weight','baseFactor','meals','savasShare','startTime','dinnerTime','fixSpoons']
+const SETTING_IDS = () => ['weight','height','age','baseFactor','meals','savasShare','startTime','dinnerTime','fixSpoons']
   .concat(EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]));
 // 当日の入力（食事＋その他＋有酸素の距離）。実施種目のチェックは d.c で持ち運ぶ。
 const LINK_DAILY_IDS = () => DAILY_IDS().concat(['walk','cycle']);
