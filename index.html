@@ -157,6 +157,12 @@ input[type=checkbox]:focus-visible{outline:2px solid #bfd7ff;outline-offset:2px}
   border:1px solid var(--line);border-radius:8px;background:#fff;
 }
 .memo + small{display:block;margin-top:4px}   /* 入力欄の下に置く注記 */
+/* 「その他」の栄養成分。分かる範囲だけ入れれば、その分が④の合計に乗る */
+.other-body{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.other-body div{display:flex;flex-direction:column}
+.other-body span{font-size:.72rem;color:var(--sub);margin-bottom:3px}
+.other-body input{text-align:center}
+@media (max-width:560px){ .other-body{grid-template-columns:repeat(2,1fr)} }
 
 /* 筋トレカード */
 .ex{
@@ -428,7 +434,15 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
     <h2>② 今日の食事<button type="button" id="clearFoods" class="mini-btn">食事をリセット</button></h2>
     <div id="foods"></div>
     <div class="row">
-      <div class="name"><b>その他（自由入力）</b><input type="text" id="otherNote" class="memo" maxlength="60" placeholder="例：ゆで卵2個・ヨーグルト1個"><small>上記以外で摂ったタンパク質の合計</small></div>
+      <div class="name"><b>その他（自由入力）</b><input type="text" id="otherNote" class="memo" maxlength="60" placeholder="例：ゆで卵2個・ヨーグルト1個"><small>上記以外で摂ったタンパク質の合計</small>
+        <div class="other-body">
+          <div><span>飽和脂肪酸 (g)</span><input type="number" inputmode="decimal" id="otherSat" value="0" min="0" step="0.1"></div>
+          <div><span>食塩相当量 (g)</span><input type="number" inputmode="decimal" id="otherSalt" value="0" min="0" step="0.1"></div>
+          <div><span>炭水化物 (g)</span><input type="number" inputmode="decimal" id="otherCarb" value="0" min="0" step="0.1"></div>
+          <div><span>食物繊維 (g)</span><input type="number" inputmode="decimal" id="otherFiber" value="0" min="0" step="0.1"></div>
+          <div><span>エネルギー (kcal)</span><input type="number" inputmode="numeric" id="otherKcal" value="0" min="0" step="1"></div>
+          <div><span>価格 (円)</span><input type="number" inputmode="numeric" id="otherPrice" value="0" min="0" step="1"></div>
+        </div></div>
       <div class="qty"><input type="number" inputmode="decimal" id="otherP" value="0" min="0" step="0.1"></div>
       <div class="unit">g</div>
     </div>
@@ -546,7 +560,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.54';
+const APP_VERSION = '2026-09-01.55';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -746,6 +760,10 @@ function readState(){
     baseFactor: num('baseFactor') || 1.5,
     walk: num('walk'), cycle: num('cycle'), otherP: num('otherP'),
     otherNote: ($('otherNote').value || '').trim(),
+    // 「その他」の栄養成分。分かる範囲だけ入れてもらう（未入力は0）
+    otherSat:   num('otherSat'),   otherSalt:  num('otherSalt'),
+    otherCarb:  num('otherCarb'),  otherFiber: num('otherFiber'),
+    otherKcal:  num('otherKcal'),  otherPrice: num('otherPrice'),
     foods: {}, ex: {}
   };
   // SAVASは水で溶かす固定。液体からのタンパク質は 0。
@@ -778,7 +796,7 @@ function readState(){
    ============================================================ */
 // 食事からの合計タンパク質
 function calcFood(st){
-  let total = st.otherP, cost = 0;
+  let total = st.otherP, cost = st.otherPrice;
   const list = [];
   FOODS.forEach(f => {
     const q = st.foods[f.id];
@@ -797,7 +815,11 @@ function calcFood(st){
 
 // 食事とSAVASから摂る飽和脂肪酸の合計（推定値）。
 // 「その他（自由入力）」はタンパク質量しか分からないので数えない。
-// 食事とSAVASから摂る量の合計。key は 'sat'（飽和脂肪酸）か 'salt'（食塩相当量）。
+// 「その他（自由入力）」の欄と FOODS の項目の対応
+const OTHER_KEY = {sat:'otherSat', salt:'otherSalt', carbG:'otherCarb',
+                   fiber:'otherFiber', kcal:'otherKcal'};
+
+// 食事とSAVASから摂る量の合計。key は 'sat' / 'salt' / 'carbG' / 'fiber' / 'kcal'。
 function totalOf(st, sv, key, perSpoon){
   const items = [];
   let food = 0;
@@ -805,6 +827,9 @@ function totalOf(st, sv, key, perSpoon){
     const q = st.foods[f.id];
     if(q > 0 && f[key]){ const g = q * f[key]; food += g; items.push({name:f.short, g:r1(g)}); }
   });
+  // 「その他」に入力があれば、その分も合計に入れる
+  const other = st[OTHER_KEY[key]] || 0;
+  if(other > 0){ food += other; items.push({name:st.otherNote || 'その他', g:r1(other)}); }
   const savas = (sv ? sv.spoons : 0) * perSpoon;
   if(savas > 0) items.push({name:'SAVAS', g:r1(savas)});
   items.sort((a, b) => b.g - a.g);
@@ -1145,7 +1170,7 @@ function render(opts){
         `外食が2食入る日は、店のメニューだけで5g前後になります。</div>`
       : '') +
     `<small>飽和脂肪酸と外食の食物繊維は推定値、ほかは公表値です` +
-    `（SAVASの食塩は1食分0.31〜0.76gと幅があるため中間値）。「その他（自由入力）」は数えていません。` +
+    `（SAVASの食塩は1食分0.31〜0.76gと幅があるため中間値）。「その他（自由入力）」は、入力された欄だけ合計に入ります。` +
     `エネルギーは<b>入力した品目だけ</b>の合計なので、ほかに食べたものがあれば実際はもっと多くなります。</small>`;
 
   const badge = $('lvBadge');
@@ -2509,7 +2534,7 @@ function updateLive(){
   const fc = calcFood(st);
   $('foodNote').innerHTML =
     `現在の食事合計：<b>${fc.total} g</b>　／　合計金額：<b>${fc.cost.toLocaleString()} 円</b>` +
-    `<br><small>「その他（自由入力）」は金額に含まれません。</small>` +
+    `<br><small>「その他（自由入力）」は、価格欄に入れた分だけ金額に含みます。</small>` +
     (st.otherNote && st.otherP <= 0
       ? `<br><small class="warn-inline">「その他」に「${esc(st.otherNote)}」と書かれていますが、` +
         `タンパク質が 0g のため計算には入っていません。右の欄にg数を入れてください。</small>`
@@ -2517,6 +2542,11 @@ function updateLive(){
     (!homeDinnerDay(st) && !homeBreakfastDay(st) && Math.round(st.foods.rice || 0) > 0
       ? `<br><small class="warn-inline">今日は朝食も夕食も外食です。丼・定食にはご飯が付くので、` +
         `「ご飯」は 0 にしてください。</small>`
+      : '') +
+    // たんぱく質だけ入れて他の欄が空だと、④の合計に乗らないので知らせる
+    (st.otherP > 0 && !st.otherKcal
+      ? `<br><small>「その他」の<b>エネルギーが未入力</b>です。飽和脂肪酸・食塩・炭水化物・食物繊維・価格も` +
+        `分かる範囲で入れると、④の合計に反映されます（空欄の項目は0として扱います）。</small>`
       : '') +
     (homeBreakfastDay(st)
       ? `<br><small><b>今日は朝食も自宅です。</b>ご飯・卵・納豆1パックを朝食の枠に回します` +
@@ -2563,13 +2593,16 @@ const DEFAULTS_VER = 10;
 //      小数を入れられるよう、重量欄は step="any" にしてある。
 const RESET_IDS = () =>
   EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]);
-const ALL_IDS = () => ['weight','height','age','baseFactor','meals','savasShare','walk','cycle','otherP','otherNote','startTime','dinnerTime','fixSpoons']
+const ALL_IDS = () => ['weight','height','age','baseFactor','meals','savasShare','walk','cycle',
+   'otherP','otherNote','otherSat','otherSalt','otherCarb','otherFiber','otherKcal','otherPrice',
+   'startTime','dinnerTime','fixSpoons']
   .concat(FOODS.map(f => 'f_' + f.id))
   .concat(EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]));
 
 // 「② 今日の食事」はその日限りの入力。日付が変わったら復元せず 0 から始める。
 // （同じ日のうちに開き直した場合は、入力し直さずに済むよう復元する）
-const DAILY_IDS = () => FOODS.map(f => 'f_' + f.id).concat(['otherP', 'otherNote']);
+const DAILY_IDS = () => FOODS.map(f => 'f_' + f.id)
+  .concat(['otherP','otherNote','otherSat','otherSalt','otherCarb','otherFiber','otherKcal','otherPrice']);
 
 // 1週間の型（固定メニュー）。曜日ごとに 朝食・夕食・追加するもの を決めておく。
 //   バナナ（運動直後）とトマトジュース（間食）は毎日1つずつ。
