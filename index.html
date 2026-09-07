@@ -546,7 +546,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.50';
+const APP_VERSION = '2026-09-01.51';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -584,16 +584,20 @@ const SERVE_G   = SPOON_G * PER_SERVE;  // 1回 = 19.5g
 const FOODS = [
   // --- 牛丼チェーン（1食＝1単位。朝食メニューは朝食、夕食メニューは夕食の枠にだけ配分する） ---
   {id:'sk_mazenokke', shop:'すき家',  name:'まぜのっけ朝食',       short:'まぜのっけ朝食',
-   weekName:'すき家<br>まぜのっけ朝食', note:'1食 約15g（卵1個ぶん）',
+   weekName:'すき家<br>まぜのっけ朝食', note:'1食 約17.1g（卵1個ぶん）',
    price:300, p:17.1, unit:'食', sat:2.8, salt:2.4, carbG:96.4, fiber:8.5, kcal:531, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1},
   {id:'sk_gyudon',    shop:'すき家',  name:'牛丼（並）',           short:'牛丼',         weekName:'すき家<br>牛丼',   note:'1食 約21.7g',
    price:430, p:21.7, unit:'食', sat:9.4, salt:2.4, carbG:99.8, fiber:4.3, kcal:695, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
-  {id:'mt_gyuzara',   shop:'松屋',    name:'得朝牛皿定食',         short:'得朝牛皿定食',   weekName:'松屋<br>得朝牛皿定食', note:'1食 約15g',
+  {id:'mt_gyuzara',   shop:'松屋',    name:'得朝牛皿定食',         short:'得朝牛皿定食',   weekName:'松屋<br>得朝牛皿定食', note:'1食 約13.5g',
    price:400, p:13.5, unit:'食', sat:6.6, salt:3.2, carbG:88.3, fiber:4.0, kcal:568, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
   {id:'mt_gyumeshi',  shop:'松屋',    name:'牛めし（並）',         short:'牛めし',       weekName:'松屋<br>牛めし',   note:'1食 約17.1g',
    price:460, p:17.1, unit:'食', sat:11.6, salt:3.0, carbG:85.5, fiber:3.9, kcal:687, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
+  {id:'mt_miso',      shop:'松屋',    name:'みそ汁',               short:'みそ汁',       weekName:'松屋<br>みそ汁',
+   note:'1杯 約1.8g',
+   price:0, p:1.8, unit:'杯', sat:0.2, salt:1.5, carbG:3.7, fiber:0.8, kcal:35,
+   slots:['d'], lock:true, slot:'d', fixedMenu:true},
   {id:'ys_hamegg',    shop:'吉野家',  name:'ハムエッグ納豆定食',   short:'ハムエッグ納豆定食',
-   weekName:'吉野家<br>ﾊﾑｴｯｸﾞ納豆定食', note:'1食 約18g（卵1個ぶん）',
+   weekName:'吉野家<br>ﾊﾑｴｯｸﾞ納豆定食', note:'1食 約24.1g（卵1個ぶん）',
    price:468, p:24.1, unit:'食', sat:4.2, salt:2.6, carbG:94.2, fiber:7.6, kcal:581, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1},
   {id:'ys_saba',      shop:'吉野家',  name:'塩さば得朝定食',       short:'塩さば得朝定食',
    weekName:'吉野家<br>塩さば得朝定食', note:'1食 約31.9g（卵1個ぶん）',
@@ -607,7 +611,7 @@ const FOODS = [
 
   // --- 運動直後 ---
   {id:'banana',  name:'バナナ',              short:'バナナ',       note:'1本 約1g',
-   price:34, ruleNote:'運動直後に必ず1本', p:1, unit:'本', sat:0.1, salt:0, carbG:20.3, fiber:1.0, kcal:77, slots:['b','l','d'], post:true, autoDaily:1},
+   price:34, ruleNote:'運動直後に2本', p:1, unit:'本', sat:0.1, salt:0, carbG:20.3, fiber:1.0, kcal:77, slots:['b','l','d'], post:true, autoDaily:2},
 
   // --- 自宅の食材（外食には持ち込めないので「間食」の枠にまとめる） ---
   {id:'tomato',  name:'トマトジュース',        short:'トマトジュース', note:'200ml 約1.8g（食塩無添加）',
@@ -703,7 +707,7 @@ $('foods').innerHTML = FOODS.map(f => `
   <div class="row">
     <div class="name"><b>${f.shop ? f.shop + '<br>' : ''}${f.name}</b>` +
       // 全角の「）」で終わる注記は、そのあとに半角スペースを足すと空きすぎて見える
-      `<small>${f.note}${/）$/.test(f.note) ? '' : ' '}<b>${f.price}円</b>` +
+      `<small>${f.note}${/）$/.test(f.note) ? '' : ' '}<b>${f.price ? f.price + '円' : '無料'}</b>` +
       `${f.ruleNote ? `<br>${f.ruleNote}` : ''}${f.limitNote ? `<br><b>${f.limitNote}</b>` : ''}` +
       // 自動計算する品目は、手で書き換えたときに自動へ戻せるようにする
       `${f.autoNatto ? `<br><span id="autoNote_${f.id}"></span>` +
@@ -2459,7 +2463,8 @@ function updateLive(){
   // 列幅が狭いので、長い名前は weekName で改行位置を指定する
   const menuOf = (plan, slot) => Object.keys(plan)
     .map(foodById).filter(f => f && f.slot === slot)
-    .map(f => `${f.weekName || f.short}<br><small>${f.p}g ／ ${f.price}円</small>`).join('<br>') || '—';
+    .map(f => `${f.weekName || f.short}<br><small>${f.p}g ／ ${f.price ? f.price + '円' : '無料'}</small>`)
+    .join('<br>') || '—';
   // 型としては毎日1つずつなので、追加列は品目名だけを出す（2つ以上のときだけ数量を添える）
   const qtyLine = (f, n) => `${f.weekName || f.short}${n > 1 ? `（${n}${f.unit}）` : ''}`;
   const extraOf = plan => Object.keys(plan)
@@ -2564,7 +2569,7 @@ const WEEKLY_PLAN = {
   0: {sk_mazenokke:1, sk_gyudon:1},                   // 日（牛：夕）
   1: {sk_mazenokke:1, saba:1, rice:2},                // 月（自宅：サバ缶＋ご飯1合）
   2: {sk_mazenokke:1, saba:1, rice:2},                // 火（自宅）
-  3: {sk_mazenokke:1, mt_gyumeshi:1},                 // 水（牛：夕）
+  3: {sk_mazenokke:1, mt_gyumeshi:1, mt_miso:1},      // 水（牛：夕／みそ汁が付く）
   4: {ys_hamegg:1,    saba:1, rice:2},                // 木（朝：ハムエッグ納豆定食／自宅）
   5: {sk_mazenokke:1, saba:1, rice:2},                // 金（自宅）
   6: {sk_mazenokke:1, ys_butadon:1}                   // 土（豚：夕）
