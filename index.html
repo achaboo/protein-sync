@@ -526,7 +526,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.43';
+const APP_VERSION = '2026-09-01.44';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのタンパク質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -588,6 +588,9 @@ const FOODS = [
   {id:'tomato',  name:'トマトジュース',        short:'トマトジュース', note:'200ml 約1.8g（食塩無添加）',
    price:40, ruleNote:'毎日2杯（カリウム補給）', p:1.8, unit:'杯', sat:0,
    slots:['s'], lock:true, home:true, autoDaily:2},
+  {id:'salad',   name:'ミックスサラダ',        short:'ミックスサラダ', note:'0.5袋 約0.65g',
+   price:53, p:0.65, unit:'皿', sat:0,
+   slots:['s'], lock:true, home:true},
   {id:'egg',     name:'卵',                  short:'卵',           note:'1個 約6g',
    price:27, ruleNote:'1日2個まで<br>（メニューに含まれる卵も数える）', p:6, unit:'個', sat:1.6,
    slots:['s'], lock:true, home:true, autoDaily:2, max:2},
