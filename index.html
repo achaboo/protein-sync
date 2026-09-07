@@ -585,7 +585,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.58';
+const APP_VERSION = '2026-09-01.59';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのたんぱく質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -659,6 +659,10 @@ const FOODS = [
    slots:['s'], lock:true, home:true, autoDaily:2},
   {id:'dressing',name:'ドレッシング',          short:'ドレッシング',   note:'1ふり 約0.4g',
    price:25, p:0.4, unit:'ふり', sat:0.5, salt:0.7, carbG:2.4, fiber:0, kcal:53, fat:4.6,
+   slots:['s'], lock:true, home:true, homeMeal:true, homeBreakfast:true},
+  {id:'olive',   name:'オリーブオイル',        short:'オリーブオイル', note:'1さじ 約0g',
+   ruleNote:'エクストラバージン（大さじ1＝14g）',
+   price:41, p:0, unit:'さじ', fat:14, sat:1.9, salt:0, carbG:0, fiber:0, kcal:126,
    slots:['s'], lock:true, home:true, homeMeal:true, homeBreakfast:true},
   {id:'salad',   name:'ミックスサラダ',        short:'ミックスサラダ', note:'0.5袋 約0.65g',
    price:53, p:0.65, unit:'皿', sat:0, salt:0, carbG:1.9, fiber:0.8, kcal:12, fat:0.1,
@@ -2102,9 +2106,8 @@ const snackQty = (f, st) => {
   return Math.max(0, q - bQuota(f, st));
 };
 const inSnack = (f, st) => snackQty(f, st) > 0;
-// 自宅で摂る食事1回につきご飯1.5合（0.5合の欄で3杯）。外食の丼のご飯（約260g）より多いが、
-// 丼をやめたぶんのエネルギー不足を埋めるためにこの量にしている。
-const RICE_PER_MEAL = 3;
+// 自宅で摂る食事1回につきご飯1合（0.5合の欄で2杯）。外食の丼のご飯とほぼ同じ量。
+const RICE_PER_MEAL = 2;
 const riceNeed = st =>
   ((homeBreakfastDay(st) ? 1 : 0) + (homeDinnerDay(st) ? 1 : 0)) * RICE_PER_MEAL;
 
@@ -2122,7 +2125,7 @@ function calcEnergy(st, ex){
 }
 
 /* たんぱく質10gあたりの単価（円）。安いほどコスト効率がよい。 */
-const pricePer10g = f => Math.round(f.price / f.p * 10);
+const pricePer10g = f => f.p > 0 ? Math.round(f.price / f.p * 10) : Infinity;
 /* その品目をその日あと何個足せるか（1日の上限がある品目は残りの枠まで） */
 /* メニューに含まれる卵の個数（親子丼・ハムエッグ納豆定食など）。
    卵の1日上限はこれを含めて数える。 */
@@ -2553,7 +2556,7 @@ function updateLive(){
     `<b>朝食は牛丼チェーンの固定メニュー、夕食は外食3日・自宅4日</b>です（下表）。曜日に応じて毎日自動で入ります。` +
     (postDay.length  ? `<br><b>毎日（運動直後）：</b>${postDay.join('・')}` : '') +
     (snackDay.length ? `<br><b>毎日（間食）：</b>${snackDay.join('・')}＋納豆（不足分から自動計算）` : '') +
-    `<br><b>月・火・木・金の夕食は自宅</b>（サバ缶＋ご飯1.5合）。なか卯が遠いため親子丼を型から外しました。` +
+    `<br><b>月・火・木・金の夕食は自宅</b>（サバ缶＋ご飯1合＋サラダ・ドレッシング・オリーブオイル）。なか卯が遠いため親子丼を型から外しました。` +
     `<br><b>牛肉は週2食まで</b>（日・水の夕食）。土曜は豚丼、魚は自宅の夕食のサバ缶で週4回摂ります。` +
     `<br>朝食は飽和脂肪酸の最も少ない<b>まぜのっけ朝食</b>を基本にし、余裕のある木曜だけ変えています（④に1日の合計を表示）。` +
     `<br><small>親子丼は食材の一覧に残してあります。なか卯へ行ける日は手で <b>1</b> を入れてください` +
@@ -2675,17 +2678,18 @@ const WEEK_LABEL = ['日','月','火','水','木','金','土'];
 // 得朝牛皿定食（9.0g）は牛が増えるため型から外している（手で入れれば使える）。
 //
 // なか卯が自宅から遠いため、親子丼を使っていた4日（月・火・木・金）の夕食は
-// 自宅にしている。サバ缶＋ご飯1.5合が主菜で、これで魚は週4回になる。
-// ご飯は 0.5合の欄で3杯。丼をやめたぶんのエネルギー不足を埋めるための量で、
-// ゆっくり食べれば入る、という本人の申告に合わせている。
+// 自宅にしている。サバ缶＋ご飯1合＋サラダが主菜で、これで魚は週4回になる。
+// ご飯は 0.5合の欄で2杯。もとは3杯だったが、炭水化物が総エネルギーの62%まで上がったため
+// 1杯をオリーブオイル大さじ1に置き換えた（−257kcal ＋126kcal、炭水化物−58g・脂質+14g）。
+// サラダ＋ドレッシング＋オリーブオイルは一緒に食べる前提で、まとめて型に入れている。
 // 親子丼は FOODS に残してあるので、行ける日は手で1を入れれば使える。
 const WEEKLY_PLAN = {
   0: {sk_mazenokke:1, sk_gyudon:1},                   // 日（牛：夕）
-  1: {sk_mazenokke:1, saba:1, rice:3},                // 月（自宅：サバ缶＋ご飯1.5合）
-  2: {sk_mazenokke:1, saba:1, rice:3},                // 火（自宅）
-  3: {sk_mazenokke:1, mt_gyumeshi:1, mt_miso:1},      // 水（牛：夕／みそ汁が付く）
-  4: {ys_hamegg:1,    saba:1, rice:3},                // 木（朝：ハムエッグ納豆定食／自宅）
-  5: {sk_mazenokke:1, saba:1, rice:3},                // 金（自宅）
+  1: {sk_mazenokke:1, saba:1, rice:2, salad:1, dressing:1, olive:1},  // 月（自宅）
+  2: {sk_mazenokke:1, saba:1, rice:2, salad:1, dressing:1, olive:1},  // 火（自宅）
+  3: {sk_mazenokke:1, mt_gyumeshi:1, mt_miso:1},                      // 水（牛：夕／みそ汁）
+  4: {ys_hamegg:1,    saba:1, rice:2, salad:1, dressing:1, olive:1},  // 木（朝：ハムエッグ／自宅）
+  5: {sk_mazenokke:1, saba:1, rice:2, salad:1, dressing:1, olive:1},  // 金（自宅）
   6: {sk_mazenokke:1, ys_butadon:1}                   // 土（豚：夕）
 };
 const todayIdx = () => new Date().getDay();
