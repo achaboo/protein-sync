@@ -628,7 +628,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.73';
+const APP_VERSION = '2026-09-01.74';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのたんぱく質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -706,8 +706,8 @@ const FOODS = [
    price:15, p:0.5, unit:'ふり', sat:0, salt:0.8, carbG:1.4, fiber:0, kcal:8, fat:0,
    slots:['s'], lock:true, home:true, homeMeal:true, homeBreakfast:true},
   {id:'olive',   name:'オリーブオイル',        short:'オリーブオイル', note:'1さじ 約0g',
-   ruleNote:'エクストラバージン（大さじ1＝14g）<br>昼食のサラダに',
-   price:41, p:0, unit:'さじ', fat:14, sat:1.9, salt:0, carbG:0, fiber:0, kcal:126,
+   ruleNote:'エクストラバージン（小さじ1＝4g）<br>昼食のサラダに',
+   price:13, p:0, unit:'さじ', fat:4, sat:0.5, salt:0, carbG:0, fiber:0, kcal:36,
    slots:['s'], lock:true, home:true, homeMeal:true, homeBreakfast:true, homeSlot:'l'},
   {id:'salad',   name:'ミックスサラダ',        short:'ミックスサラダ', note:'0.5袋 約0.65g',
    price:53, p:0.65, unit:'皿', sat:0, salt:0, carbG:1.9, fiber:0.8, kcal:12, fat:0.1,
@@ -2864,7 +2864,8 @@ const WEEK_LABEL = ['日','月','火','水','木','金','土'];
 // なか卯が自宅から遠いため、親子丼を使っていた4日（月・火・木・金）の夕食は
 // 自宅にしている。サバ缶＋ご飯1合＋サラダが主菜で、これで魚は週4回になる。
 // ご飯は 0.5合の欄で2杯。もとは3杯だったが、炭水化物が総エネルギーの62%まで上がったため
-// 1杯をオリーブオイル大さじ1に置き換えた（−257kcal ＋126kcal、炭水化物−58g・脂質+14g）。
+// 1杯をオリーブオイルに置き換えた（−257kcal、炭水化物−58g）。
+// オリーブオイルは小さじ1（4g・36kcal・脂質4g）なので、置き換えで戻る分はわずか。
 // サラダ＋ドレッシング＋オリーブオイルは一緒に食べる前提で、まとめて型に入れている。
 // 親子丼は FOODS に残してあるので、行ける日は手で1を入れれば使える。
 const WEEKLY_PLAN = {
