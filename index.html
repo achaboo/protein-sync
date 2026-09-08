@@ -601,7 +601,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.61';
+const APP_VERSION = '2026-09-01.62';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのたんぱく質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -1716,6 +1716,9 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
     return m ? (+m[1]) * 60 + (+m[2]) : null;
   };
   const setAt = {b:hhmmOf('breakfastTime'), l:hhmmOf('lunchTime'), d:hhmmOf('dinnerTime')};
+  /* 朝食の時刻が運動を終える時刻より前なら「朝食 → 筋トレ → SAVAS」の順とみなす。
+     朝食は経過時間がマイナスの位置に置き、SAVASの行を朝食のうしろへ動かす。 */
+  const eatFirst = st.skip !== 'b' && anchor !== null && setAt.b !== null && setAt.b < anchor;
   const MAX_GAP = 5;                          // これ以上空いたら間に「間食」を挟む（時間）
 
   const gaps  = {};                           // 表に出す「○時間後」（直前の行から）
@@ -1736,6 +1739,9 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
     let off;
     if(!started){                             // 運動していない日の1食目＝起点そのもの
       off = 0; started = true;
+    }else if(k === 'b' && eatFirst){
+      // 運動より前の朝食。1日の起点なので「○時間後」は付けない
+      off = r1((setAt.b - anchor) / 60);
     }else if(setAt[k] !== null && anchor !== null){
       // 時刻が指定されていればその時刻に置く（直前の摂取より前にはしない）。
       // 3時間空かない場合も指定を優先し、実際の間隔を「○時間後」に出す。
@@ -1758,6 +1764,8 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
       afterSplit = false;
     }
     offOf[k] = off;
+    // 朝食を運動より前に置いた日は、次の食事を「運動直後のSAVAS」から数える
+    if(k === 'b' && eatFirst){ prevRow = 0; nextFrom = 0; afterSplit = false; }
   });
 
   /* 自宅の食材（納豆・卵・サラダ）は外食に持ち込めないので「間食」の行にまとめる。
@@ -1766,19 +1774,23 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   const ORDER_T = ['b','l','d'].filter(s => s !== st.skip && offOf[s] !== undefined);
   const snack = (() => {
     if(!bins.s.items.length) return null;
+    // 朝食を運動より前に置いた日は、朝食のあとに運動直後のSAVASが入る。
+    // 間食はそのあとの空白を埋めるので、起点は朝食ではなくSAVASの時刻（経過0）にする。
+    const endOf = k => (k === 'b' && eatFirst) ? Math.max(offOf.b, 0) : offOf[k];
     let at = null, span = 0, from = '', to = '', afterKey = '';
     ORDER_T.forEach((k, i) => {
       const next = ORDER_T[i + 1];
       if(!next) return;
-      const w = r1(offOf[next] - offOf[k]);
+      const w = r1(offOf[next] - endOf(k));
       if(w > span){
-        span = w; at = r1(offOf[k] + w / 2);
-        from = MEAL_NAME[k]; to = MEAL_NAME[next]; afterKey = k;
+        span = w; at = r1(endOf(k) + w / 2);
+        from = (k === 'b' && eatFirst) ? '運動直後のSAVAS' : MEAL_NAME[k];
+        to = MEAL_NAME[next]; afterKey = k;
       }
     });
     // 食事が1つしかない日は、その3時間後に置く
     if(at === null && ORDER_T.length){
-      at = offOf[ORDER_T[0]] + SPLIT_GAP; span = 0; afterKey = ORDER_T[ORDER_T.length - 1];
+      at = endOf(ORDER_T[0]) + SPLIT_GAP; span = 0; afterKey = ORDER_T[ORDER_T.length - 1];
     }
     if(at === null) return null;
     return {at:clock(at), off:at, span, from, to, afterKey, bin:bins.s};
@@ -1786,8 +1798,15 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
 
   /* 「1回目のSAVASは朝食のあとに摂る」設定。朝食と次の食事のちょうど中間に置き、
      食事の時刻には影響させない（間食の行と同じ考え方）。 */
-  const afterB = st.savasAfterB && dosed && st.skip !== 'b' && offOf.b !== undefined;
+  const canMove = dosed && st.skip !== 'b' && offOf.b !== undefined;
+  const afterB  = st.savasAfterB && canMove;
   const postAt = (() => {
+    // 朝食が運動より前の日は、SAVASは運動直後のまま。行の位置だけ朝食のうしろへ
+    const gapLabel = g => g < 1 ? Math.round(g * 60) + '分後' : g + '時間後';
+    if(canMove && eatFirst){
+      const gap = r1(0 - offOf.b);
+      return {off:0, at:clock(0), gap, label:gapLabel(gap), preWorkout:true};
+    }
     if(!afterB) return null;
     const i = ORDER_T.indexOf('b'), next = ORDER_T[i + 1];
     // 次に何か摂る時刻。間食が朝食のあとに入る日は、そこまでの中間に置く
@@ -1796,8 +1815,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
                   : offOf.b + 4;
     const off = r1((offOf.b + nextOff) / 2);
     const gap = r1(off - offOf.b);
-    return {off, at:clock(off), gap,
-            label: gap < 1 ? Math.round(gap * 60) + '分後' : gap + '時間後'};
+    return {off, at:clock(off), gap, label:gapLabel(gap)};
   })();
 
   const timeLabel = k => {
@@ -1932,30 +1950,32 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
 
   const postRow = [
       trained
-        ? (postAt
+        ? (postAt && !postAt.preWorkout
             ? `朝食のあとのSAVAS<br><small>（${postAt.at !== null ? hhmm(postAt.at) + '・' : ''}朝食の${postAt.label}）</small>`
-            : `運動直後<br><small>（${anchor === null ? '30分以内' : hhmm(anchor) + '・30分以内'}）</small>`)
+            : postAt
+              ? `運動直後<br><small>（${hhmm(postAt.at)}・朝食の${postAt.label}）</small>`
+              : `運動直後<br><small>（${anchor === null ? '30分以内' : hhmm(anchor) + '・30分以内'}）</small>`)
         : '起床後<br><small>（朝食前）</small>',
       cup(sMorning),
       trained
-        ? (postAt
+        ? (postAt && !postAt.preWorkout
             ? `先に朝食を済ませてから摂る設定です。運動後に<b>吸収が高まる状態は数時間〜翌日まで続く</b>ので、` +
               `順番を入れ替えても効果は落ちません。朝食と次の食事の中間に置いて、1回の量が偏らないようにしています。` +
               `<b>水${WATER_ML}ml</b>に溶かして飲んでください。`
             : '') +
-          (postAt ? '' : `運動後は<b>吸収に有利な時間帯</b>です（この状態は数時間〜翌日まで続くので、30分を過ぎても無駄にはなりません）。` +
+          (postAt && !postAt.preWorkout ? '' : `運動後は<b>吸収に有利な時間帯</b>です（この状態は数時間〜翌日まで続くので、30分を過ぎても無駄にはなりません）。` +
           `<b>水${WATER_ML}ml</b>に溶かして飲み、筋肉の修復材料を入れます。` +
           `脂質を含まないぶん胃を素早く通過し、アミノ酸が早く血中に届きます。`) +
           (postSplit.first.length
             ? `<br><b>あわせて ${labelOf(postSplit.first)}</b>。` +
-              (postAt
+              (postAt && !postAt.preWorkout
                 ? `糖質は朝食のご飯で入っているので、バナナだけ運動直後に食べても構いません。`
                 : `糖質を補うことでたんぱく質がエネルギーに回されるのを防げます。`) +
               (postSplit.second.length
                 ? `<br><small>残りは下の「2回目のSAVAS」に回しています。</small>`
                 : '')
             : `<br><b>バナナ1本もあわせて</b>摂ってください（「② 今日の食事」で本数を入力すると反映されます）。`) +
-          (postAt ? '' : `<br><small>この時間帯はSAVASとバナナのみで、他のものは摂りません。</small>`)
+          (postAt && !postAt.preWorkout ? '' : `<br><small>この時間帯はSAVASとバナナのみで、他のものは摂りません。</small>`)
         : dosed
           ? `<b>運動しなかった日もSAVASを摂る</b>設定です。不足分をここで補います。` +
             `<b>水${WATER_ML}ml</b>に溶かし、起床後から朝のうちに飲んでください。` +
