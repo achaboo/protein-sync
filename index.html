@@ -616,7 +616,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.71';
+const APP_VERSION = '2026-09-01.72';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのたんぱく質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -2021,8 +2021,8 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
         ? (postAt && !postAt.preWorkout
             ? `朝食のあとのSAVAS<br><small>（${postAt.at !== null ? hhmm(postAt.at) + '・' : ''}朝食の${postAt.label}）</small>`
             : postAt
-              ? `運動直後<br><small>（${hhmm(postAt.at)}・朝食の${postAt.label}）</small>`
-              : `運動直後<br><small>（${anchor === null ? '30分以内' : hhmm(anchor) + '・30分以内'}）</small>`)
+              ? `運動直後のSAVAS<br><small>（${hhmm(postAt.at)}・朝食の${postAt.label}）</small>`
+              : `運動直後のSAVAS<br><small>（${anchor === null ? '30分以内' : hhmm(anchor) + '・30分以内'}）</small>`)
         : '起床後<br><small>（朝食前）</small>',
       cup(sMorning),
       !detail
@@ -2745,22 +2745,14 @@ function updateLive(){
       `</small>`)
     .join('<br>') || '—';
   // 型としては毎日1つずつなので、追加列は品目名だけを出す（2つ以上のときだけ数量を添える）
-  /* 追加列。品目名だけを決まった順に並べ、2行の長さがそろう位置で折り返す。
-     数量は表の上の案内に出しているので、ここには書かない。 */
+  /* 追加列。品目名だけを決まった順に並べる（数量は表の上の案内に出す）。
+     改行は入れず、朝食・夕食の列と同じように列幅で折り返させる。 */
   const extraCell = plan => {
     const names = WEEK_EXTRA_ORDER.map(foodById)
       .filter(f => f && !f.slot && ((f.autoDaily || 0) + (plan[f.id] || 0)) > 0)
       .map(f => f.weekName || f.short)
       .concat(FOODS.filter(f => f.autoNatto).map(f => `（${f.short}）`));
-    if(!names.length) return '—';
-    if(names.length === 1) return names[0];
-    const len = a => a.join('・').length;
-    let at = 1, best = Infinity;
-    for(let i = 1; i < names.length; i++){
-      const d = Math.abs(len(names.slice(0, i)) - len(names.slice(i)));
-      if(d < best){ best = d; at = i; }
-    }
-    return names.slice(0, at).join('・') + '<br>' + names.slice(at).join('・');
+    return names.length ? names.join('・') : '—';
   };
   $('weekPlan').innerHTML =
     `<thead><tr><th>曜日</th><th>朝食</th><th>夕食</th><th>追加</th></tr></thead>` +
@@ -2874,8 +2866,8 @@ const WEEKLY_PLAN = {
 };
 const todayIdx = () => new Date().getDay();
 
-// 1週間の型の「追加」列に並べる順番（この順に出し、長さがそろう位置で2行に折り返す）
-const WEEK_EXTRA_ORDER = ['salad', 'olive', 'tomato', 'dressing', 'banana', 'egg'];
+// 1週間の型の「追加」列に並べる順番。折り返しは列幅に任せる
+const WEEK_EXTRA_ORDER = ['banana', 'tomato', 'salad', 'dressing', 'olive', 'egg'];
 
 // 毎日の初期値。
 //   autoPerMeal（ご飯）… 食事回数と同じ数
