@@ -252,6 +252,11 @@ th{background:#eef3fa;font-weight:700;white-space:nowrap}
 td.time{white-space:nowrap;font-weight:700;background:#fafcff;width:26%}
 td.amt{font-weight:700;color:var(--brand-d);width:20%}   /* 液体名を含む長文が折り返せるよう nowrap にしない */
 .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+/* 「くわしい説明を表示する」がオフのときの詰めた表示 */
+table.simple th,table.simple td{padding:7px 8px;font-size:.84rem;line-height:1.5}
+table.simple td.time{width:32%;font-size:.82rem}
+table.simple td.amt{width:16%;white-space:nowrap}
+table.simple td.time small{font-weight:400}
 /* 食べる順番の注意（内容欄の先頭に置く） */
 .order{
   display:block;background:#fff7ed;border-left:3px solid var(--accent);
@@ -579,10 +584,14 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
 
     <section>
       <h2>⑤ 時間帯別の摂取スケジュール</h2>
+      <div class="ex-head" style="margin-bottom:8px">
+        <input type="checkbox" id="schedDetail">
+        <label for="schedDetail">くわしい説明を表示する</label>
+      </div>
       <div class="table-wrap">
         <table>
           <thead>
-            <tr><th>時間帯</th><th>目安量</th><th>内容・ポイント</th></tr>
+            <tr><th>時間帯</th><th>目安量</th><th id="schedHead">内容・ポイント</th></tr>
           </thead>
           <tbody id="schedule"></tbody>
         </table>
@@ -607,7 +616,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.63';
+const APP_VERSION = '2026-09-01.64';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのたんぱく質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -857,6 +866,7 @@ function readState(){
   st.restSavas   = $('restSavas').checked;                    // 運動しなかった日もSAVASを摂るか
   st.twoDoses    = $('twoDoses').checked;                     // 夕方の2回目を許可するか
   st.savasAfterB = $('savasAfterB').checked;                  // 1回目を朝食のあとへ動かすか
+  st.schedDetail = $('schedDetail').checked;                  // ⑤にくわしい説明を出すか
   // 杯数の手動指定（空欄・範囲外は自動計算）
   st.fixSpoons   = (() => {
     const v = parseInt($('fixSpoons').value, 10);
@@ -1641,6 +1651,10 @@ function mealAdvice(bin, target, st, dayCovered){
 function renderSchedule(st, ex, target, sv, plan, dayCovered){
   const trained = ex.done > 0 || ex.cardio > 0;
 
+  /* 「くわしい説明を表示する」がオフのときは、食べるものだけを出す。
+     順番の案内・過不足の一言・就寝前の注意などは省く（⚠の警告だけは残す）。 */
+  const detail = st.schedDetail;
+
   // 自宅の食材（納豆・卵・トマトジュース）は外食に持ち込めないので「間食」でまとめて摂る。
   // その分は食事の枠から差し引いてから 朝／昼／晩 に配分する。
   // 自宅で夕食をとる日のサバ缶とご飯は夕食の枠に入るので、ここでは差し引かない。
@@ -1661,7 +1675,9 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   const dosed    = !!(sMorning && sMorning.spoons > 0);
   const cup = sn => {
     if(!sn || sn.spoons <= 0) return '—';
-    return `スプーン ${sn.spoons}杯<br><small>（水${WATER_ML}mlで溶かす<br>約${r1(sn.spoons * SPOON_G)}g）</small>`;
+    return detail
+      ? `スプーン ${sn.spoons}杯<br><small>（水${WATER_ML}mlで溶かす<br>約${r1(sn.spoons * SPOON_G)}g）</small>`
+      : `${sn.spoons}杯<br><small>約${r1(sn.spoons * SPOON_G)}g</small>`;
   };
 
   // 「② 今日の食事」の入力を朝・昼・晩へ自動配分
@@ -1926,7 +1942,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
     return [head, `約&nbsp;${s.move ? s.move.g : s.g}&nbsp;g`,
       body + (late
         ? `<br><span class="warnbox"><b>⚠ この時刻は就寝前にかかります。</b>` +
-          `運動を早い時間に移すか、品目を減らすほうが確実です。</span>`
+          (detail ? `運動を早い時間に移すか、品目を減らすほうが確実です。` : '') + `</span>`
         : '')];
   };
 
@@ -1949,14 +1965,16 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
       `間食<br><small>（${(at !== null && at !== undefined ? hhmm(at) + '・' : '')}自宅）</small>`,
       `約&nbsp;${snack.bin.total}&nbsp;g`,
       `<b>${snack.bin.label}</b>` +
-      `<br><small>${FOODS.filter(f => inSnack(f, st)).map(f => f.short).join('・')}は外食に持ち込めないため、この時間にまとめて摂ります。` +
-      (snack.span
-        ? `${snack.from}から${snack.to}まで${snack.span}時間空くので、その中間に置いています。`
+      (detail
+        ? `<br><small>${FOODS.filter(f => inSnack(f, st)).map(f => f.short).join('・')}は外食に持ち込めないため、この時間にまとめて摂ります。` +
+          (snack.span
+            ? `${snack.from}から${snack.to}まで${snack.span}時間空くので、その中間に置いています。`
+            : '') +
+          `</small>`
         : '') +
-      `</small>` +
       (late
         ? `<br><span class="warnbox"><b>⚠ この時刻は就寝前にかかります。</b>` +
-          `夕食の時刻を早めるか、間食を前倒ししてください。</span>`
+          (detail ? `夕食の時刻を早めるか、間食を前倒ししてください。` : '') + `</span>`
         : '')];
   };
 
@@ -1964,18 +1982,27 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   const meal = (raw, targetG, tail, k) => {
     const bin = viewOf(raw, k);
     // 食前のデキストリンを先に、店での食べる順番をそのあとに置く
-    const head = orderNote(bin,
-      (k === 'd' && homeDinnerDay(st)) || (k === 'b' && homeBreakfastDay(st)));
+    const head = detail
+      ? orderNote(bin, (k === 'd' && homeDinnerDay(st)) || (k === 'b' && homeBreakfastDay(st)))
+      : '';
     if(empty && !bin.addTotal){
-      return `<b>「② 今日の食事」が未入力です。</b>食べたもの（納豆・豆腐・サバ缶など）を入力すると、ここに ${targetG}g 分の配分が自動表示されます。`;
+      return detail
+        ? `<b>「② 今日の食事」が未入力です。</b>食べたもの（納豆・豆腐・サバ缶など）を入力すると、ここに ${targetG}g 分の配分が自動表示されます。`
+        : `<b>未入力</b>`;
     }
     if(bin.items.length){
-      return `${head}<b>${bin.label}</b> ＝ 合計 <b>${bin.total}g</b><br>${mealAdvice(bin, targetG, st, dayCovered)}${tail}`;
+      return detail
+        ? `${head}<b>${bin.label}</b> ＝ 合計 <b>${bin.total}g</b><br>${mealAdvice(bin, targetG, st, dayCovered)}${tail}`
+        : `<b>${bin.label}</b>`;
     }
     if(bin.addTotal){
-      return `${head}入力済みの食事はこの時間帯に配分されていません。<br>${mealAdvice(bin, targetG, st, dayCovered)}${tail}`;
+      return detail
+        ? `${head}入力済みの食事はこの時間帯に配分されていません。<br>${mealAdvice(bin, targetG, st, dayCovered)}${tail}`
+        : `<b>この時間帯の配分はありません</b>`;
     }
-    return `今日の入力分はすべて他の時間帯に配分されました。ここで摂るなら ${targetG}g 前後を目安に。${tail}`;
+    return detail
+      ? `今日の入力分はすべて他の時間帯に配分されました。ここで摂るなら ${targetG}g 前後を目安に。${tail}`
+      : `<b>—</b>`;
   };
 
   const postRow = [
@@ -1987,7 +2014,11 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
               : `運動直後<br><small>（${anchor === null ? '30分以内' : hhmm(anchor) + '・30分以内'}）</small>`)
         : '起床後<br><small>（朝食前）</small>',
       cup(sMorning),
-      trained
+      !detail
+        ? (trained || dosed
+            ? (postSplit.first.length ? `<b>あわせて ${labelOf(postSplit.first)}</b>` : `水${WATER_ML}mlで溶かす`)
+            : `<b>—</b>`)
+        : trained
         ? (postAt && !postAt.preWorkout
             ? `先に朝食を済ませてから摂る設定です。運動後に<b>吸収が高まる状態は数時間〜翌日まで続く</b>ので、` +
               `順番を入れ替えても効果は落ちません。朝食と次の食事の中間に置いて、1回の量が偏らないようにしています。` +
@@ -2065,7 +2096,10 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
       return [
         `2回目のSAVAS<br><small>（${at !== null ? hhmm(at) + '・' : ''}${SPLIT_GAP}時間後）</small>`,
         cup(sEvening),
-        `夕食で摂りきれない分をここで補います。<b>水${WATER_ML}ml</b>に溶かして飲んでください。` +
+        !detail
+          // SAVASは就寝前でも負担にならないので、簡潔表示では注意も出さない
+          ? (postSplit.second.length ? `<b>あわせて ${labelOf(postSplit.second)}</b>` : `水${WATER_ML}mlで溶かす`)
+          : `夕食で摂りきれない分をここで補います。<b>水${WATER_ML}ml</b>に溶かして飲んでください。` +
         (postSplit.second.length ? `<br><b>あわせて ${labelOf(postSplit.second)}</b>。` : '') +
         `<br><small>運動直後に全部まとめるより、1回30〜40gの範囲に収まるほうが筋肉の材料として使われます。</small>` +
         // SAVASは吸収が速く脂質も少ないため、就寝前でも食事のような負担にならない。
@@ -2079,6 +2113,8 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
     })()
   ].filter(Boolean);
 
+  $('schedule').closest('table').className = detail ? '' : 'simple';
+  $('schedHead').textContent = detail ? '内容・ポイント' : '内容';
   $('schedule').innerHTML = rows.map(r =>
     `<tr><td class="time">${r[0]}</td><td class="amt">${r[1]}</td><td>${r[2]}</td></tr>`
   ).join('');
@@ -2835,7 +2871,7 @@ const applyDailyDefaults = () => DAILY_IDS().forEach(id => { if($(id)) $(id).val
 const todayKey  = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
 
 function save(){
-  const d = {v:{}, c:{}, date:todayKey(), dv:DEFAULTS_VER, rest:$('restSavas').checked, two:$('twoDoses').checked, ab:$('savasAfterB').checked, ao:autoOverride, calc:calculated};
+  const d = {v:{}, c:{}, date:todayKey(), dv:DEFAULTS_VER, rest:$('restSavas').checked, two:$('twoDoses').checked, ab:$('savasAfterB').checked, sd:$('schedDetail').checked, ao:autoOverride, calc:calculated};
   ALL_IDS().forEach(id => d.v[id] = $(id).value);
   EXERCISES.forEach(e => d.c[e.id] = $('c_' + e.id).checked);
   try{ localStorage.setItem(KEY, JSON.stringify(d)); }catch(err){}
@@ -2885,6 +2921,7 @@ function load(){
     // 既定値を変えた版では、チェックの状態も新しい初期値に合わせる
     if(d.two  !== undefined && !staleEx) $('twoDoses').checked = !!d.two;
     if(d.ab   !== undefined) $('savasAfterB').checked = !!d.ab;
+    if(d.sd   !== undefined) $('schedDetail').checked = !!d.sd;
     // 手入力への切り替えはその日限り
     setAutoOverride(sameDay && !!d.ao);
     wasCalculated = !!d.calc;
@@ -2918,7 +2955,7 @@ const b64dec = str =>
   JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(str), c => c.charCodeAt(0))));
 
 function buildSettingsLink(){
-  const d = {v:{}, c:{}, date:todayKey(), rest:$('restSavas').checked, two:$('twoDoses').checked, ab:$('savasAfterB').checked};
+  const d = {v:{}, c:{}, date:todayKey(), rest:$('restSavas').checked, two:$('twoDoses').checked, ab:$('savasAfterB').checked, sd:$('schedDetail').checked};
   SETTING_IDS().concat(LINK_DAILY_IDS()).forEach(id => { if($(id)) d.v[id] = $(id).value; });
   EXERCISES.forEach(e => d.c[e.id] = $('c_' + e.id).checked);
   // クエリ（キャッシュ回避用の ?v= など）は引き継がず、素のURLに設定だけを付ける
@@ -2938,7 +2975,7 @@ function applySettingsFromHash(hash){
     if(d.rest !== undefined) $('restSavas').checked = !!d.rest;   // 設定なので日付に関係なく反映
     if(d.two  !== undefined) $('twoDoses').checked  = !!d.two;
     if(d.ab   !== undefined) $('savasAfterB').checked = !!d.ab;
-    if(d.ab   !== undefined) $('savasAfterB').checked = !!d.ab;
+    if(d.sd   !== undefined) $('schedDetail').checked = !!d.sd;
 
     // 日付を持たない古いリンクは設定のみ。当日のリンクなら食事・距離・種目も反映する
     const sameDay = d.date === todayKey();
