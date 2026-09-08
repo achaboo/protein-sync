@@ -228,7 +228,13 @@ table.nutri .num{width:6em;text-align:right;white-space:nowrap}
 table.nutri .num b{font-size:1.05rem}
 table.nutri .lim{width:7em;color:var(--sub);font-size:.78rem;white-space:nowrap}
 table.nutri .note{color:var(--sub);font-size:.76rem}
-table.nutri tr.ng .num b{color:var(--warn)}
+table.nutri tr.over .num b{color:var(--warn)}      /* 多い＝赤 */
+table.nutri tr.under .num b{color:#b45309}         /* 少ない＝橙 */
+table.nutri .tag{display:inline-block;padding:0 6px;margin-right:5px;border-radius:999px;
+  font-size:.72rem;font-weight:700;vertical-align:1px}
+table.nutri .tag.over{background:#fdeae6;color:var(--warn)}
+table.nutri .tag.under{background:#fdf0dc;color:#b45309}
+table.nutri .tag.ok{background:#e9f5ed;color:var(--ok)}
 .satbox .advice{margin:4px 0;font-size:.8rem}
 @media (max-width:560px){
   table.nutri .lim{display:none}                 /* 幅が足りないので目安の列は隠す */
@@ -601,7 +607,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.62';
+const APP_VERSION = '2026-09-01.63';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのたんぱく質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -750,6 +756,8 @@ const KCAL_PER_SPOON  = 36;
 const FIBER_TARGET = 21;
 // 脂質の目標範囲（総エネルギーの20〜30%）。脂質は1gあたり9kcal。
 const FAT_MIN_E = 0.20, FAT_MAX_E = 0.30, KCAL_PER_FAT = 9;
+// 炭水化物の目標範囲（総エネルギーの50〜65%）。炭水化物は1gあたり4kcal。
+const CARB_MIN_E = 0.50, CARB_MAX_E = 0.65, KCAL_PER_CARB = 4;
 
 /* 栄養成分表示に飽和脂肪酸が載っていない商品のための目安。
    脂質のうち飽和脂肪酸が占めるおよその割合（日本食品標準成分表より）。 */
@@ -1202,39 +1210,61 @@ function render(opts){
   const kcalGap  = Math.round(kcal.total - need);
   const top3     = t => t.items.slice(0, 3).map(x => `${x.name} ${x.g}g`).join('、') || '—';
 
-  // 目安に対して外れている行だけ色を変える
-  const row = (name, val, unit, limit, over, note) =>
-    `<tr${over ? ' class="ng"' : ''}><th>${name}</th>` +
+  /* 各行の判定を「多い／少ない／範囲内」の札で示す。
+     赤いだけでは多いのか少ないのか分からないため、色も分けている。 */
+  const TAG = {over:'多い', under:'少ない', ok:'ちょうどよい'};
+  const row = (name, val, unit, limit, state, note) =>
+    `<tr class="${state}"><th>${name}</th>` +
     `<td class="num"><b>${val}</b> ${unit}</td><td class="lim">${limit}</td>` +
-    `<td class="note">${note}</td></tr>`;
+    `<td class="note"><b class="tag ${state}">${TAG[state]}</b>${note}</td></tr>`;
+  const judge = (v, min, max) => v < min ? 'under' : (max !== null && v > max) ? 'over' : 'ok';
 
-  // 脂質は総エネルギーの20〜30%が目標範囲（1gあたり9kcal）
-  const fatMin = Math.round(need * FAT_MIN_E / KCAL_PER_FAT);
-  const fatMax = Math.round(need * FAT_MAX_E / KCAL_PER_FAT);
+  /* 脂質は総エネルギーの20〜30%、炭水化物は50〜65%が目標範囲。
+     割合は「実際に摂ったエネルギー」に対して見る。必要量を基準にすると、
+     エネルギーが足りない日はどの栄養素も自動的に「少ない」と出てしまうため。 */
+  const eBase = kcal.total > 0 ? kcal.total : need;
+  const fatMin = Math.round(eBase * FAT_MIN_E / KCAL_PER_FAT);
+  const fatMax = Math.round(eBase * FAT_MAX_E / KCAL_PER_FAT);
+  const carbMin = Math.round(eBase * CARB_MIN_E / KCAL_PER_CARB);
+  const carbMax = Math.round(eBase * CARB_MAX_E / KCAL_PER_CARB);
   const satPct = fat.total > 0 ? Math.round(sat.total / fat.total * 100) : 0;
+  const fatState  = judge(fat.total, fatMin, fatMax);
+  const carbState = judge(Math.round(carb.total), carbMin, carbMax);
+  const kcalState = kcalGap < -400 ? 'under' : kcalGap > 400 ? 'over' : 'ok';
 
   $('oSatBox').className = 'satbox' + (satOver > 0 || saltOver > 0 ? ' over' : '');
   $('oSatBox').innerHTML =
     `<table class="nutri"><tbody>` +
-    row('脂質', fat.total, 'g', `${fatMin}〜${fatMax}g`,
-        fat.total < fatMin || fat.total > fatMax,
-        `うち飽和脂肪酸 ${sat.total}g（${satPct}%）／` +
-        (fat.total < fatMin ? `目標の下限まで ${r1(fatMin - fat.total)}g`
-         : fat.total > fatMax ? `目標の上限を ${r1(fat.total - fatMax)}g 超過`
-         : `目標の範囲内`)) +
-    row('飽和脂肪酸', sat.total, 'g', `${SAT_LIMIT}g 以下`, satOver > 0,
-        satOver > 0 ? `+${satOver}g／${top3(sat)}` : `残り ${r1(-satOver)}g`) +
-    row('食塩相当量', salt.total, 'g', `${SALT_LIMIT}g 未満`, saltOver > 0,
-        saltOver > 0 ? `+${saltOver}g／${top3(salt)}` : `残り ${r1(-saltOver)}g`) +
-    row('食物繊維', fiber.total, 'g', `${FIBER_TARGET}g 以上`, fiber.total < FIBER_TARGET,
-        fiber.total < FIBER_TARGET ? `${r1(FIBER_TARGET - fiber.total)}g 不足／${top3(fiber)}` : `${top3(fiber)}`) +
-    row('炭水化物', Math.round(carb.total), 'g', '—', false, top3(carb)) +
-    row('エネルギー', kcal.total.toLocaleString(), 'kcal', `約${need.toLocaleString()}kcal`,
-        Math.abs(kcalGap) > 400,
-        `${kcalGap >= 0 ? '+' : ''}${kcalGap.toLocaleString()}kcal` +
+    row('脂質', fat.total, 'g', `${fatMin}〜${fatMax}g`, fatState,
+        (fatState === 'under' ? `目標まで あと ${r1(fatMin - fat.total)}g。`
+         : fatState === 'over' ? `目標を ${r1(fat.total - fatMax)}g 超えています。`
+         : '') +
+        `うち飽和脂肪酸 ${sat.total}g（${satPct}%）`) +
+    row('飽和脂肪酸', sat.total, 'g', `${SAT_LIMIT}g 以下`, satOver > 0 ? 'over' : 'ok',
+        satOver > 0 ? `目安を ${satOver}g 超えています。${top3(sat)}`
+                    : `目安まで あと ${r1(-satOver)}g。${top3(sat)}`) +
+    row('食塩相当量', salt.total, 'g', `${SALT_LIMIT}g 未満`, saltOver > 0 ? 'over' : 'ok',
+        saltOver > 0 ? `目標を ${saltOver}g 超えています。${top3(salt)}`
+                     : `目標まで あと ${r1(-saltOver)}g。${top3(salt)}`) +
+    row('食物繊維', fiber.total, 'g', `${FIBER_TARGET}g 以上`,
+        fiber.total < FIBER_TARGET ? 'under' : 'ok',
+        (fiber.total < FIBER_TARGET
+          ? `目標まで あと ${r1(FIBER_TARGET - fiber.total)}g。`
+          : `目標を満たしています（+${r1(fiber.total - FIBER_TARGET)}g）。`) + top3(fiber)) +
+    row('炭水化物', Math.round(carb.total), 'g', `${carbMin}〜${carbMax}g`, carbState,
+        (carbState === 'under' ? `目標まで あと ${carbMin - Math.round(carb.total)}g。`
+         : carbState === 'over' ? `目標を ${Math.round(carb.total) - carbMax}g 超えています。`
+         : '') + top3(carb)) +
+    row('エネルギー', kcal.total.toLocaleString(), 'kcal', `約${need.toLocaleString()}kcal`, kcalState,
+        // 札が「ちょうどよい」のときに強い言い方をしないよう、判定に合わせる
+        (kcalState === 'ok'
+          ? (kcalGap === 0 ? `必要量ちょうどです。`
+             : `おおむね必要量どおりです（${Math.abs(kcalGap).toLocaleString()}kcal ${kcalGap < 0 ? '少なめ' : '多め'}）。`)
+          : kcalGap < 0 ? `必要量に ${Math.abs(kcalGap).toLocaleString()}kcal 足りません。`
+          : `必要量を ${kcalGap.toLocaleString()}kcal 上回っています。`) +
         // 体脂肪1kg ≒ 7,200kcal。差がこのまま続いたときの週あたりの体重変化
         (Math.abs(kcalGap) > 100
-          ? `／この差が続くと週 約${r1(Math.abs(kcalGap) * 7 / 7200)}kg ${kcalGap < 0 ? '減' : '増'}`
+          ? `このままなら週 約${r1(Math.abs(kcalGap) * 7 / 7200)}kg ${kcalGap < 0 ? '減' : '増'}`
           : '') +
         `（基礎代謝 ${calcBMR(st).toLocaleString()} × 1.50 ＋ 運動 ${calcEnergy(st, ex).kcal}）`) +
     `</tbody></table>` +
