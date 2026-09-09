@@ -631,7 +631,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.78';
+const APP_VERSION = '2026-09-01.79';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのたんぱく質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -676,13 +676,13 @@ const FOODS = [
   {id:'sk_gyudon',    shop:'すき家',  name:'牛丼（並）',           short:'牛丼',         weekName:'すき家<br>牛丼',   note:'1食 約21.7g',
    price:430, p:21.7, unit:'食', sat:9.4, salt:2.4, carbG:99.8, fiber:4.3, kcal:695, fat:23.4, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
   {id:'mt_gyuzara',   shop:'松屋',    name:'得朝牛皿定食',         short:'得朝牛皿定食',   weekName:'松屋<br>得朝牛皿定食', note:'1食 約13.5g',
-   price:400, p:13.5, unit:'食', sat:6.6, salt:3.2, carbG:88.3, fiber:4.0, kcal:568, fat:16.4, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
+   price:400, p:13.5, unit:'食', sat:6.6, salt:3.2, carbG:88.3, fiber:4.0, kcal:568, fat:16.4, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, teishoku:true},
   {id:'mt_rice',      shop:'松屋',    name:'ライス（並盛）',       short:'松屋ライス',     note:'1杯 約5.1g',
-   ruleNote:'エネルギーが足りない日のおかわり用<br>（その店のメニューを食べる日だけ）',
+   ruleNote:'エネルギーが足りない日のおかわり用<br>（その店の定食を食べる日だけ）',
    price:0, p:5.1, unit:'杯', sat:0.1, salt:0, carbG:76.1, fiber:3.3, kcal:344, fat:0.6,
    slots:['d'], lock:true, shopSlot:true, fixedMenu:true, carb:true, autoEnergy:true},
   {id:'mt_rice_l',    shop:'松屋',    name:'ライス（大盛）',       short:'松屋ライス大盛', note:'1杯 約7.6g',
-   ruleNote:'エネルギーが足りない日のおかわり用<br>（その店のメニューを食べる日だけ）',
+   ruleNote:'エネルギーが足りない日のおかわり用<br>（その店の定食を食べる日だけ）',
    price:0, p:7.6, unit:'杯', sat:0.2, salt:0, carbG:113.2, fiber:4.9, kcal:512, fat:0.9,
    slots:['d'], lock:true, shopSlot:true, fixedMenu:true, carb:true},
   {id:'mt_gyumeshi',  shop:'松屋',    name:'牛めし（並）',         short:'牛めし',       weekName:'松屋<br>牛めし',   note:'1食 約17.1g',
@@ -693,16 +693,16 @@ const FOODS = [
    slots:['d'], lock:true, slot:'d', fixedMenu:true},
   {id:'ys_hamegg',    shop:'吉野家',  name:'ハムエッグ納豆定食',   short:'ハムエッグ納豆定食',
    weekName:'吉野家<br>ﾊﾑｴｯｸﾞ納豆定食', note:'1食 約24.1g（卵1個ぶん）',
-   price:468, p:24.1, unit:'食', sat:4.2, salt:2.6, carbG:94.2, fiber:7.6, kcal:581, fat:13.0, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1},
+   price:468, p:24.1, unit:'食', sat:4.2, salt:2.6, carbG:94.2, fiber:7.6, kcal:581, fat:13.0, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1, teishoku:true},
   {id:'ys_saba',      shop:'吉野家',  name:'塩さば得朝定食',       short:'塩さば得朝定食',
    weekName:'吉野家<br>塩さば得朝定食', note:'1食 約31.9g（卵1個ぶん）',
-   price:630, p:31.9, unit:'食', sat:6.9, salt:3.4, carbG:92.2, fiber:7.9, kcal:744, fat:27.7, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1},
+   price:630, p:31.9, unit:'食', sat:6.9, salt:3.4, carbG:92.2, fiber:7.9, kcal:744, fat:27.7, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1, teishoku:true},
   {id:'ys_rice',      shop:'吉野家',  name:'ご飯（並盛）',         short:'吉野家ご飯',     note:'1杯 約5.5g',
-   ruleNote:'エネルギーが足りない日のおかわり用<br>（その店のメニューを食べる日だけ）',
+   ruleNote:'エネルギーが足りない日のおかわり用<br>（その店の定食を食べる日だけ）',
    price:0, p:5.5, unit:'杯', sat:0.1, salt:0, carbG:81.6, fiber:3.5, kcal:343, fat:0.7,
    slots:['d'], lock:true, shopSlot:true, fixedMenu:true, carb:true, autoEnergy:true},
   {id:'ys_rice_l',    shop:'吉野家',  name:'ご飯（大盛）',         short:'吉野家ご飯大盛', note:'1杯 約7.5g',
-   ruleNote:'エネルギーが足りない日のおかわり用<br>（その店のメニューを食べる日だけ）',
+   ruleNote:'エネルギーが足りない日のおかわり用<br>（その店の定食を食べる日だけ）',
    price:0, p:7.5, unit:'杯', sat:0.2, salt:0, carbG:111.3, fiber:4.8, kcal:468, fat:0.9,
    slots:['d'], lock:true, shopSlot:true, fixedMenu:true, carb:true},
   {id:'ys_butadon',   shop:'吉野家',  name:'豚丼（並）',           short:'豚丼',         weekName:'吉野家<br>豚丼',   note:'1食 約14.4g',
@@ -2405,10 +2405,10 @@ const mealSlotsOf = (f, st) => {
   return at;
 };
 const atMeal = (f, st) => !!(f.home && mealSlotsOf(f, st).length);
-// ご飯のおかわりは「同じ店のメニューを食べる日」だけ。その料理と同じ時間帯に置く。
-// 目印にするのは定食・丼（carb）で、単品のみそ汁やご飯自身は数えない。
+// ご飯のおかわりができるのは「同じ店の定食を食べる日」だけ（teishoku）。
+// 丼・牛めしは対象外。置く時間帯はその定食と同じ枠にする。
 const shopMenuOf = (f, st) => FOODS.find(x =>
-  x.shop === f.shop && x.slot && x.carb && !x.shopSlot &&
+  x.shop === f.shop && x.slot && x.teishoku &&
   Math.round((st.foods && st.foods[x.id]) || 0) > 0);
 const atShop = (f, st) => !!(f.shop && shopMenuOf(f, st));
 // その日この食材を置ける時間帯
