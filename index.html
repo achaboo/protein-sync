@@ -632,7 +632,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.80';
+const APP_VERSION = '2026-09-01.81';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのたんぱく質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -679,13 +679,8 @@ const FOODS = [
   {id:'mt_gyuzara',   shop:'松屋',    name:'得朝牛皿定食',         short:'得朝牛皿定食',   weekName:'松屋<br>得朝牛皿定食', note:'1食 約13.5g',
    price:400, p:13.5, unit:'食', sat:6.6, salt:3.2, carbG:88.3, fiber:4.0, kcal:568, fat:16.4, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, teishoku:true},
   {id:'mt_rice',      shop:'松屋',    name:'ライス（並盛）',       short:'松屋ライス',     note:'1杯 約5.1g',
-   ruleNote:'エネルギーが足りない日のおかわり用<br>（その店の定食を食べる日だけ）',
    price:0, p:5.1, unit:'杯', sat:0.1, salt:0, carbG:76.1, fiber:3.3, kcal:344, fat:0.6,
    slots:['d'], lock:true, shopSlot:true, fixedMenu:true, carb:true, autoEnergy:true},
-  {id:'mt_rice_l',    shop:'松屋',    name:'ライス（大盛）',       short:'松屋ライス大盛', note:'1杯 約7.6g',
-   ruleNote:'エネルギーが足りない日のおかわり用<br>（その店の定食を食べる日だけ）',
-   price:0, p:7.6, unit:'杯', sat:0.2, salt:0, carbG:113.2, fiber:4.9, kcal:512, fat:0.9,
-   slots:['d'], lock:true, shopSlot:true, fixedMenu:true, carb:true},
   {id:'mt_gyumeshi',  shop:'松屋',    name:'牛めし（並）',         short:'牛めし',       weekName:'松屋<br>牛めし',   note:'1食 約17.1g',
    price:460, p:17.1, unit:'食', sat:11.6, salt:3.0, carbG:85.5, fiber:3.9, kcal:687, fat:28.9, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
   {id:'mt_miso',      shop:'松屋',    name:'みそ汁',               short:'みそ汁',       weekName:'松屋<br>みそ汁',
@@ -699,13 +694,8 @@ const FOODS = [
    weekName:'吉野家<br>塩さば得朝定食', note:'1食 約31.9g（卵1個ぶん）',
    price:630, p:31.9, unit:'食', sat:6.9, salt:3.4, carbG:92.2, fiber:7.9, kcal:744, fat:27.7, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1, teishoku:true},
   {id:'ys_rice',      shop:'吉野家',  name:'ご飯（並盛）',         short:'吉野家ご飯',     note:'1杯 約5.5g',
-   ruleNote:'エネルギーが足りない日のおかわり用<br>（その店の定食を食べる日だけ）',
    price:0, p:5.5, unit:'杯', sat:0.1, salt:0, carbG:81.6, fiber:3.5, kcal:343, fat:0.7,
    slots:['d'], lock:true, shopSlot:true, fixedMenu:true, carb:true, autoEnergy:true},
-  {id:'ys_rice_l',    shop:'吉野家',  name:'ご飯（大盛）',         short:'吉野家ご飯大盛', note:'1杯 約7.5g',
-   ruleNote:'エネルギーが足りない日のおかわり用<br>（その店の定食を食べる日だけ）',
-   price:0, p:7.5, unit:'杯', sat:0.2, salt:0, carbG:111.3, fiber:4.8, kcal:468, fat:0.9,
-   slots:['d'], lock:true, shopSlot:true, fixedMenu:true, carb:true},
   {id:'ys_butadon',   shop:'吉野家',  name:'豚丼（並）',           short:'豚丼',         weekName:'吉野家<br>豚丼',   note:'1食 約14.4g',
    price:465, p:14.4, unit:'食', sat:7.1, salt:2.3, carbG:88.1, fiber:3.9, kcal:576, fat:18.6, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
   {id:'nk_oyako',     shop:'なか卯',  name:'親子丼（並）',         short:'親子丼',
