@@ -51,6 +51,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Protein Sync 一日のたんぱく質 設計ツール</title>
+<!-- アイコン。タブ用の32pxは data: で埋め込んであるので、
+     このHTML1枚を持ち出しても（file:// でも）表示される。
+     iOSのホーム画面は data: を読まないため、apple-touch-icon だけは実ファイル。
+     四隅は透明にしてあるが、iOSは透明を黒く塗るうえ自分で角を丸めるので、
+     apple-touch-icon.png だけは角まで塗った不透明の正方形にしている。 -->
+<link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAKtElEQVR42l2XaZBdxXXHf9193/5m5s2m0WgW7cJa0CAkS4hVWBQopZIJURSLmCIKThzK2IqD7XxwqiJim1SFGCc4dsplEgpEbEOKYomBsGkQJQVhIYQUyaDRMqMRI81o9pk3b7v3dp98ePOeFPf70ve+vn1On/6f//kfBcAe0fydchqo/97IfQXf7XLOXu+szYg4BSAoEAEFoDAaECm/0grnQPj/o7xUiVZ6ynje0bjH3rE9LXuVQio2VWWy7PunFg6UGp70xWwWZ1HOR4mDsp3Z3coPSiuCggU3+16BF9MopX5n/ewzGkwUrQ0ewXutKvvnvT9YcoY9ohWIWv79wc6+gjkY6ES7Ko5bUEpppSo7ighKgVYOcQrfF25fEucrN6RZOTfCr47m+FF3Fh0BpQUnGlBU/BABRBwKkXjGRGzhcluam899t+WsFkH158KnA5NsV8XxAKUNSmmR2R2oGBZKMzX4ObhndZzuh1r48toU//7+NNtWJGhrUPglKGVTiAhw5U6UArTWKG10cTIIVKJlcLK0d8+74pmf8uCOPInvUJyyaO2VP6geHq1C/FIMEc09d71Ic3Mff3vjTVhCHnltnH95dYyjI4aahn7u3b6XVLpIb38n1nqYSIhIea/yDwBDULAumu48fn7yjGHjN5+wyluICwXQKMWsbZQK8QtJ5jYP8vCuH2ME3n73VtZ0ZljQYHjgP0YxKUM64RjLpjnZ007XqlPcdONH9PV1MDNdgxcNEUwVlFLBifJwNmg05saH/9k5lwCnQCmlypHXyhEU47S1DvDN+3/Mf72zlVde24GvI3w0WKQj4/F2T4Ef3t1AKIqjFwKmcvUcP3o9RRvhrq2H6OudR34miTYWRF8BhFYKsUobGrWFesSWA68qwBWc1cRiRb76R//Gs698iQ8/vIVYwxhCwKWRgKGsZVGjxw/fmeLsaEDJd0ipAKkJTny0kjff2sgtW05iVIgSUEqu5KYAzmFF1egyYKoZhohgtCPMp9i2+RVOnr6Gk8duIFo/Rqmo6ZoX5Sc7G9l6TZwtyxOEJeH+tWne+8tWHv39RhY3xFCpLOc/6eD8Z600rbyIPwEoxxVUlrNKrEN5f33hKg/KyeOcJpXIsvu+n/BPzzxEsZQCsfx8ZzMPrK8hDB1DWUu25Git88gkzCxJKfrGAtY9fpHJvJBMCts3GIaH4rx1tlQGo55NrtmD6yqTVFCvLTaXYGF7L2fPLyA3PBcnPivnxbh/bYpjFwp4nqa9PsLwVIA3C9jxvOVvXhxkYWOExY0eznfc/bk0R48ZBiZ81ndECQOHKnNqdWhcOTRKQOEoFSKk68aZkxlmIpdm4ZIeZCpOOiqM5Rw/OzDJgZ4850Z8rCiePzLN/k+zfPtXl4gaCKxw3/UpVM7n8+0e391ax/2fT1MTVSAKpHL48lxXcw7BhZq6VI6NG1/nxOQYRy6VWLyqm/qm82xZkqKl1sNZy6vHpoh6ihWtUe5ckaI+ZWhMapTWRIzij9fVIMbRnDbsXFfDl9fV0H22hPEqxqXK1JpqzjtsMcKSBT18MloiFTGs7pzi44EYmXm9zEnUcuZykdePF5jTFCeuhWOfFekbC1g6J8qmrgaePFjgmUOTZJKGFZ1xUhEAR/eZIi4fEjHM0nOVZNHVmSjwHGNjTbTUlUinZ7h26TBtmYDsxXkMTfYwWXAMZ+FAn8/AeEAqpgmtkPcdzx3NMdDvc2IwwDPQUWeIJlP8dlzz/AmLk9QVU+XiAAJeBQxOFF40YGColWTNWvLeCIcOzGEibGZ+Mkcy/wsaUo+yaH6Uzozh2o442ZJQCoSm2ghaKZSnuG1pAlD8ZlDx5mv7ud0c4ZGJw3yhaQ3fyj+AMXYW8ApRUnagHJLyvVijGTi2iB9l3+CXiyNk+qPUrtX84fL97PzXT9EqycuHxynkSxQCRyKiKBVCus8U0XGP2kSEpw5N8feRp3gw+2sksLya3MbMSIihhOgISqsqJXj8zn0EOsEt6jBfGX+VHX4tpybO0XdvCy3pkMPncygdkI4qNi5u5oGb6pkpWn7+7hgvH56gpS7Bzw5McW//P/DF+K9xpTR7F3yPNffcyYv7Idg3RDwK9ipS1CKuQoE4FEZKvB9fyZt1m5iYaOa36xfwpY3v8tjB34OZuYi1PHhHPc45ntg3wtOHJqit9XhoSyOXhoXhA2/wRdfNx8XlPB75Brfdfp4us4nlGSkLGIQK+wqgvG/3VwoU4gQlglUKV/T4QuuH7Nn6DO98vJ7fpGupifm89J+3c/M1c+iZyHK5bwaAlkUpVjWk2Hc8y4auAXQUDvUtQicaOf219yiK4q5nb2ZwOovnaVy13M46AIKny5rPOkAcIppEJIeEjpnpZhqbB9lyxz4aGsc48ekiuqKbuDgUwQq0zbF0D/dQ1+4YCeZy7ngzKmtRElKTrqcUKgqFabyYqWrIqrzzvnVeRMAWHFgHMU0srmedKS+MaJ9C1oMgSkvHIMuuPcuZnrno8Q7q0h6FmovUt43Tc2Ix+f56SPtEawJEDFZCtAJjPKxVaC0oDdbpcu3Rf9UncU+x47oUzWnDS8eynPusBJ4uJ2nJgYGVnTHOjRYpThqY1Kxd5/G5Vo9fvDkJiQj4MRavOsdNG05y8Mhqek8vRaV9pBQvo80pdLKIC6Lge+hUAa0dRtbtfqQpbfjvv5hDWAz4xqYMUyXLyvYoqajivhtryRVCune3USg6knHHrV0RPOPYtipNPGXY3JUm743w9a8+yfR4Gq1CElGf0DnWrzlBR9sgK645zYWLTaxcdpYb1x/hs4tz8X0PD+ewoWNo2jIyY1lt4PHtTZy9XCIV05y+7PMna+cylbds6IzytVsz5eqXs/ih8IO7Gwmd0DW3kxf2XUfXkjFsoNm+7W1GRlM0ZGZIJQOc03QtO4VnAk71zMdQRLkEmtBNSCh0ZIxoo/mDnw4wNBny2FvjOFF80FugGDjGsiHWQSahOdaX5/JUQGe9x/lRn6cOTLO83TI02IAD1qw+zSenO1i14gLd/3MdQ6MZ3vvgWhZ2DhKGht7eNvELGm2DaaOv//rmSDS2qDWj3J89O6wvj1lWzk/w0skCZ0cD7t1Qz8MvjHJx2hGJGF7/JE866fHc0RwTJeF/LwWcGnVczgV4bR/QWOvz/Mt30NgwiRXN/oM34CVhZKKBoyeXMTlVy7p1p9yJnlUqzHvvq4bdp7dPhIkXpJizXipiUBAWy9lA4MACEV1VTNVhFLiyCsIDAg0SBV9R3zLM7l2/5OkXttHfvxC82eLjgBAIlKXGM03x7E4lIir50Ok3gnjjneJP+igVNVrhFBijK7qh0uddrd6qvY/Mik6peCgW3zcgBi9aFqUiUu4MXBhIrD4SKU7szz+xdLNWCjpT8T/VfrZXopkoIta6skyyIlgB5wTrBCeCk/LBRcCKKv8vghWFcwonGkcEL6KJRC2IQgTBKeec2DDSGDF+fmBBjbdLKUSzB9Xzj/Mvdarp22I297ryEoZIUsuseqyevFJCkepdVOKhtOKKpJ9drmebUqUQ5SnxElp5KRO3+bcXxPK3fProon72VGJ6VXve+J3+HXmndlnn1juk0THbU1WdkKvvpEynqipyr7TmSpVrCyJa6TGN/ihl1NMTj7U/Z6+y+X8krDoaNF9FzwAAAABJRU5ErkJggg==">
+<link rel="icon" type="image/png" sizes="192x192" href="favicon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Protein Sync">
 <style>
 :root{
   --bg:#f2f5f9; --card:#ffffff; --ink:#1c2530; --sub:#5d6b7c; --line:#e2e8f0;
@@ -632,7 +641,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.85';
+const APP_VERSION = '2026-09-01.86';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのたんぱく質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
