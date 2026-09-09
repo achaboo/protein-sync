@@ -236,6 +236,9 @@ table.nutri .tag.over{background:#fdeae6;color:var(--warn)}
 table.nutri .tag.under{background:#fdf0dc;color:#b45309}
 table.nutri .tag.ok{background:#e9f5ed;color:var(--ok)}
 .satbox .advice{margin:4px 0;font-size:.8rem}
+.satbox .advice ul.engy{margin:5px 0 4px;padding-left:1.2em}
+.satbox .advice ul.engy li{margin:2px 0}
+.satbox .advice small{color:var(--muted)}
 @media (max-width:560px){
   table.nutri .lim{display:none}                 /* 幅が足りないので目安の列は隠す */
   table.nutri th{width:5.5em;font-size:.76rem}
@@ -628,7 +631,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.76';
+const APP_VERSION = '2026-09-01.77';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのたんぱく質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -1234,7 +1237,63 @@ function render(opts){
   const kcalGap  = Math.round(kcal.total - need);
   const top3     = t => t.items.slice(0, 3).map(x => `${x.name} ${x.g}g`).join('、') || '—';
 
-  /* 各行の判定を「多い／少ない／範囲内」の札で示す。
+  /* エネルギーが足りないときに、②の品目から手早く足せるものを挙げる。
+   たんぱく質を含む品目を足すと自動計算の納豆がそのぶん減るため、実際に増えるのは
+   「その品目のkcal − 減る納豆のkcal」。この正味で並べないと、足しても増えない品目
+   （卵）やかえって減る品目（サバ缶）を勧めてしまう。納豆が0パックの日は相殺が
+   起きないので、そのままのkcalで見る。 */
+const ENERGY_MIN_NET = 20;   // これ未満しか増えない品目は挙げない
+const SAT_PER_UNIT_MIN  = 0.4;  // 飽和脂肪酸の残り枠で数を絞る対象（1単位あたり）
+const SALT_PER_UNIT_MIN = 0.2;  // 食塩の残り枠で数を絞る対象（1単位あたり）
+const ENERGY_OVER_OK    = 150;  // この量までの超過は書き添えない
+function energyAdvice(st, gap, satTotal, saltTotal){
+  const natto    = FOODS.find(f => f.autoNatto);
+  const nattoQty = natto ? Math.round(st.foods[natto.id] || 0) : 0;
+  const offset   = nattoQty > 0 && natto ? natto.kcal / natto.p : 0;   // たんぱく質1gあたり減るkcal
+  const netOf    = f => Math.round(f.kcal - f.p * offset);
+  // 店のメニュー（朝食・夕食）は曜日で決まっているので、増やす候補にはしない
+  const cands = FOODS.filter(f => !f.shop && !f.autoNatto && f.kcal > 0 && roomFor(f, st) > 0)
+                     .map(f => ({f, net:netOf(f)}))
+                     .filter(x => x.net >= ENERGY_MIN_NET)
+                     .sort((a, b) => b.net - a.net)
+                     .slice(0, 3);
+  if(!cands.length) return '';
+  const rows = cands.map(({f, net}) => {
+    // 飽和脂肪酸と食塩の残り枠を超えない数までにする。1単位の量がわずかな品目
+    // （ご飯0.1g・バナナ0.1gなど）は、枠の計算に入れると数え負けするので対象外。
+    let cap = roomFor(f, st);
+    if(f.sat  >= SAT_PER_UNIT_MIN)  cap = Math.min(cap, Math.floor((SAT_LIMIT  - satTotal)  / f.sat));
+    if(f.salt >= SALT_PER_UNIT_MIN) cap = Math.min(cap, Math.floor((SALT_LIMIT - saltTotal) / f.salt));
+    if(cap < 1) return '';
+    const n    = Math.min(cap, Math.ceil(gap / net));
+    const left = gap - n * net;
+    const add  = [];
+    if(f.sat)  add.push(`飽和+${r1(n * f.sat)}g`);
+    if(f.salt) add.push(`食塩+${r1(n * f.salt)}g`);
+    return `<li><b>${f.short} ${r1(n)}${f.unit}</b>（+${(n * net).toLocaleString()}kcal` +
+           `／${(n * f.price).toLocaleString()}円${add.length ? '／' + add.join('・') : ''}）` +
+           (left > 0
+             ? `<br><small>他の目標に収まるのはここまでです。あと ${Math.round(left).toLocaleString()}kcal 残ります。</small>`
+             : left < -ENERGY_OVER_OK
+               ? `<br><small>1単位が大きいため、必要量を ${Math.round(-left).toLocaleString()}kcal 上回ります。</small>`
+               : '') + `</li>`;
+  }).filter(Boolean).join('');
+  if(!rows) return '';
+  // 相殺で増えない品目があるなら、勧めない理由も書いておく
+  const flat = nattoQty > 0
+    ? FOODS.filter(f => !f.shop && !f.autoNatto && f.kcal > 0 && netOf(f) < ENERGY_MIN_NET && f.p >= 5)
+           .map(f => f.short)
+    : [];
+  return `<div class="advice"><b>エネルギー：あと ${gap.toLocaleString()}kcal。</b>` +
+         `この品目だけで埋めるなら次のとおりです（組み合わせても構いません）。` +
+         `<ul class="engy">${rows}</ul>` +
+         (flat.length
+           ? `<small>${flat.join('・')}は、足すと自動計算の納豆（1P 99kcal）がそのぶん減るため、` +
+             `合計はほとんど増えません。エネルギーを増やすなら、たんぱく質の少ない品目を選びます。</small>`
+           : '') + `</div>`;
+}
+
+/* 各行の判定を「多い／少ない／範囲内」の札で示す。
      赤いだけでは多いのか少ないのか分からないため、色も分けている。 */
   const TAG = {over:'多い', under:'少ない', ok:'ちょうどよい'};
   const row = (name, val, unit, limit, state, note) =>
@@ -1292,6 +1351,7 @@ function render(opts){
           : '') +
         `（基礎代謝 ${calcBMR(st).toLocaleString()} × 1.50 ＋ 運動 ${calcEnergy(st, ex).kcal}）`) +
     `</tbody></table>` +
+    (kcalState === 'under' ? energyAdvice(st, -kcalGap, sat.total, salt.total) : '') +
     (satOver > 0 && satAlts.length
       ? `<div class="advice">飽和脂肪酸：${satTop.short}（${satTop.sat}g）を${satAlts.join('／')}に替えると下がります。</div>`
       : '') +
