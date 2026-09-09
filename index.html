@@ -631,7 +631,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.77';
+const APP_VERSION = '2026-09-01.78';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのたんぱく質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -677,6 +677,14 @@ const FOODS = [
    price:430, p:21.7, unit:'食', sat:9.4, salt:2.4, carbG:99.8, fiber:4.3, kcal:695, fat:23.4, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
   {id:'mt_gyuzara',   shop:'松屋',    name:'得朝牛皿定食',         short:'得朝牛皿定食',   weekName:'松屋<br>得朝牛皿定食', note:'1食 約13.5g',
    price:400, p:13.5, unit:'食', sat:6.6, salt:3.2, carbG:88.3, fiber:4.0, kcal:568, fat:16.4, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true},
+  {id:'mt_rice',      shop:'松屋',    name:'ライス（並盛）',       short:'松屋ライス',     note:'1杯 約5.1g',
+   ruleNote:'エネルギーが足りない日のおかわり用<br>（その店のメニューを食べる日だけ）',
+   price:0, p:5.1, unit:'杯', sat:0.1, salt:0, carbG:76.1, fiber:3.3, kcal:344, fat:0.6,
+   slots:['d'], lock:true, shopSlot:true, fixedMenu:true, carb:true, autoEnergy:true},
+  {id:'mt_rice_l',    shop:'松屋',    name:'ライス（大盛）',       short:'松屋ライス大盛', note:'1杯 約7.6g',
+   ruleNote:'エネルギーが足りない日のおかわり用<br>（その店のメニューを食べる日だけ）',
+   price:0, p:7.6, unit:'杯', sat:0.2, salt:0, carbG:113.2, fiber:4.9, kcal:512, fat:0.9,
+   slots:['d'], lock:true, shopSlot:true, fixedMenu:true, carb:true},
   {id:'mt_gyumeshi',  shop:'松屋',    name:'牛めし（並）',         short:'牛めし',       weekName:'松屋<br>牛めし',   note:'1食 約17.1g',
    price:460, p:17.1, unit:'食', sat:11.6, salt:3.0, carbG:85.5, fiber:3.9, kcal:687, fat:28.9, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
   {id:'mt_miso',      shop:'松屋',    name:'みそ汁',               short:'みそ汁',       weekName:'松屋<br>みそ汁',
@@ -689,6 +697,14 @@ const FOODS = [
   {id:'ys_saba',      shop:'吉野家',  name:'塩さば得朝定食',       short:'塩さば得朝定食',
    weekName:'吉野家<br>塩さば得朝定食', note:'1食 約31.9g（卵1個ぶん）',
    price:630, p:31.9, unit:'食', sat:6.9, salt:3.4, carbG:92.2, fiber:7.9, kcal:744, fat:27.7, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1},
+  {id:'ys_rice',      shop:'吉野家',  name:'ご飯（並盛）',         short:'吉野家ご飯',     note:'1杯 約5.5g',
+   ruleNote:'エネルギーが足りない日のおかわり用<br>（その店のメニューを食べる日だけ）',
+   price:0, p:5.5, unit:'杯', sat:0.1, salt:0, carbG:81.6, fiber:3.5, kcal:343, fat:0.7,
+   slots:['d'], lock:true, shopSlot:true, fixedMenu:true, carb:true, autoEnergy:true},
+  {id:'ys_rice_l',    shop:'吉野家',  name:'ご飯（大盛）',         short:'吉野家ご飯大盛', note:'1杯 約7.5g',
+   ruleNote:'エネルギーが足りない日のおかわり用<br>（その店のメニューを食べる日だけ）',
+   price:0, p:7.5, unit:'杯', sat:0.2, salt:0, carbG:111.3, fiber:4.8, kcal:468, fat:0.9,
+   slots:['d'], lock:true, shopSlot:true, fixedMenu:true, carb:true},
   {id:'ys_butadon',   shop:'吉野家',  name:'豚丼（並）',           short:'豚丼',         weekName:'吉野家<br>豚丼',   note:'1食 約14.4g',
    price:465, p:14.4, unit:'食', sat:7.1, salt:2.3, carbG:88.1, fiber:3.9, kcal:576, fat:18.6, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true},
   {id:'nk_oyako',     shop:'なか卯',  name:'親子丼（並）',         short:'親子丼',
@@ -820,7 +836,7 @@ $('foods').innerHTML = FOODS.map(f => `
       `<small>${f.note}${/）$/.test(f.note) ? '' : ' '}<b>${f.price ? f.price + '円' : '無料'}</b>` +
       `${f.ruleNote ? `<br>${f.ruleNote}` : ''}${f.limitNote ? `<br><b>${f.limitNote}</b>` : ''}` +
       // 自動計算する品目は、手で書き換えたときに自動へ戻せるようにする
-      `${f.autoNatto ? `<br><span id="autoNote_${f.id}"></span>` +
+      `${f.autoNatto || f.autoEnergy ? `<br><span id="autoNote_${f.id}"></span>` +
         `<button type="button" id="autoBack_${f.id}" class="mini-btn" hidden>自動計算に戻す</button>` : ''}` +
       `</small></div>
     <div class="qty"><input type="number" inputmode="numeric" id="f_${f.id}" value="0" min="0" step="1"${f.max ? ` max="${f.max}"` : ''}></div>
@@ -1143,22 +1159,59 @@ function savasFor(st, ex, lack, target, lackBase){
    のではなく毎回上書きするため、変更したいときは他の品目か「その他」で調整する。 */
 /* 自動計算する品目を手で書き換えたか（切らしている日など）。
    その日のうちは手入力を優先し、「自動計算に戻す」で解除する。 */
-let autoOverride = false;
-function setAutoOverride(on){
-  autoOverride = !!on;
-  const f = FOODS.find(x => x.autoNatto);
-  if(!f) return;
-  const note = $('autoNote_' + f.id), btn = $('autoBack_' + f.id);
-  if(note) note.innerHTML = autoOverride
-    ? `<b>手入力に切り替えています</b>（自動計算は止まっています）。 `
-    : '';
-  if(btn) btn.hidden = !autoOverride;
+let autoOverride = {};                 // 自動入力を止めている品目 {id:true}
+const AUTO_IDS = () => FOODS.filter(f => f.autoNatto || f.autoEnergy).map(f => f.id);
+const autoOff  = id => !!autoOverride[id];
+function refreshAutoNotes(){
+  AUTO_IDS().forEach(fid => {
+    const note = $('autoNote_' + fid), btn = $('autoBack_' + fid);
+    if(note) note.innerHTML = autoOff(fid)
+      ? `<b>手入力に切り替えています</b>（自動計算は止まっています）。 `
+      : '';
+    if(btn) btn.hidden = !autoOff(fid);
+  });
+}
+function setAutoOverride(id, on){
+  if(id === null){ autoOverride = {}; }          // すべて自動へ戻す
+  else if(on) autoOverride[id] = true;
+  else delete autoOverride[id];
+  refreshAutoNotes();
+}
+
+/* その日のエネルギーの過不足（プラスなら足りない kcal）。
+   納豆を確定させてから見るので、自動入力どうしで数字が揺れない。 */
+function energyGapNow(){
+  const st     = readState();
+  const ex     = calcFactor(st);
+  const food   = calcFood(st);
+  const target = r1(st.weight * ex.factor);
+  const lack   = r1(Math.max(0, target - food.total));
+  const sv     = savasFor(st, ex, lack, target, lackBeforeAuto(st, food, target));
+  return calcNeed(st, ex) - calcKcal(st, sv).total;
+}
+
+/* ご飯のおかわり（無料）を自動で入れる。
+   ・その店のメニューを食べる日だけ（行かない日に入れても意味がないため）
+   ・④が「エネルギーが少ない」と判定する日（必要量を ENERGY_OK 以上下回る日）だけ
+   ・入れるのは並盛1杯まで。それでも足りなければ④の候補で大盛などを案内する
+   手で書き換えた品目は autoOverride で自動入力を止める。            */
+function autoFillRice(){
+  const items = FOODS.filter(f => f.autoEnergy && $('f_' + f.id));
+  if(!items.length) return;
+  const auto = items.filter(f => !autoOff(f.id));
+  auto.forEach(f => { $('f_' + f.id).value = 0; });   // まず0にして、ご飯なしの過不足を見る
+  autoFillNatto();
+  const st  = readState();
+  const gap = energyGapNow();
+  if(gap <= ENERGY_OK) return;
+  const f = auto.find(x => atShop(x, st));
+  if(f) $('f_' + f.id).value = 1;
 }
 
 function autoFillNatto(){
   const f = FOODS.find(x => x.autoNatto);
   if(!f || !$('f_' + f.id)) return;
-  if(autoOverride) return;                        // 手入力を優先する
+  if(autoOff(f.id)) return;                       // 手入力を優先する
   const el = $('f_' + f.id);
   el.value = 0;                                   // 納豆を除いた状態で不足を測る
   const st = readState();
@@ -1171,6 +1224,71 @@ function autoFillNatto(){
   el.value = Math.min(f.max || 99, Math.max(0, Math.round(rest / f.p)));
 }
 
+/* エネルギーが足りないときに、②の品目から手早く足せるものを挙げる。
+   たんぱく質を含む品目を足すと自動計算の納豆がそのぶん減るため、実際に増えるのは
+   「その品目のkcal − 減る納豆のkcal」。この正味で並べないと、足しても増えない品目
+   （卵）やかえって減る品目（サバ缶）を勧めてしまう。納豆が0パックの日は相殺が
+   起きないので、そのままのkcalで見る。 */
+const ENERGY_MIN_NET = 20;   // これ未満しか増えない品目は挙げない
+const SAT_PER_UNIT_MIN  = 0.4;  // 飽和脂肪酸の残り枠で数を絞る対象（1単位あたり）
+const SALT_PER_UNIT_MIN = 0.2;  // 食塩の残り枠で数を絞る対象（1単位あたり）
+const ENERGY_OVER_OK    = 150;  // この量までの超過は書き添えない
+const ENERGY_OK         = 400;  // 必要量とのズレがこの範囲なら「ちょうどよい」
+function energyAdvice(st, gap, satTotal, saltTotal){
+  const natto    = FOODS.find(f => f.autoNatto);
+  const nattoQty = natto ? Math.round(st.foods[natto.id] || 0) : 0;
+  const offset   = nattoQty > 0 && natto ? natto.kcal / natto.p : 0;   // たんぱく質1gあたり減るkcal
+  const netOf    = f => Math.round(f.kcal - f.p * offset);
+  // 店のメニュー（朝食・夕食）は曜日で決まっているので候補にしない。
+  // 候補にするのは、その店に行く日のご飯のおかわり（無料）だけ。
+  const pick = f => !f.shop || (f.shopSlot && atShop(f, st));
+  /* 飽和脂肪酸と食塩の残り枠を超えない数までにする。1単位の量がわずかな品目
+     （ご飯0.1g・バナナ0.1gなど）は、枠の計算に入れると数え負けするので対象外。
+     枠が1単位も無い品目はここで外し、代わりに次の候補を繰り上げる。 */
+  const capOfFood = f => {
+    let cap = roomFor(f, st);
+    if(f.sat  >= SAT_PER_UNIT_MIN)  cap = Math.min(cap, Math.floor((SAT_LIMIT  - satTotal)  / f.sat));
+    if(f.salt >= SALT_PER_UNIT_MIN) cap = Math.min(cap, Math.floor((SALT_LIMIT - saltTotal) / f.salt));
+    return cap;
+  };
+  const cands = FOODS.filter(f => pick(f) && !f.autoNatto && f.kcal > 0)
+                     .map(f => ({f, net:netOf(f), cap:capOfFood(f)}))
+                     .filter(x => x.net >= ENERGY_MIN_NET && x.cap >= 1)
+                     .sort((a, b) => b.net - a.net)
+                     .slice(0, 3);
+  if(!cands.length) return '';
+  const rows = cands.map(({f, net, cap}) => {
+    const n    = Math.min(cap, Math.ceil(gap / net));
+    const left = gap - n * net;
+    const add  = [];
+    if(f.sat)  add.push(`飽和+${r1(n * f.sat)}g`);
+    if(f.salt) add.push(`食塩+${r1(n * f.salt)}g`);
+    return `<li><b>${f.short} ${r1(n)}${f.unit}</b>（+${(n * net).toLocaleString()}kcal` +
+           `／${f.price ? (n * f.price).toLocaleString() + '円' : '無料'}${add.length ? '／' + add.join('・') : ''}）` +
+           (left > 0
+             ? `<br><small>他の目標に収まるのはここまでです。あと ${Math.round(left).toLocaleString()}kcal 残ります。</small>`
+             : left < -ENERGY_OVER_OK
+               ? `<br><small>1単位が大きいため、必要量を ${Math.round(-left).toLocaleString()}kcal 上回ります。</small>`
+               : '') + `</li>`;
+  }).join('');
+  // 相殺で増えない品目があるなら、勧めない理由も書いておく
+  const flat = nattoQty > 0
+    ? FOODS.filter(f => pick(f) && !f.autoNatto && f.kcal > 0 && netOf(f) < ENERGY_MIN_NET && f.p >= 5)
+           .map(f => f.short)
+    : [];
+  return `<div class="advice"><b>エネルギー：あと ${gap.toLocaleString()}kcal。</b>` +
+         `この品目だけで埋めるなら次のとおりです（組み合わせても構いません）。` +
+         `<ul class="engy">${rows}</ul>` +
+         (flat.length
+           ? `<small>${flat.join('・')}は、足すと自動計算の納豆（1P 99kcal）がそのぶん減るため、` +
+             `合計はほとんど増えません。エネルギーを増やすなら、たんぱく質の少ない品目を選びます。</small>`
+           : '') + `</div>`;
+}
+
+// 自動入力はご飯（エネルギー）→ 納豆（たんぱく質）の順。
+// 先にご飯を決めることで、そのご飯のたんぱく質ぶん納豆が減る。
+function autoFillAuto(){ autoFillRice(); autoFillNatto(); }
+
 /* ============================================================
    結果描画
    ============================================================ */
@@ -1180,7 +1298,7 @@ function render(opts){
   const scroll  = !!(opts && opts.scroll);
   // 起動時の復元。結果は出すが、更新したわけではないのでハイライトはしない
   const restore = !!(opts && opts.restore);
-  autoFillNatto();                     // 不足分から納豆のパック数を決めて入力欄へ書き戻す
+  autoFillAuto();                      // ご飯のおかわりと納豆のパック数を入力欄へ書き戻す
   const st   = readState();
   const food = calcFood(st);
   const ex   = calcFactor(st);
@@ -1237,61 +1355,6 @@ function render(opts){
   const kcalGap  = Math.round(kcal.total - need);
   const top3     = t => t.items.slice(0, 3).map(x => `${x.name} ${x.g}g`).join('、') || '—';
 
-  /* エネルギーが足りないときに、②の品目から手早く足せるものを挙げる。
-   たんぱく質を含む品目を足すと自動計算の納豆がそのぶん減るため、実際に増えるのは
-   「その品目のkcal − 減る納豆のkcal」。この正味で並べないと、足しても増えない品目
-   （卵）やかえって減る品目（サバ缶）を勧めてしまう。納豆が0パックの日は相殺が
-   起きないので、そのままのkcalで見る。 */
-const ENERGY_MIN_NET = 20;   // これ未満しか増えない品目は挙げない
-const SAT_PER_UNIT_MIN  = 0.4;  // 飽和脂肪酸の残り枠で数を絞る対象（1単位あたり）
-const SALT_PER_UNIT_MIN = 0.2;  // 食塩の残り枠で数を絞る対象（1単位あたり）
-const ENERGY_OVER_OK    = 150;  // この量までの超過は書き添えない
-function energyAdvice(st, gap, satTotal, saltTotal){
-  const natto    = FOODS.find(f => f.autoNatto);
-  const nattoQty = natto ? Math.round(st.foods[natto.id] || 0) : 0;
-  const offset   = nattoQty > 0 && natto ? natto.kcal / natto.p : 0;   // たんぱく質1gあたり減るkcal
-  const netOf    = f => Math.round(f.kcal - f.p * offset);
-  // 店のメニュー（朝食・夕食）は曜日で決まっているので、増やす候補にはしない
-  const cands = FOODS.filter(f => !f.shop && !f.autoNatto && f.kcal > 0 && roomFor(f, st) > 0)
-                     .map(f => ({f, net:netOf(f)}))
-                     .filter(x => x.net >= ENERGY_MIN_NET)
-                     .sort((a, b) => b.net - a.net)
-                     .slice(0, 3);
-  if(!cands.length) return '';
-  const rows = cands.map(({f, net}) => {
-    // 飽和脂肪酸と食塩の残り枠を超えない数までにする。1単位の量がわずかな品目
-    // （ご飯0.1g・バナナ0.1gなど）は、枠の計算に入れると数え負けするので対象外。
-    let cap = roomFor(f, st);
-    if(f.sat  >= SAT_PER_UNIT_MIN)  cap = Math.min(cap, Math.floor((SAT_LIMIT  - satTotal)  / f.sat));
-    if(f.salt >= SALT_PER_UNIT_MIN) cap = Math.min(cap, Math.floor((SALT_LIMIT - saltTotal) / f.salt));
-    if(cap < 1) return '';
-    const n    = Math.min(cap, Math.ceil(gap / net));
-    const left = gap - n * net;
-    const add  = [];
-    if(f.sat)  add.push(`飽和+${r1(n * f.sat)}g`);
-    if(f.salt) add.push(`食塩+${r1(n * f.salt)}g`);
-    return `<li><b>${f.short} ${r1(n)}${f.unit}</b>（+${(n * net).toLocaleString()}kcal` +
-           `／${(n * f.price).toLocaleString()}円${add.length ? '／' + add.join('・') : ''}）` +
-           (left > 0
-             ? `<br><small>他の目標に収まるのはここまでです。あと ${Math.round(left).toLocaleString()}kcal 残ります。</small>`
-             : left < -ENERGY_OVER_OK
-               ? `<br><small>1単位が大きいため、必要量を ${Math.round(-left).toLocaleString()}kcal 上回ります。</small>`
-               : '') + `</li>`;
-  }).filter(Boolean).join('');
-  if(!rows) return '';
-  // 相殺で増えない品目があるなら、勧めない理由も書いておく
-  const flat = nattoQty > 0
-    ? FOODS.filter(f => !f.shop && !f.autoNatto && f.kcal > 0 && netOf(f) < ENERGY_MIN_NET && f.p >= 5)
-           .map(f => f.short)
-    : [];
-  return `<div class="advice"><b>エネルギー：あと ${gap.toLocaleString()}kcal。</b>` +
-         `この品目だけで埋めるなら次のとおりです（組み合わせても構いません）。` +
-         `<ul class="engy">${rows}</ul>` +
-         (flat.length
-           ? `<small>${flat.join('・')}は、足すと自動計算の納豆（1P 99kcal）がそのぶん減るため、` +
-             `合計はほとんど増えません。エネルギーを増やすなら、たんぱく質の少ない品目を選びます。</small>`
-           : '') + `</div>`;
-}
 
 /* 各行の判定を「多い／少ない／範囲内」の札で示す。
      赤いだけでは多いのか少ないのか分からないため、色も分けている。 */
@@ -1313,7 +1376,7 @@ function energyAdvice(st, gap, satTotal, saltTotal){
   const satPct = fat.total > 0 ? Math.round(sat.total / fat.total * 100) : 0;
   const fatState  = judge(fat.total, fatMin, fatMax);
   const carbState = judge(Math.round(carb.total), carbMin, carbMax);
-  const kcalState = kcalGap < -400 ? 'under' : kcalGap > 400 ? 'over' : 'ok';
+  const kcalState = kcalGap < -ENERGY_OK ? 'under' : kcalGap > ENERGY_OK ? 'over' : 'ok';
 
   $('oSatBox').className = 'satbox' + (satOver > 0 || saltOver > 0 ? ' over' : '');
   $('oSatBox').innerHTML =
@@ -2342,8 +2405,17 @@ const mealSlotsOf = (f, st) => {
   return at;
 };
 const atMeal = (f, st) => !!(f.home && mealSlotsOf(f, st).length);
+// ご飯のおかわりは「同じ店のメニューを食べる日」だけ。その料理と同じ時間帯に置く。
+// 目印にするのは定食・丼（carb）で、単品のみそ汁やご飯自身は数えない。
+const shopMenuOf = (f, st) => FOODS.find(x =>
+  x.shop === f.shop && x.slot && x.carb && !x.shopSlot &&
+  Math.round((st.foods && st.foods[x.id]) || 0) > 0);
+const atShop = (f, st) => !!(f.shop && shopMenuOf(f, st));
 // その日この食材を置ける時間帯
-const slotsOf = (f, st) => atMeal(f, st) ? mealSlotsOf(f, st) : f.slots;
+const slotsOf = (f, st) => {
+  if(f.shopSlot){ const m = shopMenuOf(f, st); return m ? [m.slot] : f.slots; }
+  return atMeal(f, st) ? mealSlotsOf(f, st) : f.slots;
+};
 // 自宅の食材のうち「間食」に残る数量
 const snackQty = (f, st) => {
   if(!f.home || atMeal(f, st)) return 0;
@@ -2723,7 +2795,7 @@ function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, pl
    入力中のライブ表示（総負荷量・食事合計・目標レンジ）
    ============================================================ */
 function updateLive(){
-  autoFillNatto();                 // 合計gと金額に自動入力分を含めるため、先に確定させる
+  autoFillAuto();                  // 合計gと金額に自動入力分を含めるため、先に確定させる
   // 1日の上限がある食品は、手入力で超えた場合もその場で切り詰める
   const stNow = readState();
   FOODS.forEach(f => {
@@ -3032,7 +3104,11 @@ function load(){
     if(d.ab   !== undefined) $('savasAfterB').checked = !!d.ab;
     if(d.sd   !== undefined) $('schedDetail').checked = !!d.sd;
     // 手入力への切り替えはその日限り
-    setAutoOverride(sameDay && !!d.ao);
+    // 旧形式（真偽値）は納豆だけの指定として読む
+    autoOverride = !sameDay || !d.ao ? {}
+                 : typeof d.ao === 'object' ? {...d.ao}
+                 : {natto:true};
+    refreshAutoNotes();
     wasCalculated = !!d.calc;
   }catch(err){}
 }
@@ -3121,7 +3197,7 @@ function copySettingsLink(){
 
 /* 「② 今日の食事」だけを 0 に戻す（設定はそのまま） */
 function clearFoods(){
-  setAutoOverride(false);        // 自動計算も元に戻す
+  setAutoOverride(null, false);  // 自動計算も元に戻す
   applyDailyDefaults();          // その日の型に戻す
   onInputChanged();
 }
@@ -3212,10 +3288,10 @@ $('satCalc').addEventListener('click', () => {
 });
 
 // 自動計算する品目（納豆）を手で書き換えたら、その日は手入力を優先する
-FOODS.filter(f => f.autoNatto).forEach(f => {
+FOODS.filter(f => f.autoNatto || f.autoEnergy).forEach(f => {
   const el = $('f_' + f.id), btn = $('autoBack_' + f.id);
-  if(el) el.addEventListener('input', () => { setAutoOverride(true); onInputChanged(); });
-  if(btn) btn.addEventListener('click', () => { setAutoOverride(false); onInputChanged(); });
+  if(el) el.addEventListener('input', () => { setAutoOverride(f.id, true); onInputChanged(); });
+  if(btn) btn.addEventListener('click', () => { setAutoOverride(f.id, false); onInputChanged(); });
 });
 
 // 食事回数を変えたら、毎回0.5合のご飯もその数に合わせる
