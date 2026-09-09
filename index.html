@@ -632,7 +632,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.84';
+const APP_VERSION = '2026-09-01.85';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのたんぱく質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -3015,15 +3015,17 @@ const WEEK_LABEL = ['日','月','火','水','木','金','土'];
 // オリーブオイルは小さじ2（8g・72kcal・脂質8g）。1さじだと脂質が総エネルギーの
 // 20%を下回るため2さじにしている（2さじとも昼のサラダに置く）。
 // サラダ＋ドレッシング＋オリーブオイルは一緒に食べる前提で、まとめて型に入れている。
+// 朝食も夕食も外食の日（日・水・土）も、3食なら昼食は自宅なのでサラダを1皿入れている。
+// これらの日は外食で脂質が58〜69gと多いので、油ではなくノンオイルドレッシングを付ける。
 // 親子丼は FOODS に残してあるので、行ける日は手で1を入れれば使える。
 const WEEKLY_PLAN = {
-  0: {sk_mazenokke:1, sk_gyudon:1},                   // 日（牛：夕）
+  0: {sk_mazenokke:1, sk_gyudon:1,    salad:1, dressing:1},           // 日（牛：夕）
   1: {sk_mazenokke:1, saba:1, rice:2, salad:2, dressing:1, olive:2},  // 月（自宅）
   2: {sk_mazenokke:1, saba:1, rice:2, salad:2, dressing:1, olive:2},  // 火（自宅）
-  3: {sk_mazenokke:1, mt_gyumeshi:1, mt_miso:1},                      // 水（牛：夕／みそ汁）
+  3: {sk_mazenokke:1, mt_gyumeshi:1, mt_miso:1, salad:1, dressing:1}, // 水（牛：夕／みそ汁）
   4: {ys_hamegg:1,    saba:1, rice:2, salad:2, dressing:1, olive:2},  // 木（朝：ハムエッグ／自宅）
   5: {sk_mazenokke:1, saba:1, rice:2, salad:2, dressing:1, olive:2},  // 金（自宅）
-  6: {sk_mazenokke:1, ys_butadon:1}                   // 土（豚：夕）
+  6: {sk_mazenokke:1, ys_butadon:1,   salad:1, dressing:1}            // 土（豚：夕）
 };
 const todayIdx = () => new Date().getDay();
 
