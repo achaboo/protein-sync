@@ -244,6 +244,14 @@ table.nutri .tag{display:inline-block;padding:0 6px;margin-right:5px;border-radi
 table.nutri .tag.over{background:#fdeae6;color:var(--warn)}
 table.nutri .tag.under{background:#fdf0dc;color:#b45309}
 table.nutri .tag.ok{background:#e9f5ed;color:var(--ok)}
+.edit-box{border:1px solid var(--brand);border-radius:12px;padding:12px;margin:0 0 12px;background:#f7faff}
+.edit-box>b{display:block;font-size:.92rem}
+.edit-box>small{display:block;color:var(--muted);margin:2px 0 8px}
+/* .mini-btn は見出しの右端に寄せる前提で margin-left:auto が付いているので、
+   並べて置くここでは打ち消す */
+.edit-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.edit-actions .mini-btn,.other-add .mini-btn,.row .del-btn{margin-left:0;margin-right:0}
+.edited{color:var(--brand-d);font-size:.75rem}
 .other-add{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
 .other-add small{flex:1 1 260px;color:var(--muted);line-height:1.5}
 .row .del-btn{margin-top:4px}
@@ -522,6 +530,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
         </details></div>
     </div>
     <p class="hint" id="foodNote"></p>
+    <p class="hint" id="editNote" style="margin-top:0"></p>
 
     <h3>1週間の型（初期値として自動入力）</h3>
     <p class="hint" id="dailyNote" style="margin-top:0"></p>
@@ -650,7 +659,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.87';
+const APP_VERSION = '2026-09-01.88';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのたんぱく質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -840,17 +849,45 @@ const serveText = n => n === 1 ? '1回で摂取' : `${n}回に分けて摂取`;
 /* ============================================================
    UI 生成
    ============================================================ */
+/* 品目の値（価格・栄養成分）をあとから直せるようにする。
+   商品の値上げやリニューアルのたびにHTMLを書き換えなくて済むように、
+   変えた分だけを foodOverride に持ち、FOODS へ上書きして使う。
+   食事の数量とちがって日付では消さない（値段は翌日も同じもののため）。 */
+const EDIT_KEYS = [
+  ['p',     'たんぱく質 (g)',   '0.1'],
+  ['kcal',  'エネルギー (kcal)', '1'],
+  ['fat',   '脂質 (g)',         '0.1'],
+  ['sat',   '飽和脂肪酸 (g)',   '0.1'],
+  ['carbG', '炭水化物 (g)',     '0.1'],
+  ['fiber', '食物繊維 (g)',     '0.1'],
+  ['salt',  '食塩相当量 (g)',   '0.1'],
+  ['price', '価格 (円)',        '1']
+];
+const FOOD_BASE = {};
+FOODS.forEach(f => {
+  const o = {note: f.note};
+  EDIT_KEYS.forEach(([k]) => o[k] = f[k] || 0);
+  FOOD_BASE[f.id] = o;
+});
+let foodOverride = {};                       // {id: {price: 300, ...}} 変えた項目だけ
+const isEdited = f => !!foodOverride[f.id];
+const infoHtml = f =>
+  `${f.note}${/）$/.test(f.note) ? '' : ' '}<b>${f.price ? f.price + '円' : '無料'}</b>` +
+  (isEdited(f) ? ' <b class="edited">変更済み</b>' : '');
+
 const foodRow = f => `
   <div class="row" id="row_${f.id}">
     <div class="name"><b>${f.shop ? f.shop + '<br>' : ''}${esc(f.name)}</b>` +
       // 全角の「）」で終わる注記は、そのあとに半角スペースを足すと空きすぎて見える
-      `<small>${f.note}${/）$/.test(f.note) ? '' : ' '}<b>${f.price ? f.price + '円' : '無料'}</b>` +
+      `<small><span id="info_${f.id}">${infoHtml(f)}</span>` +
       `${f.ruleNote ? `<br>${f.ruleNote}` : ''}${f.limitNote ? `<br><b>${f.limitNote}</b>` : ''}` +
       // 自動計算する品目は、手で書き換えたときに自動へ戻せるようにする
       `${f.autoNatto || f.autoEnergy ? `<br><span id="autoNote_${f.id}"></span>` +
         `<button type="button" id="autoBack_${f.id}" class="mini-btn" hidden>自動計算に戻す</button>` : ''}` +
-      // 自由入力から足した品目は、その場で消せるようにする
-      `${f.custom ? `<br><button type="button" class="mini-btn del-btn" data-del="${f.id}">削除</button>` : ''}` +
+      // 自由入力から足した品目は消せるように、それ以外は値を直せるようにする
+      `<br>${f.custom
+        ? `<button type="button" class="mini-btn del-btn" data-del="${f.id}">削除</button>`
+        : `<button type="button" class="mini-btn del-btn" data-edit="${f.id}">価格・栄養成分を変更</button>`}` +
       `</small></div>
     <div class="qty"><input type="number" inputmode="numeric" id="f_${f.id}" value="0" min="0" step="1"${f.max ? ` max="${f.max}"` : ''}></div>
     <div class="unit">${esc(f.unit)}</div>
@@ -889,6 +926,73 @@ function removeCustomFood(id){
   const row = $('row_' + id);
   if(row) row.remove();
 }
+/* 変更を FOODS へ反映し、行の表示も書き直す。
+   注記の「約○g」はたんぱく質量に合わせて書き換える（1食あたりの表示のため）。 */
+function applyFoodOverrides(){
+  FOODS.forEach(f => {
+    const base = FOOD_BASE[f.id];
+    if(!base) return;                        // 自由入力から足した品目は対象外
+    const ov = foodOverride[f.id] || {};
+    EDIT_KEYS.forEach(([k]) => f[k] = ov[k] !== undefined ? ov[k] : base[k]);
+    f.note = base.note.replace(/約[0-9.]+ ?g/, '約' + r1(f.p) + 'g');
+    const info = $('info_' + f.id);
+    if(info) info.innerHTML = infoHtml(f);
+  });
+  const n = Object.keys(foodOverride).length;
+  const note = $('editNote');
+  if(note){
+    note.innerHTML = n
+      ? `価格・栄養成分を変更した品目：<b>${n}件</b>　` +
+        `<button type="button" id="editResetAll" class="mini-btn inline-btn">すべて初期値に戻す</button>`
+      : '';
+    const all = $('editResetAll');
+    if(all) all.addEventListener('click', () => {
+      foodOverride = {};
+      closeEditor();
+      applyFoodOverrides();
+      onInputChanged();
+    });
+  }
+}
+function closeEditor(){ const b = $('editBox'); if(b) b.remove(); }
+function openEditor(id){
+  const f = foodById(id), row = $('row_' + id);
+  if(!f || !FOOD_BASE[id] || !row) return;
+  const open = $('editBox');
+  closeEditor();
+  if(open && open.dataset.for === id) return;       // 同じ品目なら閉じるだけ
+  const box = document.createElement('div');
+  box.className = 'edit-box'; box.id = 'editBox'; box.dataset.for = id;
+  box.innerHTML =
+    `<b>${esc((f.shop ? f.shop + ' ' : '') + f.name)}</b>` +
+    `<small>1${esc(f.unit)}あたりの値です。商品の栄養成分表示から書き写してください。</small>` +
+    `<div class="other-body">` +
+    EDIT_KEYS.map(([k, label, step]) =>
+      `<div><span>${label}</span>` +
+      `<input type="number" inputmode="decimal" id="ed_${k}" value="${f[k] || 0}" min="0" step="${step}"></div>`).join('') +
+    `</div><div class="edit-actions">` +
+      `<button type="button" class="mini-btn" data-edit-save="${id}">保存</button>` +
+      `<button type="button" class="mini-btn" data-edit-cancel="1">取消</button>` +
+      (isEdited(f) ? `<button type="button" class="mini-btn" data-edit-reset="${id}">この品目を初期値に戻す</button>` : '') +
+    `</div>`;
+  row.insertAdjacentElement('afterend', box);
+  box.scrollIntoView({block:'nearest'});
+}
+function saveEditor(id){
+  const base = FOOD_BASE[id];
+  if(!base) return;
+  const ov = {};
+  EDIT_KEYS.forEach(([k]) => {
+    const v = num('ed_' + k);
+    if(Math.abs(v - base[k]) > 1e-9) ov[k] = v;     // 初期値と同じものは持たない
+  });
+  if(Object.keys(ov).length) foodOverride[id] = ov;
+  else delete foodOverride[id];
+  closeEditor();
+  applyFoodOverrides();
+  onInputChanged();
+}
+
 const customFoods = () => FOODS.filter(f => f.custom);
 const customData  = () => customFoods().map(f => ({id:f.id, name:f.name, unit:f.unit, p:f.p,
   price:f.price, fat:f.fat, sat:f.sat, salt:f.salt, carbG:f.carbG, fiber:f.fiber, kcal:f.kcal}));
@@ -3118,7 +3222,7 @@ const applyDailyDefaults = () => DAILY_IDS().forEach(id => { if($(id)) $(id).val
 const todayKey  = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
 
 function save(){
-  const d = {v:{}, c:{}, date:todayKey(), dv:DEFAULTS_VER, rest:$('restSavas').checked, two:$('twoDoses').checked, ab:$('savasAfterB').checked, sd:$('schedDetail').checked, ao:autoOverride, calc:calculated, cf:customData()};
+  const d = {v:{}, c:{}, date:todayKey(), dv:DEFAULTS_VER, rest:$('restSavas').checked, two:$('twoDoses').checked, ab:$('savasAfterB').checked, sd:$('schedDetail').checked, ao:autoOverride, calc:calculated, cf:customData(), ov:foodOverride};
   ALL_IDS().forEach(id => d.v[id] = $(id).value);
   EXERCISES.forEach(e => d.c[e.id] = $('c_' + e.id).checked);
   try{ localStorage.setItem(KEY, JSON.stringify(d)); }catch(err){}
@@ -3133,6 +3237,8 @@ function load(){
   try{ d = JSON.parse(localStorage.getItem(KEY) || 'null'); }catch(err){}
 
   const sameDay = !!d && d.date === todayKey();
+  // 品目の値の変更は日付では消さない（値段は翌日も同じもののため）
+  if(d && d.ov){ foodOverride = {...d.ov}; applyFoodOverrides(); }
   // 自由入力から足した品目はその日限り。数量を戻す前に行を作り直しておく
   if(sameDay && d && d.cf) restoreCustomFoods(d.cf, d.v);
   const daily   = DAILY_IDS();
@@ -3210,6 +3316,7 @@ const b64dec = str =>
 function buildSettingsLink(){
   const d = {v:{}, c:{}, date:todayKey(), rest:$('restSavas').checked, two:$('twoDoses').checked, ab:$('savasAfterB').checked, sd:$('schedDetail').checked};
   d.cf = customData();
+  d.ov = foodOverride;
   SETTING_IDS().concat(LINK_DAILY_IDS()).forEach(id => { if($(id)) d.v[id] = $(id).value; });
   EXERCISES.forEach(e => d.c[e.id] = $('c_' + e.id).checked);
   // クエリ（キャッシュ回避用の ?v= など）は引き継がず、素のURLに設定だけを付ける
@@ -3226,6 +3333,8 @@ function applySettingsFromHash(hash){
     if(!d.v) return false;
     const put = id => { if(d.v[id] !== undefined && $(id)) $(id).value = d.v[id]; };
     SETTING_IDS().forEach(put);
+    // 品目の値の変更は設定と同じ扱い（日付に関係なく反映する）
+    if(d.ov){ foodOverride = {...d.ov}; applyFoodOverrides(); }
     if(d.rest !== undefined) $('restSavas').checked = !!d.rest;   // 設定なので日付に関係なく反映
     if(d.two  !== undefined) $('twoDoses').checked  = !!d.two;
     if(d.ab   !== undefined) $('savasAfterB').checked = !!d.ab;
@@ -3385,13 +3494,28 @@ $('otherAdd').addEventListener('click', () => {
     `個数は上の一覧の末尾で変えられます。`;
   onInputChanged();
 });
-// 足した品目を消す
+// 行の中のボタン（足した品目を消す／値を直す）
 $('foods').addEventListener('click', e => {
-  const btn = e.target.closest('[data-del]');
-  if(!btn) return;
-  removeCustomFood(btn.getAttribute('data-del'));
-  $('otherAddNote').innerHTML = '';
-  onInputChanged();
+  const hit = sel => e.target.closest('[' + sel + ']');
+  const del = hit('data-del');
+  if(del){
+    removeCustomFood(del.getAttribute('data-del'));
+    $('otherAddNote').innerHTML = '';
+    onInputChanged();
+    return;
+  }
+  const edit = hit('data-edit');
+  if(edit){ openEditor(edit.getAttribute('data-edit')); return; }
+  const sv = hit('data-edit-save');
+  if(sv){ saveEditor(sv.getAttribute('data-edit-save')); return; }
+  if(hit('data-edit-cancel')){ closeEditor(); return; }
+  const rs = hit('data-edit-reset');
+  if(rs){
+    delete foodOverride[rs.getAttribute('data-edit-reset')];
+    closeEditor();
+    applyFoodOverrides();
+    onInputChanged();
+  }
 });
 
 // 自動計算する品目（納豆）を手で書き換えたら、その日は手入力を優先する
