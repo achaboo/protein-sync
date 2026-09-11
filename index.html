@@ -244,6 +244,9 @@ table.nutri .tag{display:inline-block;padding:0 6px;margin-right:5px;border-radi
 table.nutri .tag.over{background:#fdeae6;color:var(--warn)}
 table.nutri .tag.under{background:#fdf0dc;color:#b45309}
 table.nutri .tag.ok{background:#e9f5ed;color:var(--ok)}
+.other-add{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
+.other-add small{flex:1 1 260px;color:var(--muted);line-height:1.5}
+.row .del-btn{margin-top:4px}
 .satbox .advice{margin:4px 0;font-size:.8rem}
 .satbox .advice ul.engy{margin:5px 0 4px;padding-left:1.2em}
 .satbox .advice ul.engy li{margin:2px 0}
@@ -501,7 +504,13 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
           <div><span>食物繊維 (g)</span><input type="number" inputmode="decimal" id="otherFiber" value="0" min="0" step="0.1"></div>
           <div><span>食塩相当量 (g)</span><input type="number" inputmode="decimal" id="otherSalt" value="0" min="0" step="0.1"></div>
           <div><span>価格 (円)</span><input type="number" inputmode="numeric" id="otherPrice" value="0" min="0" step="1"></div>
+          <div><span>単位</span><input type="text" id="otherUnit" maxlength="3" value="食"></div>
         </div>
+        <div class="other-add">
+          <button type="button" id="otherAdd" class="mini-btn">この内容で品目を追加</button>
+          <small>上の欄を<b>1つぶんの量</b>として、②の末尾に品目として足します。個数は足した行で変えられます。</small>
+        </div>
+        <p class="hint" id="otherAddNote" style="margin:6px 0 0"></p>
         <details class="ratio">
           <summary>飽和脂肪酸が書かれていないときは（脂質から推定）</summary>
           <table id="ratioTable"></table>
@@ -641,7 +650,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.86';
+const APP_VERSION = '2026-09-01.87';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのたんぱく質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -766,6 +775,8 @@ const EXERCISES = [
 
 const $  = id => document.getElementById(id);
 const r1 = n  => Math.round(n * 10) / 10;
+// 手書きの文字列をそのまま innerHTML に混ぜないための最低限の処理
+const esc = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const r2 = n  => Math.round(n * 100) / 100;
 
 // 運動による係数の加算量（基本係数に上乗せする）と、その日の上限
@@ -829,19 +840,69 @@ const serveText = n => n === 1 ? '1回で摂取' : `${n}回に分けて摂取`;
 /* ============================================================
    UI 生成
    ============================================================ */
-$('foods').innerHTML = FOODS.map(f => `
-  <div class="row">
-    <div class="name"><b>${f.shop ? f.shop + '<br>' : ''}${f.name}</b>` +
+const foodRow = f => `
+  <div class="row" id="row_${f.id}">
+    <div class="name"><b>${f.shop ? f.shop + '<br>' : ''}${esc(f.name)}</b>` +
       // 全角の「）」で終わる注記は、そのあとに半角スペースを足すと空きすぎて見える
       `<small>${f.note}${/）$/.test(f.note) ? '' : ' '}<b>${f.price ? f.price + '円' : '無料'}</b>` +
       `${f.ruleNote ? `<br>${f.ruleNote}` : ''}${f.limitNote ? `<br><b>${f.limitNote}</b>` : ''}` +
       // 自動計算する品目は、手で書き換えたときに自動へ戻せるようにする
       `${f.autoNatto || f.autoEnergy ? `<br><span id="autoNote_${f.id}"></span>` +
         `<button type="button" id="autoBack_${f.id}" class="mini-btn" hidden>自動計算に戻す</button>` : ''}` +
+      // 自由入力から足した品目は、その場で消せるようにする
+      `${f.custom ? `<br><button type="button" class="mini-btn del-btn" data-del="${f.id}">削除</button>` : ''}` +
       `</small></div>
     <div class="qty"><input type="number" inputmode="numeric" id="f_${f.id}" value="0" min="0" step="1"${f.max ? ` max="${f.max}"` : ''}></div>
-    <div class="unit">${f.unit}</div>
-  </div>`).join('');
+    <div class="unit">${esc(f.unit)}</div>
+  </div>`;
+$('foods').innerHTML = FOODS.map(foodRow).join('');
+
+/* 「その他（自由入力）」を品目として②の末尾に足す。
+   入力した栄養成分は「1つぶん」として持ち、個数は足した行の数量欄で変える。
+   その日限りのもの（翌日は消える）なので、FOODS へ足したうえで保存データにも書き出す。 */
+let customSeq = 0;
+function addCustomFood(o, qty){
+  const p = +o.p || 0;
+  // 品目名は④や⑤など多くの場所へそのまま出るので、タグになる文字はここで落としておく
+  const name = String(o.name || '').replace(/[<>]/g, '').trim() || '品目';
+  const unit = String(o.unit || '').replace(/[<>]/g, '').trim() || '食';
+  const f = {
+    id: o.id || 'cf' + (++customSeq),
+    name, short: name, unit,
+    note: `1${unit} 約${r1(p)}g`,
+    p, price: +o.price || 0,
+    fat: +o.fat || 0, sat: +o.sat || 0, salt: +o.salt || 0,
+    carbG: +o.carbG || 0, fiber: +o.fiber || 0, kcal: +o.kcal || 0,
+    slots: ['b','l','d'], custom: true
+  };
+  const n = parseInt(String(f.id).replace(/[^0-9]/g, ''), 10);
+  if(n > customSeq) customSeq = n;        // 復元したidと番号がぶつからないようにする
+  FOODS.push(f);
+  $('foods').insertAdjacentHTML('beforeend', foodRow(f));
+  $('f_' + f.id).value = qty === undefined ? 1 : qty;
+  return f;
+}
+function removeCustomFood(id){
+  const i = FOODS.findIndex(f => f.id === id && f.custom);
+  if(i < 0) return;
+  FOODS.splice(i, 1);
+  const row = $('row_' + id);
+  if(row) row.remove();
+}
+const customFoods = () => FOODS.filter(f => f.custom);
+const customData  = () => customFoods().map(f => ({id:f.id, name:f.name, unit:f.unit, p:f.p,
+  price:f.price, fat:f.fat, sat:f.sat, salt:f.salt, carbG:f.carbG, fiber:f.fiber, kcal:f.kcal}));
+const clearCustomFoods = () => customFoods().forEach(f => removeCustomFood(f.id));
+// 保存データ・設定リンクから品目を復元する（同じ日のものだけ）
+function restoreCustomFoods(list, values){
+  clearCustomFoods();
+  (list || []).forEach(o => {
+    if(!o || !o.name) return;
+    const f = addCustomFood(o, 0);
+    const v = values && values['f_' + f.id];
+    $('f_' + f.id).value = v === undefined ? 1 : v;
+  });
+}
 
 // 飽和脂肪酸の推定表と、脂質から書き込むボタン
 $('ratioTable').innerHTML = SAT_RATIO
@@ -866,9 +927,7 @@ $('exercises').innerHTML = EXERCISES.map(e => `
 /* ============================================================
    入力値の取得
    ============================================================ */
-const num = id => { const v = parseFloat($(id).value); return (isNaN(v) || v < 0) ? 0 : v; };
-// 手書きの文字列をそのまま innerHTML に混ぜないための最低限の処理
-const esc = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const num = id => { const el = $(id); const v = el ? parseFloat(el.value) : NaN; return (isNaN(v) || v < 0) ? 0 : v; };
 
 function readState(){
   const st = {
@@ -3059,7 +3118,7 @@ const applyDailyDefaults = () => DAILY_IDS().forEach(id => { if($(id)) $(id).val
 const todayKey  = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
 
 function save(){
-  const d = {v:{}, c:{}, date:todayKey(), dv:DEFAULTS_VER, rest:$('restSavas').checked, two:$('twoDoses').checked, ab:$('savasAfterB').checked, sd:$('schedDetail').checked, ao:autoOverride, calc:calculated};
+  const d = {v:{}, c:{}, date:todayKey(), dv:DEFAULTS_VER, rest:$('restSavas').checked, two:$('twoDoses').checked, ab:$('savasAfterB').checked, sd:$('schedDetail').checked, ao:autoOverride, calc:calculated, cf:customData()};
   ALL_IDS().forEach(id => d.v[id] = $(id).value);
   EXERCISES.forEach(e => d.c[e.id] = $('c_' + e.id).checked);
   try{ localStorage.setItem(KEY, JSON.stringify(d)); }catch(err){}
@@ -3074,6 +3133,8 @@ function load(){
   try{ d = JSON.parse(localStorage.getItem(KEY) || 'null'); }catch(err){}
 
   const sameDay = !!d && d.date === todayKey();
+  // 自由入力から足した品目はその日限り。数量を戻す前に行を作り直しておく
+  if(sameDay && d && d.cf) restoreCustomFoods(d.cf, d.v);
   const daily   = DAILY_IDS();
 
   // 当日の入力でなければ食事欄を明示的に 0 に戻す。
@@ -3148,6 +3209,7 @@ const b64dec = str =>
 
 function buildSettingsLink(){
   const d = {v:{}, c:{}, date:todayKey(), rest:$('restSavas').checked, two:$('twoDoses').checked, ab:$('savasAfterB').checked, sd:$('schedDetail').checked};
+  d.cf = customData();
   SETTING_IDS().concat(LINK_DAILY_IDS()).forEach(id => { if($(id)) d.v[id] = $(id).value; });
   EXERCISES.forEach(e => d.c[e.id] = $('c_' + e.id).checked);
   // クエリ（キャッシュ回避用の ?v= など）は引き継がず、素のURLに設定だけを付ける
@@ -3172,9 +3234,11 @@ function applySettingsFromHash(hash){
     // 日付を持たない古いリンクは設定のみ。当日のリンクなら食事・距離・種目も反映する
     const sameDay = d.date === todayKey();
     if(!sameDay){
+      clearCustomFoods();          // 別の日の自由入力は持ち込まない
       applyDailyDefaults();        // 食事は受け取った端末の「その日の型」に戻す
       return 'settings';
     }
+    restoreCustomFoods(d.cf, d.v); // 品目を作ってから数量を入れる
     LINK_DAILY_IDS().forEach(put);
     EXERCISES.forEach(e => { if(d.c && d.c[e.id] !== undefined && $('c_' + e.id)) $('c_' + e.id).checked = !!d.c[e.id]; });
     return 'all';
@@ -3204,6 +3268,8 @@ function copySettingsLink(){
 
 /* 「② 今日の食事」だけを 0 に戻す（設定はそのまま） */
 function clearFoods(){
+  clearCustomFoods();            // 自由入力から足した品目も消す
+  $('otherAddNote').innerHTML = '';
   setAutoOverride(null, false);  // 自動計算も元に戻す
   applyDailyDefaults();          // その日の型に戻す
   onInputChanged();
@@ -3291,6 +3357,40 @@ $('clearFoods').addEventListener('click', clearFoods);
 // 脂質 × 選んだ割合 を「飽和脂肪酸」の欄へ書き込む
 $('satCalc').addEventListener('click', () => {
   $('otherSat').value = r1(num('otherFat') * parseFloat($('satRatio').value));
+  onInputChanged();
+});
+
+/* 「その他（自由入力）」の内容を品目として足す。
+   足したあとは欄を空にして、続けて次の品目を入れられるようにする。 */
+const OTHER_NUM_IDS = ['otherP','otherKcal','otherFat','otherSat','otherCarb','otherFiber','otherSalt','otherPrice'];
+$('otherAdd').addEventListener('click', () => {
+  const note = $('otherAddNote');
+  const name = ($('otherNote').value || '').trim();
+  const unit = ($('otherUnit').value || '').trim() || '食';
+  if(!name){
+    note.innerHTML = '<span class="warn-inline"><b>品目名を入れてください。</b>「例：ゆで卵2個・ヨーグルト」の欄です。</span>';
+    $('otherNote').focus();
+    return;
+  }
+  if(!OTHER_NUM_IDS.some(id => num(id) > 0)){
+    note.innerHTML = '<span class="warn-inline"><b>数値がすべて0です。</b>たんぱく質かエネルギーだけでも入れてください。</span>';
+    return;
+  }
+  const f = addCustomFood({name, unit, p:num('otherP'), price:num('otherPrice'),
+    kcal:num('otherKcal'), fat:num('otherFat'), sat:num('otherSat'),
+    carbG:num('otherCarb'), fiber:num('otherFiber'), salt:num('otherSalt')}, 1);
+  $('otherNote').value = '';
+  OTHER_NUM_IDS.forEach(id => $(id).value = 0);
+  note.innerHTML = `<b>${esc(f.name)} ${r1(f.p)}g（1${esc(f.unit)}・${f.price ? f.price + '円' : '無料'}）</b>を足しました。` +
+    `個数は上の一覧の末尾で変えられます。`;
+  onInputChanged();
+});
+// 足した品目を消す
+$('foods').addEventListener('click', e => {
+  const btn = e.target.closest('[data-del]');
+  if(!btn) return;
+  removeCustomFood(btn.getAttribute('data-del'));
+  $('otherAddNote').innerHTML = '';
   onInputChanged();
 });
 
