@@ -653,7 +653,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.94';
+const APP_VERSION = '2026-09-01.95';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのたんぱく質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -875,10 +875,10 @@ const foodRow = f => `
       // 全角の「）」で終わる注記は、そのあとに半角スペースを足すと空きすぎて見える
       `<small><span id="info_${f.id}">${infoHtml(f)}</span>` +
       `${f.ruleNote ? `<br>${f.ruleNote}` : ''}${f.limitNote ? `<br><b>${f.limitNote}</b>` : ''}` +
-      // 自由入力から足した品目は消せるように、それ以外は値を直せるようにする
-      `<br>${f.custom
-        ? `<button type="button" class="mini-btn del-btn" data-del="${f.id}">削除</button>`
-        : `<button type="button" class="mini-btn del-btn" data-edit="${f.id}">価格・栄養成分を変更</button>`}` +
+      // どの品目も値を直せる。自由入力から足した品目は消すこともできる
+      `<br><button type="button" class="mini-btn del-btn" data-edit="${f.id}">` +
+        `${f.custom ? '品目名・価格・栄養成分を変更' : '価格・栄養成分を変更'}</button>` +
+      `${f.custom ? `<button type="button" class="mini-btn del-btn" data-del="${f.id}">削除</button>` : ''}` +
       // 自動計算する品目は、手で書き換えたときに自動へ戻せるようにする。
       // 手入力に切り替えたときだけ出す行なので、まるごと hidden にして空の行を作らない
       `${f.autoNatto || f.autoEnergy
@@ -954,7 +954,7 @@ function applyFoodOverrides(){
 function closeEditor(){ const b = $('editBox'); if(b) b.remove(); }
 function openEditor(id){
   const f = foodById(id), row = $('row_' + id);
-  if(!f || !FOOD_BASE[id] || !row) return;
+  if(!f || !row || (!FOOD_BASE[id] && !f.custom)) return;
   const open = $('editBox');
   closeEditor();
   if(open && open.dataset.for === id) return;       // 同じ品目なら閉じるだけ
@@ -963,6 +963,13 @@ function openEditor(id){
   box.innerHTML =
     `<b>${esc((f.shop ? f.shop + ' ' : '') + f.name)}</b>` +
     `<small>1${esc(f.unit)}あたりの値です。商品の栄養成分表示から書き写してください。</small>` +
+    // 自由入力から足した品目は、名前と単位もあとから直せる
+    (f.custom
+      ? `<div class="other-body">` +
+        `<div><span>品目名</span><input type="text" id="ed_name" maxlength="60" value="${esc(f.name)}"></div>` +
+        `<div><span>単位</span><input type="text" id="ed_unit" maxlength="3" value="${esc(f.unit)}"></div>` +
+        `</div>`
+      : '') +
     `<div class="other-body">` +
     EDIT_KEYS.map(([k, label, step]) =>
       `<div><span>${label}</span>` +
@@ -976,6 +983,20 @@ function openEditor(id){
   box.scrollIntoView({block:'nearest'});
 }
 function saveEditor(id){
+  const f = foodById(id);
+  if(f && f.custom){
+    const name = String($('ed_name').value || '').replace(/[<>]/g, '').trim() || f.name;
+    const unit = String($('ed_unit').value || '').replace(/[<>]/g, '').trim() || f.unit;
+    EDIT_KEYS.forEach(([k]) => f[k] = num('ed_' + k));
+    f.name = name; f.short = name; f.unit = unit;
+    f.note = `1${unit} 約${r1(f.p)}g`;
+    const row = $('row_' + id), qty = $('f_' + id).value;
+    closeEditor();
+    row.outerHTML = foodRow(f);        // 見出しと単位欄も書き直す
+    $('f_' + id).value = qty;
+    onInputChanged();
+    return;
+  }
   const base = FOOD_BASE[id];
   if(!base) return;
   const ov = {};
