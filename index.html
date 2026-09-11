@@ -420,7 +420,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
     <div class="grid2" style="margin-top:12px">
       <div>
         <label for="fixSpoons">SAVASの杯数を指定（空欄＝自動）</label>
-        <input type="number" inputmode="numeric" id="fixSpoons" value="" min="1" max="4" step="1" placeholder="自動">
+        <input type="number" inputmode="numeric" id="fixSpoons" value="" min="1" max="8" step="1" placeholder="自動">
       </div>
     </div>
     <p class="hint" id="fixNote"></p>
@@ -653,7 +653,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.93';
+const APP_VERSION = '2026-09-01.94';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのたんぱく質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
@@ -1063,9 +1063,11 @@ function readState(){
   st.savasAfterB = $('savasAfterB').checked;                  // 1回目を朝食のあとへ動かすか
   st.schedDetail = $('schedDetail').checked;                  // ⑤にくわしい説明を出すか
   // 杯数の手動指定（空欄・範囲外は自動計算）
+  // 杯数の手動指定。上限は1回4杯×その日に許した回数（2回までなら8杯）
+  st.maxSpoons   = (st.twoDoses ? 2 : MAX_SESSIONS) * MAX_PER_SERVE;
   st.fixSpoons   = (() => {
     const v = parseInt($('fixSpoons').value, 10);
-    return (v >= 1 && v <= MAX_PER_SERVE) ? v : 0;
+    return (v >= 1 && v <= st.maxSpoons) ? v : 0;
   })();
   FOODS.forEach(f => st.foods[f.id] = num('f_' + f.id));
   EXERCISES.forEach(e => st.ex[e.id] = {
@@ -1299,7 +1301,7 @@ function savasFor(st, ex, lack, target, lackBase){
   const autoSpoons = sv.spoons;
 
   if(st.fixSpoons){                       // 手動指定が最優先
-    sv = fixedSavas(st.fixSpoons); sv.manual = true;
+    sv = fixedSavas(st.fixSpoons, st); sv.manual = true;
   // 2食の日は上限の8杯に固定する。摂りすぎになる日（不足が8杯ぶんを大きく下回る日）は
   // 自動計算に任せるが、誤差の範囲（DEVIATION_OK）で収まるなら固定を通す。
   }else if(st.meals === 2 &&
@@ -2667,10 +2669,21 @@ function cheapestPlan(g){
 const planCost = ids => (ids || []).reduce((a, id) => a + (foodById(id).price || 0), 0);
 
 /* 筋トレをした日に必ず飲む最低量（製品推奨の1回3杯）を組み立てる */
-function fixedSavas(spoons){
+/* 杯数を決め打ちする。1回 MAX_PER_SERVE 杯を超えるときは、
+   その日に許した回数（既定は2回まで）に分ける。 */
+function fixedSavas(spoons, st){
+  const maxN = st && st.twoDoses ? 2 : MAX_SESSIONS;
+  const n    = Math.max(1, Math.min(maxN, Math.ceil(spoons / MAX_PER_SERVE)));
+  const sessions = [];
+  let rest = spoons;
+  for(let i = 0; i < n; i++){
+    const give = Math.min(MAX_PER_SERVE, Math.ceil(rest / (n - i)));
+    sessions.push({milk:false, cap:MAX_PER_SERVE, spoons:give});
+    rest -= give;
+  }
   const savasG = r1(spoons * SPOON_G);
   return {
-    spoons, sessions:[{milk:false, cap:spoons, spoons}],
+    spoons, sessions,
     savasG, liquidG:0, totalG:savasG,
     maxSingleG:r1(Math.min(MAX_PER_SERVE, Math.floor(ABSORB_CAP / SPOON_G)) * SPOON_G),
     packed:spoons > PER_SERVE, mixed:false, remainG:0, overG:0, forced:true
@@ -3021,10 +3034,18 @@ function updateLive(){
     : `オフなら運動直後の1回だけです。夕食を食べきれず、その分を粉に回したいときはオンにしてください。`;
 
   // 杯数の手動指定
+  const fixRaw = parseInt($('fixSpoons').value, 10);
   $('fixNote').innerHTML = st.fixSpoons
-    ? `<b>${st.fixSpoons}杯（${r1(st.fixSpoons * SPOON_G)}g）に固定</b>します。空欄にすると不足量から自動で決めます。`
-    : `空欄なら不足量から自動で決めます（不足23g以上で4杯、それ未満は3杯）。` +
-      `夕食を食べきれない日など、粉を多めにしたいときは 1〜${MAX_PER_SERVE} を入力してください。`;
+    ? `<b>${st.fixSpoons}杯（${r1(st.fixSpoons * SPOON_G)}g）に固定</b>します` +
+      `（${serveText(Math.ceil(st.fixSpoons / MAX_PER_SERVE))}）。` +
+      `不足量にかかわらずこの杯数にするので、食事が足りている日は目標を上回ることがあります。` +
+      `空欄にすると不足量から自動で決めます。`
+    : fixRaw >= 1 && fixRaw > st.maxSpoons
+      ? `<b>${fixRaw}杯は指定できません。</b>いまの設定では最大 ${st.maxSpoons}杯 です` +
+        `（1回${MAX_PER_SERVE}杯まで×1日${st.twoDoses ? 2 : MAX_SESSIONS}回）。` +
+        (st.twoDoses ? '' : `「SAVASを1日2回まで摂る」をオンにすると ${2 * MAX_PER_SERVE}杯 まで指定できます。`)
+      : `空欄なら不足量から自動で決めます（食事で足りているほど少なくなります）。` +
+        `毎日同じ杯数にしたいときは 1〜${st.maxSpoons} を入力してください。`;
 
   // 1回目のSAVASを朝食のあとに摂る
   $('afterBNote').innerHTML = st.savasAfterB
