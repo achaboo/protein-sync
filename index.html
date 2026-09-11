@@ -394,10 +394,8 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
         <label for="savasShare">SAVASで賄う上限（1日の目標に対する割合 %）</label>
         <input type="number" inputmode="numeric" id="savasShare" value="40" min="0" max="100" step="5">
       </div>
-      <div>
-        <p class="hint" id="shareNote" style="margin:0"></p>
-      </div>
     </div>
+    <p class="hint" id="shareNote"></p>
 
     <p class="hint" id="liquidNote"></p>
 
@@ -424,10 +422,8 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
         <label for="fixSpoons">SAVASの杯数を指定（空欄＝自動）</label>
         <input type="number" inputmode="numeric" id="fixSpoons" value="" min="1" max="4" step="1" placeholder="自動">
       </div>
-      <div>
-        <p class="hint" id="fixNote" style="margin:0"></p>
-      </div>
     </div>
+    <p class="hint" id="fixNote"></p>
 
     <h3>基本係数の入力目安</h3>
     <div class="table-wrap">
@@ -657,7 +653,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.92';
+const APP_VERSION = '2026-09-01.93';
 
 const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのたんぱく質(g)
 const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
