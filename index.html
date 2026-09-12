@@ -656,10 +656,14 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.96';
+const APP_VERSION = '2026-09-01.97';
 
-const SPOON_G   = 6.5;                  // SAVAS付属スプーン1杯あたりのたんぱく質(g)
-const PER_SERVE = 3;                    // 推奨 1回あたりのスプーン杯数
+/* SAVASの1食分は28g＝付属スプーン4杯（明治の公式値。1杯は約7g）。
+   1食分28gあたり たんぱく質19.5g・108kcal・脂質2.0g・炭水化物3.7g
+   （うち食物繊維1.4g）・食塩相当量0.31〜0.76g。
+   以前はこれを3杯で割っていたため、1杯を1.6g多く数えていた。 */
+const SPOON_G   = 4.875;                // SAVAS付属スプーン1杯あたりのたんぱく質(g) = 19.5 ÷ 4
+const PER_SERVE = 4;                    // 1食分あたりのスプーン杯数（明治の表示）
 const SERVE_G   = SPOON_G * PER_SERVE;  // 1回 = 19.5g
 
 // 食事マスタ
@@ -797,19 +801,19 @@ const CARDIO_FULL   = 10;     // ウォーキング換算 10km で有酸素側�
 // 「総エネルギーの7%以下」が目標値で、2,200kcal ならおよそ 17g にあたる。
 const SAT_LIMIT     = 17;
 // SAVAS 1杯（付属スプーン1杯＝粉 約9.3g）に含まれる飽和脂肪酸(g)。
-// 1食分28g（＝3杯）で脂質2.0g、乳脂肪とココアバターは飽和が約6割なので 2.0×0.6÷3。
-const SAT_PER_SPOON = 0.4;
+// 1食分28g（＝4杯）で脂質2.0g、乳脂肪とココアバターは飽和が約6割なので 2.0×0.6÷4。
+const SAT_PER_SPOON = 0.3;
 
 // 食塩相当量の1日の目標（日本人の食事摂取基準・成人男性は 7.5g未満）。
 const SALT_LIMIT     = 7.5;
-// SAVAS 1杯あたりの食塩相当量(g)。1食分28g（＝3杯）で 0.31〜0.76g と幅があるので中間値を使う。
-const SALT_PER_SPOON = 0.18;
+// SAVAS 1杯あたりの食塩相当量(g)。1食分28g（＝4杯）で 0.31〜0.76g と幅があるので中間値を使う。
+const SALT_PER_SPOON = 0.134;
 
-// SAVAS 1食分28g（＝3杯）あたり 脂質2.0g・炭水化物3.7g（うち食物繊維1.4g）・108kcal
-const FAT_PER_SPOON   = 0.67;
-const CARB_PER_SPOON  = 1.23;
-const FIBER_PER_SPOON = 0.47;
-const KCAL_PER_SPOON  = 36;
+// SAVAS 1食分28g（＝4杯）あたり 脂質2.0g・炭水化物3.7g（うち食物繊維1.4g）・108kcal
+const FAT_PER_SPOON   = 0.5;
+const CARB_PER_SPOON  = 0.925;
+const FIBER_PER_SPOON = 0.35;
+const KCAL_PER_SPOON  = 27;
 
 // 食物繊維の目標量（日本人の食事摂取基準・64歳以下の男性は21g以上）
 const FIBER_TARGET = 21;
@@ -1216,7 +1220,7 @@ function calcFactor(st){
 // liqP＝1回あたりに液体（牛乳・豆乳など）から摂れるたんぱく質 g。水なら 0。
 const MAX_SESSIONS  = 1;    // SAVASは運動直後の1回だけ。他の時間帯では摂らない
 const MIN_SPOONS_TRAINED = 3;  // 筋トレをした日に必ず飲む最低杯数（製品推奨の1回3杯）
-const MAX_PER_SERVE = 4;    // 1回あたりの上限。推奨は3杯で、5杯以上はメーカーも推奨していない
+const MAX_PER_SERVE = 4;    // 1回あたりの上限。明治の1食分がスプーン4杯なので、これを1回分とする
 const ABSORB_CAP    = 40;   // 1回の摂取上限 g
 
 const TOLERANCE     = 3;    // これ以上の摂りすぎは許容しない g
