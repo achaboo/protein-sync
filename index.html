@@ -239,11 +239,13 @@ table.nutri .lim{width:7em;color:var(--sub);font-size:.78rem;white-space:nowrap}
 table.nutri .note{color:var(--sub);font-size:.76rem}
 table.nutri tr.over .num b{color:var(--warn)}      /* 多い＝赤 */
 table.nutri tr.under .num b{color:#b45309}         /* 少ない＝橙 */
+table.nutri tr.warn  .num b{color:#b45309}         /* 注意＝橙 */
 table.nutri .tag{display:inline-block;padding:0 6px;margin-right:5px;border-radius:999px;
   font-size:.72rem;font-weight:700;vertical-align:1px}
 table.nutri .tag.over{background:#fdeae6;color:var(--warn)}
 table.nutri .tag.under{background:#fdf0dc;color:#b45309}
 table.nutri .tag.ok{background:#e9f5ed;color:var(--ok)}
+table.nutri .tag.warn{background:#fdf0dc;color:#b45309}
 .edit-box{border:1px solid var(--brand);border-radius:12px;padding:12px;margin:0 0 12px;background:#f7faff}
 .edit-box>b{display:block;font-size:.92rem}
 .edit-box>small{display:block;color:var(--muted);margin:2px 0 8px}
@@ -387,7 +389,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
       </div>
       <div>
         <label for="baseFactor">基本係数（運動なしの日 / g per kg）</label>
-        <input type="number" inputmode="decimal" id="baseFactor" value="1.5" step="0.05" min="1" max="2.5">
+        <input type="number" inputmode="decimal" id="baseFactor" value="1.65" step="0.05" min="1" max="2.5">
       </div>
     </div>
     <p class="hint" id="baseNote"></p>
@@ -422,8 +424,8 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
 
     <div class="grid2" style="margin-top:12px">
       <div>
-        <label for="fixSpoons">SAVASの杯数を指定（空欄＝自動）</label>
-        <input type="number" inputmode="numeric" id="fixSpoons" value="" min="1" max="8" step="1" placeholder="自動">
+        <label for="fixSpoons">SAVASの杯数を指定（空欄＝不足量から自動）</label>
+        <input type="number" inputmode="numeric" id="fixSpoons" value="8" min="1" max="8" step="1" placeholder="自動">
       </div>
     </div>
     <p class="hint" id="fixNote"></p>
@@ -446,29 +448,33 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
             <td class="amt" id="bf14">-</td>
           </tr>
           <tr>
-            <td class="time">1.5<br><small>（初期値）</small></td>
-            <td>週数回の筋トレを続けながら、筋肉量を維持〜微増させたい標準的な設定。迷ったらこの値のままで構いません。</td>
+            <td class="time">1.5</td>
+            <td>週数回の筋トレを続けながら、筋肉量を維持〜微増させたい時期。</td>
             <td class="amt" id="bf15">-</td>
           </tr>
           <tr>
-            <td class="time">1.6〜1.7</td>
-            <td>減量中で筋肉を落としたくない時期、または筋肥大を積極的に狙う時期。その分、水分を多めに摂ってください。</td>
+            <td class="time">1.65<br><small>（初期値）</small></td>
+            <td>筋肥大を積極的に狙う時期の標準値。メタ解析で追加効果が頭打ちになる 1.6g/kg を少し上回る設定です。迷ったらこの値のままで構いません。</td>
+            <td class="amt" id="bf165">-</td>
+          </tr>
+          <tr>
+            <td class="time">1.7</td>
+            <td>減量しながら筋肉を落としたくない時期。その分、水分を多めに摂ってください。</td>
             <td class="amt" id="bf17">-</td>
           </tr>
         </tbody>
       </table>
     </div>
     <p class="hint">
-      表の目標量は<b>「運動しなかった日」</b>の値です。運動した日は「③ 今日の運動」の内容に応じて、
-      この基本係数に <b>最大 +0.30</b> が加算されます（上限 1.8 g/kg）。<br>
-      加算量は運動量スコアに比例します。スコアは
-      <b>総負荷量 ÷ 6,500kg</b> ＋ <b>ウォーキング換算距離 ÷ 10km</b>（合計100%で満点）で求めるため、
-      重量・回数・セット数・距離を変えるとそのまま結果に反映されます。<br>
+      <b>たんぱく質の目標は「体重 × 基本係数」だけで決まります。</b>運動した日でも加算しません。
+      筋トレの量からたんぱく質の必要量を細かく算出できる根拠が無く、レジスタンストレーニング中の
+      目安は <b>1.6g/kg 前後で頭打ち</b>になる（それ以上増やしても除脂肪量への上乗せが見られない）
+      ためです。<br>
+      <b>運動量はエネルギー側に反映します。</b>「③ 今日の運動」の内容から消費エネルギーを見積もり、
+      必要量に足します。運動した日は<b>たんぱく質ではなく主に炭水化物</b>を増やす設計です。<br>
       <b>サイクリングの距離も含みます。</b>同じ距離ならウォーキングより負荷が低いため、
       <b>0.35倍</b>してウォーキング換算距離に加算します（自転車10km ＝ 徒歩3.5km相当）。
-      換算後の距離は「④ 計算結果」の根拠欄に表示されます。<br>
-      加算方式なので、基本係数を下げれば運動した日の目標もその分下がります。
-      例：基本 1.50 でスコア100%の日は 1.80、基本 1.20 なら同じ運動でも 1.50 になります。
+      換算後の距離は「④ 計算結果」の根拠欄に表示されます。
     </p>
 
     <h3>設定の持ち運び（別の端末で同じ設定を使う）</h3>
@@ -637,7 +643,8 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
         </table>
       </div>
       <p id="schedNote"></p>
-      <p class="hint">※ 目安量は今日の目標値から自動配分しています（1回の摂取が 30〜40g を超えないよう調整）。</p>
+      <p class="hint">※ 目安量は今日の目標値から自動配分しています（SAVASと間食を引いた残りを、食事の数で等分）。<br>
+      1食のたんぱく質は <b>25〜35g が目安</b>、45gまでは問題ありません。40gは「これ以上使えない上限」ではないため、超えた分を後ろへ回すことはしません。</p>
     </section>
 
     <section>
@@ -656,7 +663,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.103';
+const APP_VERSION = '2026-09-01.106';
 
 /* SAVASの1食分は28g＝付属スプーン4杯（明治の公式値。1杯は約7g）。
    1食分28gあたり たんぱく質19.5g・108kcal・脂質2.0g・炭水化物3.7g
@@ -754,10 +761,10 @@ const FOODS = [
   {id:'yogurt',  name:'無脂肪ヨーグルト',      short:'無脂肪ヨーグルト', note:'1杯100g 約4.6g',
    ruleNote:'1カップ400g・139円（100gあたり35円）',
    price:35, p:4.6, unit:'杯', sat:0.2, salt:0.1, carbG:4.9, fiber:0, kcal:40, fat:0.3,
-   slots:['s'], lock:true, home:true},
+   slots:['s'], lock:true, home:true, autoFill:true, fillMax:3},
   {id:'chicken', name:'サラダチキン',          short:'サラダチキン',   note:'1P 約20.9g',
    price:278, p:20.9, unit:'P', sat:0.5, salt:2.2, carbG:1.4, fiber:1.4, kcal:103, fat:1.8,
-   slots:['s'], lock:true, home:true},
+   slots:['s'], lock:true, home:true, autoFill:true, fillMax:2},
   {id:'egg',     name:'卵',                  short:'卵',           note:'1個 約6g',
    price:27, ruleNote:'1日2個まで<br>（メニューに含まれる卵も数える）', p:6, unit:'個', sat:1.6, salt:0.2, carbG:0.2, fiber:0, kcal:71, fat:5.2,
    slots:['s'], lock:true, home:true, autoDaily:2, max:2},
@@ -775,15 +782,15 @@ const FOODS = [
    slots:['s'], lock:true, slot:'d', home:true, homeMeal:true},
   {id:'tuna',    name:'ツナ缶',                short:'ツナ缶',       note:'1缶 約12.7g',
    price:133, p:12.7, unit:'缶', sat:3.8, salt:0.6, carbG:0.1, fiber:0, kcal:184, fat:14.8,
-   slots:['s'], lock:true, home:true},
+   slots:['s'], lock:true, home:true, autoFill:true, fillMax:2},
   {id:'rice',    name:'ご飯（0.5合）',        short:'ご飯',         note:'0.5合 約4.5g',
    weekName:'ご飯', ruleNote:'自宅の食事に1.5合（0.5合×3杯）',
    price:33, p:4.5, unit:'杯', sat:0.1, salt:0, carbG:58.0, fiber:2.5, kcal:257, fat:0.7,
    slots:['d'], lock:true, slot:'d', home:true, homeMeal:true, homeBreakfast:true, fixedMenu:true,
    carb:true, group:'staple', slotLimit:3},
   {id:'natto',   name:'納豆',                short:'納豆',         note:'1パック 約8.3g',
-   price:32, ruleNote:'不足分から自動計算', p:8.3, unit:'P', sat:0.8, salt:0.7, carbG:7.3, fiber:3.6, kcal:99, fat:4.9,
-   slots:['s'], lock:true, home:true, autoNatto:true}
+   price:32, p:8.3, unit:'P', sat:0.8, salt:0.7, carbG:7.3, fiber:3.6, kcal:99, fat:4.9,
+   slots:['s'], lock:true, home:true, autoFill:true, fillMax:3}
 ];
 
 // SAVASは水のみで溶かす（乳類は摂らない前提）。水にたんぱく質は含まれないため加算はない。
@@ -836,6 +843,11 @@ const KCAL_PER_SPOON  = 27;
 
 // 食物繊維の目標量（日本人の食事摂取基準・64歳以下の男性は21g以上）
 const FIBER_TARGET = 21;
+
+/* 1食あたりのたんぱく質の評価帯。40gは「これ以上は使えない上限」ではなく目安。
+   25〜35gで筋タンパク合成はほぼ最大になり、それを超えた分が無駄になるわけではない。 */
+const MEAL_P_GOOD = [25, 35];   // ◎ この範囲を基本の目標にする
+const MEAL_P_OK   = 45;         // ○ ここまでは許容。超えたときだけ「分散できるなら」と添える
 // 脂質の目標範囲（総エネルギーの20〜30%）。脂質は1gあたり9kcal。
 const FAT_MIN_E = 0.20, FAT_MAX_E = 0.30, KCAL_PER_FAT = 9;
 // 炭水化物の目標範囲（総エネルギーの50〜65%）。炭水化物は1gあたり4kcal。
@@ -895,6 +907,11 @@ const infoHtml = f =>
   `${f.note}${/）$/.test(f.note) ? '' : ' '}<b>${f.price ? f.price + '円' : '無料'}</b>` +
   (isEdited(f) ? ' <b class="edited">変更済み</b>' : '');
 
+// 不足分を自動で埋める候補には、共通の注記を付ける
+FOODS.filter(f => f.autoFill).forEach(f => {
+  f.ruleNote = (f.ruleNote ? f.ruleNote + '<br>' : '') + '不足分の自動計算の候補';
+});
+
 const foodRow = f => `
   <div class="row" id="row_${f.id}">
     <div class="name"><b>${f.shop ? f.shop + '<br>' : ''}${esc(f.name)}</b>` +
@@ -907,7 +924,7 @@ const foodRow = f => `
       `${f.custom ? `<button type="button" class="mini-btn del-btn" data-del="${f.id}">削除</button>` : ''}` +
       // 自動計算する品目は、手で書き換えたときに自動へ戻せるようにする。
       // 手入力に切り替えたときだけ出す行なので、まるごと hidden にして空の行を作らない
-      `${f.autoNatto || f.autoEnergy
+      `${f.autoFill || f.autoEnergy
         ? `<span id="autoWrap_${f.id}" hidden><br><span id="autoNote_${f.id}"></span>` +
           `<button type="button" id="autoBack_${f.id}" class="mini-btn">自動計算に戻す</button></span>`
         : ''}` +
@@ -1084,7 +1101,7 @@ function readState(){
     weight: num('weight') || 73.5,
     height: num('height') || 177.4,
     age:    num('age')    || 55,
-    baseFactor: num('baseFactor') || 1.5,
+    baseFactor: num('baseFactor') || 1.65,
     walk: num('walk'), cycle: num('cycle'), otherP: num('otherP'),
     otherNote: ($('otherNote').value || '').trim(),
     // 「その他」の栄養成分。分かる範囲だけ入れてもらう（未入力は0）
@@ -1216,25 +1233,29 @@ function calcFactor(st){
                  ` → 運動量スコア ${Math.round(cardioRatio * 100)}%：${CARDIO_FULL}km で満点）`);
   }
 
+  /* たんぱく質の目標は「体重 × 基本係数」だけで決める。
+     運動量はエネルギー（calcEnergy）に反映し、たんぱく質には加算しない。
+     筋トレの量からたんぱく質の必要量を細かく算出できる根拠が無く、
+     レジスタンストレーニング中の目安は 1.6g/kg 前後で頭打ちになるため。 */
   const base   = st.baseFactor;
   const cap    = capOf(base);
-  const raw    = r2(base + bonus);
-  const factor = Math.min(raw, cap);          // 上限は 1.8（基本係数がそれ以上ならその値）
-  const capped = raw > cap;
+  const factor = base;
+  const capped = false;
 
-  if(!reasons.length) reasons.push('運動の入力なし（加算なし。基本係数をそのまま適用）');
+  if(!reasons.length) reasons.push('運動の入力なし');
 
-  const level = bonus >= 0.25 ? {t:'ハード日',       c:'#c2410c'}
-              : bonus >= 0.15 ? {t:'トレーニング日', c:'#1f6feb'}
-              : bonus >  0    ? {t:'軽運動日',       c:'#0f9d58'}
-              :                 {t:'休養日',         c:'#5d6b7c'};
+  // 運動量スコアは、たんぱく質ではなくエネルギーとその日の区分（バッジ）に使う
+  const level = loadRatio >= 0.83 ? {t:'ハード日',       c:'#c2410c'}
+              : loadRatio >= 0.50 ? {t:'トレーニング日', c:'#1f6feb'}
+              : loadRatio >  0    ? {t:'軽運動日',       c:'#0f9d58'}
+              :                     {t:'休養日',         c:'#5d6b7c'};
 
   return {factor, base, bonus, cap, capped, volume, done, cardio,
           loadRatio, loadCapped, strengthRatio, cardioRatio, reasons, level};
 }
 
 // 不足分を「1回3杯（約19.5g）」を基準にセッション分割
-// 1回の吸収上限と胃への負担を考慮し、1回は最大3杯・1日最大3回（＝9杯/約58.5g）まで。
+// 1回は明治の1食分（4杯）まで、1日2回まで。
 // それを超える不足分は粉に頼らず食事で補う想定とし、excess として返す。
 // liqP＝1回あたりに液体（牛乳・豆乳など）から摂れるたんぱく質 g。水なら 0。
 const MAX_SESSIONS  = 1;    // SAVASは運動直後の1回だけ。他の時間帯では摂らない
@@ -1331,8 +1352,8 @@ const TWO_MEAL_SPOONS = MAX_PER_SERVE * 2;   // 2食の日に固定する杯数�
 // 自動入力した納豆を除いた不足量。SAVASの杯数はこちらを基準に決めるので、
 // 納豆を足したあとに再計算しても杯数が動かない（＝堂々巡りにならない）。
 function lackBeforeAuto(st, food, target){
-  const f = FOODS.find(x => x.autoNatto);
-  const g = f ? (st.foods[f.id] || 0) * f.p : 0;
+  const g = FOODS.filter(x => x.autoFill)
+                 .reduce((a, x) => a + (st.foods[x.id] || 0) * x.p, 0);
   return r1(Math.max(0, target - r1(food.total - g)));
 }
 function savasFor(st, ex, lack, target, lackBase){
@@ -1371,7 +1392,7 @@ function savasFor(st, ex, lack, target, lackBase){
 /* 自動計算する品目を手で書き換えたか（切らしている日など）。
    その日のうちは手入力を優先し、「自動計算に戻す」で解除する。 */
 let autoOverride = {};                 // 自動入力を止めている品目 {id:true}
-const AUTO_IDS = () => FOODS.filter(f => f.autoNatto || f.autoEnergy).map(f => f.id);
+const AUTO_IDS = () => FOODS.filter(f => f.autoFill || f.autoEnergy).map(f => f.id);
 const autoOff  = id => !!autoOverride[id];
 function refreshAutoNotes(){
   AUTO_IDS().forEach(fid => {
@@ -1412,28 +1433,69 @@ function autoFillRice(){
   if(!items.length) return;
   const auto = items.filter(f => !autoOff(f.id));
   auto.forEach(f => { $('f_' + f.id).value = 0; });   // まず0にして、ご飯なしの過不足を見る
-  autoFillNatto();
+  autoFillProtein();
   const st  = readState();
   const gap = energyGapNow();
-  if(gap <= ENERGY_OK) return;
+  if(gap <= ENERGY_CARE) return;   // 注意の段階（−300kcal）から入れる
   const f = auto.find(x => atShop(x, st));
   if(f) $('f_' + f.id).value = 1;
 }
 
-function autoFillNatto(){
-  const f = FOODS.find(x => x.autoNatto);
-  if(!f || !$('f_' + f.id)) return;
-  if(autoOff(f.id)) return;                       // 手入力を優先する
-  const el = $('f_' + f.id);
-  el.value = 0;                                   // 納豆を除いた状態で不足を測る
-  const st = readState();
-  const ex = calcFactor(st);
+/* たんぱく質の残りを自動で埋める。
+   以前は納豆1種類だけを増やしていたが、それではたんぱく質だけを合わせて
+   食塩・飽和脂肪酸・食費が置き去りになる（SAVASを正しい値に直したら納豆が
+   5〜6パックになり、食塩が12gを超えた）。
+   いまは候補の中から、その日の食塩と飽和脂肪酸の残り枠を見ながら1単位ずつ選ぶ。 */
+const FILL_STEPS = 30;                    // 無限ループ防止（1日にこれ以上は足さない）
+function autoFillProtein(){
+  const all  = FOODS.filter(f => f.autoFill && $('f_' + f.id));
+  const auto = all.filter(f => !autoOff(f.id));   // 手入力に切り替えた品目は触らない
+  if(!auto.length) return;
+  auto.forEach(f => { $('f_' + f.id).value = 0; });   // まず0にして残りを測る
+
+  const st     = readState();
+  const ex     = calcFactor(st);
   const target = r1(st.weight * ex.factor);
   const lack   = r1(Math.max(0, target - calcFood(st).total));
   const sv     = savasFor(st, ex, lack, target);
-  const rest   = r1(Math.max(0, lack - sv.totalG));
-  // 四捨五入で最も目標に近いパック数にする（切り上げると数g超過しやすいため）
-  el.value = Math.min(f.max || 99, Math.max(0, Math.round(rest / f.p)));
+  let rest     = r1(Math.max(0, lack - sv.totalG));
+  if(rest <= 0) return;
+
+  // 候補を入れる前の、その日の食塩と飽和脂肪酸
+  let saltNow = calcSalt(st, sv).total;
+  let satNow  = calcSat(st, sv).total;
+
+  const qty = {};
+  auto.forEach(f => qty[f.id] = 0);
+  for(let step = 0; step < FILL_STEPS; step++){
+    const saltRoom = Math.max(0.3, SALT_LIMIT - saltNow);   // 目標までの残り（重み付け用）
+    const satRoom  = Math.max(0.5, SAT_LIMIT  - satNow);
+    let best = null;
+    auto.forEach(f => {
+      if(f.p <= 0) return;
+      const cap = Math.min(roomFor(f, st), f.fillMax || 99);
+      if(cap - qty[f.id] <= 0) return;              // 1日の上限（fillMax）まで
+      if(rest < f.p / 2) return;                    // 入れると行き過ぎる（四捨五入と同じ考え方）
+      /* たんぱく質を合わせるために食塩や飽和脂肪酸の線を越えることはしない。
+         越えるくらいなら足さずに「残りは食事で」と出す。 */
+      if(saltNow + (f.salt || 0) > SALT_BAD  + 0.05) return;
+      if(satNow  + (f.sat  || 0) > SAT_LIMIT + 0.05) return;
+      /* たんぱく質1gあたりの「痛み」。残り枠が少ない栄養素ほど重く効く。
+         同じ品目を重ねるほど痛みを増やして、1種類に偏らないようにする
+         （納豆5パックのような献立を作らないため）。 */
+      const pain = ((f.salt  || 0) / saltRoom +
+                    (f.sat   || 0) / satRoom  +
+                    (f.price || 0) / 800) / f.p * (1 + 0.6 * qty[f.id]);
+      if(!best || pain < best.pain) best = {f, pain};
+    });
+    if(!best) break;
+    qty[best.f.id]++;
+    rest    = r1(rest - best.f.p);
+    saltNow = r1(saltNow + (best.f.salt || 0));
+    satNow  = r1(satNow  + (best.f.sat  || 0));
+    if(rest <= 0) break;
+  }
+  auto.forEach(f => { $('f_' + f.id).value = qty[f.id]; });
 }
 
 /* エネルギーが足りないときに、②の品目から手早く足せるものを挙げる。
@@ -1445,12 +1507,21 @@ const ENERGY_MIN_NET = 20;   // これ未満しか増えない品目は挙げな
 const SAT_PER_UNIT_MIN  = 0.4;  // 飽和脂肪酸の残り枠で数を絞る対象（1単位あたり）
 const SALT_PER_UNIT_MIN = 0.2;  // 食塩の残り枠で数を絞る対象（1単位あたり）
 const ENERGY_OVER_OK    = 150;  // この量までの超過は書き添えない
-const ENERGY_OK         = 400;  // 必要量とのズレがこの範囲なら「ちょうどよい」
+/* 各栄養素の判定の段階。「基準を満たす／満たさない」の2値ではなく、
+   どのくらい離れているかで書き分ける。 */
+const ENERGY_OK    = 200;   // 必要量とのズレがこの範囲なら「ちょうどよい」kcal
+const ENERGY_CARE  = 300;   // ここを超える不足は注意
+const ENERGY_BAD   = 500;   // ここを超える不足は筋肥大に不利（強い警告）
+const SALT_CARE    = 8.0;   // 食塩：目標7.5gを超えたあと、ここまでは「やや多い」
+const SALT_BAD     = 9.0;   // ここを超えたら「多すぎる」
+const SAT_GOOD     = 15;    // 飽和脂肪酸：ここまでなら良好（上限17gを埋めにいかない）
 function energyAdvice(st, gap, satTotal, saltTotal){
-  const natto    = FOODS.find(f => f.autoNatto);
-  const nattoQty = natto ? Math.round(st.foods[natto.id] || 0) : 0;
-  const offset   = nattoQty > 0 && natto ? natto.kcal / natto.p : 0;   // たんぱく質1gあたり減るkcal
-  const netOf    = f => Math.round(f.kcal - f.p * offset);
+  /* たんぱく質を含む品目を足すと、自動計算で入れている品目がそのぶん減る。
+     いちばん多く入っているものを基準にして、実際に増えるkcalを見る。 */
+  const filler = FOODS.filter(f => f.autoFill && Math.round(st.foods[f.id] || 0) > 0)
+                      .sort((a, b) => (st.foods[b.id] || 0) - (st.foods[a.id] || 0))[0];
+  const offset = filler ? filler.kcal / filler.p : 0;   // たんぱく質1gあたり減るkcal
+  const netOf  = f => Math.round(f.kcal - f.p * offset);
   // 店のメニュー（朝食・夕食）は曜日で決まっているので候補にしない。
   // 候補にするのは、その店に行く日のご飯のおかわり（無料）だけ。
   const pick = f => !f.shop || (f.shopSlot && atShop(f, st));
@@ -1463,7 +1534,7 @@ function energyAdvice(st, gap, satTotal, saltTotal){
     if(f.salt >= SALT_PER_UNIT_MIN) cap = Math.min(cap, Math.floor((SALT_LIMIT - saltTotal) / f.salt));
     return cap;
   };
-  const cands = FOODS.filter(f => pick(f) && !f.autoNatto && f.kcal > 0)
+  const cands = FOODS.filter(f => pick(f) && !f.autoFill && f.kcal > 0)
                      .map(f => ({f, net:netOf(f), cap:capOfFood(f)}))
                      .filter(x => x.net >= ENERGY_MIN_NET && x.cap >= 1)
                      .sort((a, b) => b.net - a.net)
@@ -1484,22 +1555,22 @@ function energyAdvice(st, gap, satTotal, saltTotal){
                : '') + `</li>`;
   }).join('');
   // 相殺で増えない品目があるなら、勧めない理由も書いておく
-  const flat = nattoQty > 0
-    ? FOODS.filter(f => pick(f) && !f.autoNatto && f.kcal > 0 && netOf(f) < ENERGY_MIN_NET && f.p >= 5)
+  const flat = filler
+    ? FOODS.filter(f => pick(f) && !f.autoFill && f.kcal > 0 && netOf(f) < ENERGY_MIN_NET && f.p >= 5)
            .map(f => f.short)
     : [];
   return `<div class="advice"><b>エネルギー：あと ${gap.toLocaleString()}kcal。</b>` +
          `この品目だけで埋めるなら次のとおりです（組み合わせても構いません）。` +
          `<ul class="engy">${rows}</ul>` +
          (flat.length
-           ? `<small>${flat.join('・')}は、足すと自動計算の納豆（1P 99kcal）がそのぶん減るため、` +
+           ? `<small>${flat.join('・')}は、足すと自動計算の${esc(filler ? filler.short : '')}がそのぶん減るため、` +
              `合計はほとんど増えません。エネルギーを増やすなら、たんぱく質の少ない品目を選びます。</small>`
            : '') + `</div>`;
 }
 
-// 自動入力はご飯（エネルギー）→ 納豆（たんぱく質）の順。
-// 先にご飯を決めることで、そのご飯のたんぱく質ぶん納豆が減る。
-function autoFillAuto(){ autoFillRice(); autoFillNatto(); }
+// 自動入力はご飯（エネルギー）→ たんぱく質の順。
+// 先にご飯を決めることで、そのご飯のたんぱく質ぶん後の候補が減る。
+function autoFillAuto(){ autoFillRice(); autoFillProtein(); }
 
 /* ============================================================
    結果描画
@@ -1570,11 +1641,11 @@ function render(opts){
 
 /* 各行の判定を「多い／少ない／範囲内」の札で示す。
      赤いだけでは多いのか少ないのか分からないため、色も分けている。 */
-  const TAG = {over:'多い', under:'少ない', ok:'ちょうどよい'};
-  const row = (name, val, unit, limit, state, note) =>
+  const TAG = {over:'多い', under:'少ない', ok:'ちょうどよい', warn:'注意'};
+  const row = (name, val, unit, limit, state, note, tag) =>
     `<tr class="${state}"><th>${name}</th>` +
     `<td class="num"><b>${val}</b> ${unit}</td><td class="lim">${limit}</td>` +
-    `<td class="note"><b class="tag ${state}">${TAG[state]}</b>${note}</td></tr>`;
+    `<td class="note"><b class="tag ${state}">${tag || TAG[state]}</b>${note}</td></tr>`;
   const judge = (v, min, max) => v < min ? 'under' : (max !== null && v > max) ? 'over' : 'ok';
 
   /* 脂質は総エネルギーの20〜30%、炭水化物は50〜65%が目標範囲。
@@ -1588,7 +1659,15 @@ function render(opts){
   const satPct = fat.total > 0 ? Math.round(sat.total / fat.total * 100) : 0;
   const fatState  = judge(fat.total, fatMin, fatMax);
   const carbState = judge(Math.round(carb.total), carbMin, carbMax);
-  const kcalState = kcalGap < -ENERGY_OK ? 'under' : kcalGap > ENERGY_OK ? 'over' : 'ok';
+  /* エネルギーは4段階。筋肥大を狙う以上、慢性的な赤字は「たんぱく質さえ足りていればよい」
+     とは言えない（−500kcal前後の赤字は除脂肪量の増加を妨げる目安）。 */
+  const kcalState = kcalGap <= -ENERGY_BAD ? 'under'
+                  : kcalGap <  -ENERGY_OK  ? 'warn'
+                  : kcalGap >   ENERGY_OK  ? 'over' : 'ok';
+  const kcalTag   = kcalGap <= -ENERGY_BAD ? '足りない'
+                  : kcalGap <= -ENERGY_CARE ? '筋肥大には不利'
+                  : kcalGap <  -ENERGY_OK  ? 'やや少ない'
+                  : kcalGap >   ENERGY_OK  ? '多い' : 'ちょうどよい';
 
   $('oSatBox').className = 'satbox' + (satOver > 0 || saltOver > 0 ? ' over' : '');
   $('oSatBox').innerHTML =
@@ -1598,12 +1677,24 @@ function render(opts){
          : fatState === 'over' ? `目標を ${r1(fat.total - fatMax)}g 超えています。`
          : '') +
         `うち飽和脂肪酸 ${sat.total}g（${satPct}%）`) +
-    row('飽和脂肪酸', sat.total, 'g', `${SAT_LIMIT}g 以下`, satOver > 0 ? 'over' : 'ok',
-        satOver > 0 ? `目安を ${satOver}g 超えています。${top3(sat)}`
-                    : `目安まで あと ${r1(-satOver)}g。${top3(sat)}`) +
-    row('食塩相当量', salt.total, 'g', `${SALT_LIMIT}g 未満`, saltOver > 0 ? 'over' : 'ok',
-        saltOver > 0 ? `目標を ${saltOver}g 超えています。${top3(salt)}`
-                     : `目標まで あと ${r1(-saltOver)}g。${top3(salt)}`) +
+    row('飽和脂肪酸', sat.total, 'g', `${SAT_LIMIT}g 以下`,
+        satOver > 0 ? 'over' : sat.total > SAT_GOOD ? 'warn' : 'ok',
+        satOver > 0
+          ? `上限を ${satOver}g 超えています。${top3(sat)}`
+          : sat.total > SAT_GOOD
+            ? `上限（${SAT_LIMIT}g）までは あと ${r1(-satOver)}g ですが、` +
+              `LDLを下げたい日は ${SAT_GOOD}g 以下に抑えたいところです。${top3(sat)}`
+            : `${SAT_GOOD}g 以下です。${SAT_LIMIT}g は上限なので、埋めにいく必要はありません。${top3(sat)}`,
+        satOver > 0 ? '多い' : sat.total > SAT_GOOD ? '上限内' : '良好') +
+    row('食塩相当量', salt.total, 'g', `${SALT_LIMIT}g 未満`,
+        salt.total > SALT_BAD ? 'over' : saltOver > 0 ? 'warn' : 'ok',
+        saltOver > 0
+          ? `目標（${SALT_LIMIT}g未満）を ${saltOver}g 超えています。` +
+            (salt.total > SALT_BAD
+              ? `<b>たんぱく質を満たすためにここまで塩を増やすのは避けたいところです。</b>`
+              : '') + top3(salt)
+          : `目標まで あと ${r1(-saltOver)}g。${top3(salt)}`,
+        salt.total > SALT_BAD ? '多すぎる' : saltOver > 0 ? 'やや多い' : 'ちょうどよい') +
     row('食物繊維', fiber.total, 'g', `${FIBER_TARGET}g 以上`,
         fiber.total < FIBER_TARGET ? 'under' : 'ok',
         (fiber.total < FIBER_TARGET
@@ -1618,15 +1709,20 @@ function render(opts){
         (kcalState === 'ok'
           ? (kcalGap === 0 ? `必要量ちょうどです。`
              : `おおむね必要量どおりです（${Math.abs(kcalGap).toLocaleString()}kcal ${kcalGap < 0 ? '少なめ' : '多め'}）。`)
-          : kcalGap < 0 ? `必要量に ${Math.abs(kcalGap).toLocaleString()}kcal 足りません。`
-          : `必要量を ${kcalGap.toLocaleString()}kcal 上回っています。`) +
+          : kcalGap < 0
+            ? `必要量に ${Math.abs(kcalGap).toLocaleString()}kcal 足りません。` +
+              (kcalGap <= -ENERGY_CARE
+                ? `<b>筋肥大を狙うなら、この赤字は不利です</b>（たんぱく質が足りていても、` +
+                  `エネルギーが慢性的に足りないと除脂肪量は増えにくくなります）。`
+                : '')
+            : `必要量を ${kcalGap.toLocaleString()}kcal 上回っています。`) +
         // 体脂肪1kg ≒ 7,200kcal。差がこのまま続いたときの週あたりの体重変化
         (Math.abs(kcalGap) > 100
           ? `このままなら週 約${r1(Math.abs(kcalGap) * 7 / 7200)}kg ${kcalGap < 0 ? '減' : '増'}`
           : '') +
-        `（基礎代謝 ${calcBMR(st).toLocaleString()} × 1.50 ＋ 運動 ${calcEnergy(st, ex).kcal}）`) +
+        `（基礎代謝 ${calcBMR(st).toLocaleString()} × 1.50 ＋ 運動 ${calcEnergy(st, ex).kcal}）`, kcalTag) +
     `</tbody></table>` +
-    (kcalState === 'under' ? energyAdvice(st, -kcalGap, sat.total, salt.total) : '') +
+    (kcalGap <= -ENERGY_CARE ? energyAdvice(st, -kcalGap, sat.total, salt.total) : '') +
     (satOver > 0 && satAlts.length
       ? `<div class="advice">飽和脂肪酸：${satTop.short}（${satTop.sat}g）を${satAlts.join('／')}に替えると下がります。</div>`
       : '') +
@@ -1712,7 +1808,7 @@ function render(opts){
       (sv.packed
         ? (sv.sessions.length > 1
             ? `1回あたりは推奨の${PER_SERVE}杯より1杯多い${MAX_PER_SERVE}杯ですが、` +
-              `吸収上限（1回${ABSORB_CAP}g）の範囲内です。`
+              `1回の目安（${MEAL_P_GOOD[0]}〜${MEAL_P_OK}g）の範囲内です。`
             : `推奨の${PER_SERVE}杯より1杯多めですが、SAVASは運動直後の1回だけなので` +
               `上限の${MAX_PER_SERVE}杯（${r1(MAX_PER_SERVE * SPOON_G)}g）まで使っています。`)
         : '') +
@@ -1735,18 +1831,8 @@ function render(opts){
     // 端末ごとに設定が違うと結果も変わるため、比較できるよう設定値を並べる
     `<b>設定：</b>体重 ${r1(st.weight)}kg ／ ${st.meals}食 ／ 基本係数 ${st.baseFactor.toFixed(2)} ／ ` +
     `SAVAS上限 ${Math.round(st.savasShare * 100)}% ／ バージョン ${APP_VERSION}<br>` +
-    `<b>目標の算出根拠：</b>体重 ${r1(st.weight)}kg × <b>${ex.factor.toFixed(2)} g/kg</b> = <b>${target}g</b><br>` +
-    `　内訳：基本係数 <b>${ex.base.toFixed(2)}</b>` +
-    (ex.bonus > 0
-      ? ` ＋ 運動による加算 <b>+${ex.bonus.toFixed(2)}</b>` +
-        `（運動量スコア ${Math.round(ex.loadRatio * 100)}% × 上限 +${BONUS_MAX.toFixed(2)}）`
-      : `（運動による加算なし）`) +
-    (ex.capped ? `　※ ${(ex.base + ex.bonus).toFixed(2)} は上限 ${ex.cap.toFixed(2)} を超えるため ${ex.cap.toFixed(2)} に丸めました` : '') +
-    (ex.loadCapped
-      ? `<br>　<b>※ 運動量スコアが上限の100%に達しています。</b>` +
-        `これ以上 重量・回数・セット数・距離を増やしても目標は変わりません。`
-      : '') +
-    `<br>` +
+    `<b>目標の算出根拠：</b>体重 ${r1(st.weight)}kg × <b>${ex.factor.toFixed(2)} g/kg</b> = <b>${target}g</b>` +
+    `（運動量はたんぱく質ではなくエネルギーの必要量に反映します）<br>` +
     ex.reasons.map(r => '・' + r).join('<br>') +
     `<br><b>食事の内訳：</b>` + (food.list.length ? food.list.join('、') : '入力なし') +
     (sv.spoons > 0 && st.liqP > 0
@@ -1996,9 +2082,13 @@ function mealAdvice(bin, target, st, dayCovered){
         `提案した品目は分割できないため配分に偏りが出ているだけなので、無理に足す必要はありません。`
       : `<b>それでも目安まで あと約${d}g。</b>他の食事で調整するか、少量足してください。`;
   }else if(d <= -5){
+    // 多い食事。45gを超えたときだけ「分散できるなら」と添える（上限ではない）
+    const much = after > MEAL_P_OK
+      ? `1食${MEAL_P_OK}gを超えているので、分散できるなら他の時間帯に回すとより効率よく使えます。`
+      : `${MEAL_P_GOOD[0]}〜${MEAL_P_OK}gの範囲なので、このままで問題ありません。`;
     msg += (bin.locked && bin.locked.length)
-      ? `目安より約${r1(-d)}g多めですが、<b>${bin.locked.join('・')}</b>はこの時間帯にしか摂れないため、そのままで構いません。その分、他の時間帯を軽めに調整してください。`
-      : `目安より約${r1(-d)}g多めです。他の時間帯に回すと1回30〜40gの範囲に収まります。`;
+      ? `目安より約${r1(-d)}g多めです（<b>${bin.locked.join('・')}</b>はこの時間帯にしか摂れません）。${much}`
+      : `目安より約${r1(-d)}g多めです。${much}`;
   }else{
     msg += '目安どおりのバランスです。';
   }
@@ -2019,16 +2109,15 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   // その分は食事の枠から差し引いてから 朝／昼／晩 に配分する。
   // 自宅で夕食をとる日のサバ缶とご飯は夕食の枠に入るので、ここでは差し引かない。
   const snackG  = r1(FOODS.reduce((a, f) => a + snackQty(f, st) * f.p, 0));
-  // 食事で摂るべき量 = 目標 − SAVAS − 間食 を 朝30% / 昼35% / 晩35% に配分（1回40g上限）
+  /* 食事で摂るべき量 = 目標 − SAVAS − 間食。これを食事の数で等分する。
+     以前は 朝30%/昼35%/晩35% の割合で分け、1食40gで頭打ちにしていたが、
+     たんぱく質は割合ではなくgで見るほうが実態に合う（1食25〜35gが目安）。 */
   const byMeal  = Math.max(0, target - sv.totalG - snackG);
-  const cap     = g => Math.min(40, Math.round(g));
-  // 2食のときは残る2枠で半分ずつ
-  const share   = st.skip === 'b' ? {b:0,   l:0.5, d:0.5}
-                : st.skip === 'l' ? {b:0.5, l:0,   d:0.5}
-                :                   {b:0.30, l:0.35, d:0.35};
-  const mBreak  = cap(byMeal * share.b);
-  const mLunch  = cap(byMeal * share.l);
-  const mDinner = cap(byMeal * share.d);
+  const nMeals  = ['b','l','d'].filter(k => k !== st.skip).length || 1;
+  const per     = Math.round(byMeal / nMeals);
+  const mBreak  = st.skip === 'b' ? 0 : per;
+  const mLunch  = st.skip === 'l' ? 0 : per;
+  const mDinner = per;
 
   const sMorning = sv.sessions[0];   // 1回目（運動直後、休養日は起床後）
   const sEvening = sv.sessions[1];   // 2回目（「1日2回まで」を選んだ場合のみ）
@@ -2055,10 +2144,11 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   const LATE_HHMM = 20 * 60;                  // これより遅い摂取は就寝前として注意する
   const BREAKFAST_END = 11 * 60;              // 牛丼チェーンの朝食メニューの注文期限（11:00）
 
-  const overBin = (bin, targetG) => {
-    const after = r1(bin.total + bin.addTotal);
-    return (targetG - after) <= -5 && !(bin.locked && bin.locked.length);
-  };
+  /* 目安を超えた分を後ろへ回す「回し分」は作らない。
+     1回に使えるたんぱく質の上限が40gという前提が正しくないため、
+     42gになったからと2gを3時間後に食べさせるのは食事管理として不自然。
+     多い食事には⑤の一言で「分散できるなら」と添えるだけにする。 */
+  const overBin = () => false;
   const overG = (bin, targetG) => r1(r1(bin.total + bin.addTotal) - targetG);
 
   /* 回し分に出す品目を選ぶ。ご飯（主食）とミックスサラダ（先に食べる野菜）は
@@ -2461,7 +2551,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
           ? (postSplit.second.length ? `<b>あわせて ${labelOf(postSplit.second)}</b>` : `水${WATER_ML}mlで溶かす`)
           : `夕食で摂りきれない分をここで補います。<b>水${WATER_ML}ml</b>に溶かして飲んでください。` +
         (postSplit.second.length ? `<br><b>あわせて ${labelOf(postSplit.second)}</b>。` : '') +
-        `<br><small>運動直後に全部まとめるより、1回30〜40gの範囲に収まるほうが筋肉の材料として使われます。</small>` +
+        `<br><small>運動直後に全部まとめるより、1回25〜35gの範囲に分けるほうが筋肉の材料として使われます。</small>` +
         // SAVASは吸収が速く脂質も少ないため、就寝前でも食事のような負担にならない。
         // 食品の回し分・間食と違って警告は出さず、補足だけを添える。
         (late
@@ -2513,10 +2603,10 @@ function renderAltFoods(toFoodG, sv, st, plan, capBinds){
   const ALT_MIN_P = 5;
   // たんぱく質10gあたりの単価が安い順に並べる（コスト効率が一目で分かるように）
   // 自動計算の品目（納豆）は不足量から数が決まるので、ここで増やす提案はしない
-  const shown = FOODS.filter(f => !f.first && !f.fixedMenu && !f.autoNatto && f.p >= ALT_MIN_P)
+  const shown = FOODS.filter(f => !f.first && !f.fixedMenu && !f.autoFill && f.p >= ALT_MIN_P)
                      .filter(f => roomFor(f, st) > 0)
                      .slice().sort((a, b) => pricePer10g(a) - pricePer10g(b));
-  const hidden = FOODS.filter(f => !f.first && !f.fixedMenu && !f.autoNatto && f.p < ALT_MIN_P);
+  const hidden = FOODS.filter(f => !f.first && !f.fixedMenu && !f.autoFill && f.p < ALT_MIN_P);
   if(!shown.length){
     box.innerHTML =
       `<div class="alt"><h4>残り ${toFoodG}g をどうするか` +
@@ -2740,7 +2830,7 @@ function fixedSavas(spoons, st){
 /* SAVASを足すと目標を超える場合に、食事のどれを減らすとよいかを提案する。
    ルールで固定している食品（固定メニュー・バナナ・トマトジュース）は対象外とし、
    タンパク源が偏っているカテゴリから優先して減らす。 */
-const REDUCE_EXCLUDE = FOODS.filter(f => f.fixedMenu || f.first || f.post || f.autoNatto || f.autoDaily).map(f => f.id);
+const REDUCE_EXCLUDE = FOODS.filter(f => f.fixedMenu || f.first || f.post || f.autoFill || f.autoDaily).map(f => f.id);
 function suggestReduce(overG, st){
   const qty = {};
   FOODS.forEach(f => qty[f.id] = Math.round((st.foods && st.foods[f.id]) || 0));
@@ -2799,7 +2889,7 @@ const label    = (id, n) => { const f = foodById(id); return `${f.short} ${n}${f
    その日まだ摂っていないカテゴリを優先して提案する。 */
 // 不足を補う候補（固定メニュー・野菜・運動直後固定のものは除く）。
 // 現在は朝食と夕食を曜日で固定しているため、提案できる品目はない。
-const SUGGEST_ORDER = FOODS.filter(f => !f.fixedMenu && !f.first && !f.post && !f.autoNatto && f.p >= 5)
+const SUGGEST_ORDER = FOODS.filter(f => !f.fixedMenu && !f.first && !f.post && !f.autoFill && f.p >= 5)
                            .map(f => f.id);
 const FOOD_CAT = {};
 
@@ -2948,10 +3038,10 @@ function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, pl
       `リストにない食品（卵・魚・肉・乳製品・麺・パンなど）は「その他（自由入力）」にg数を入れると反映されます。`]);
   }
 
-  tips.push(['', `<b>① 1回の摂取は30〜40gまで。</b>1度に吸収・利用できるたんぱく質は 30〜40g 程度が上限です。今日の目標 ${target}g は一気に摂らず、` +
+  tips.push(['', `<b>① 1食は25〜35gを目安に分ける。</b>1回で筋タンパク合成がほぼ最大になるのが 25〜35g（体重あたり0.4g前後）です。今日の目標 ${target}g は一気に摂らず、` +
     (st.meals === 3 ? `<b>朝・昼・晩＋補食</b>`
       : st.skip === 'b' ? `<b>昼・夕の2食＋SAVAS</b>` : `<b>朝・夕の2食＋SAVAS</b>`) +
-    `に分散してください。まとめ摂りした余剰分は筋肉に回らず、エネルギーや脂肪として処理されるだけになります。` +
+    `に分けてください。<b>これは上限ではありません。</b>1食が40gを超えても無駄になるわけではないので、45gくらいまでは気にしなくて構いません。` +
     (st.meals === 2 ? `2食だと1食あたりが増えやすいので、超えた分はSAVASの回に回すほうが無駄になりません。` : '')]);
 
   // 食物繊維が食事から足りていれば、難消化性デキストリンは要らない
@@ -3083,10 +3173,10 @@ function updateLive(){
   // 杯数の手動指定
   const fixRaw = parseInt($('fixSpoons').value, 10);
   $('fixNote').innerHTML = st.fixSpoons
-    ? `<b>${st.fixSpoons}杯（${r1(st.fixSpoons * SPOON_G)}g）に固定</b>します` +
+    ? `<b>${st.fixSpoons}杯（${r1(st.fixSpoons * SPOON_G)}g）</b>を毎日の基本量にします` +
       `（${serveText(Math.ceil(st.fixSpoons / MAX_PER_SERVE))}）。` +
-      `不足量にかかわらずこの杯数にするので、食事が足りている日は目標を上回ることがあります。` +
-      `空欄にすると不足量から自動で決めます。`
+      `残りを食事から摂る設計です（初期値の8杯＝39gなら、食事は目標の残り分）。` +
+      `空欄にすると、その日の不足量から自動で決めます。`
     : fixRaw >= 1 && fixRaw > st.maxSpoons
       ? `<b>${fixRaw}杯は指定できません。</b>いまの設定では最大 ${st.maxSpoons}杯 です` +
         `（1回${MAX_PER_SERVE}杯まで×1日${st.twoDoses ? 2 : MAX_SESSIONS}回）。` +
@@ -3147,7 +3237,7 @@ function updateLive(){
     const names = WEEK_EXTRA_ORDER.map(foodById)
       .filter(f => f && !f.slot && ((f.autoDaily || 0) + (plan[f.id] || 0)) > 0)
       .map(f => f.weekName || f.short)
-      .concat(FOODS.filter(f => f.autoNatto).map(f => `（${f.short}）`));
+      .concat(FOODS.filter(f => f.autoFill).map(f => `（${f.short}）`));
     return names.length ? names.join('・') : '—';
   };
   $('weekPlan').innerHTML =
@@ -3196,16 +3286,13 @@ function updateLive(){
   $('bf12').textContent = r1(w * 1.2) + ' g';
   $('bf14').textContent = r1(w * 1.4) + ' g';
   $('bf15').textContent = r1(w * 1.5) + ' g';
-  $('bf17').textContent = `${r1(w * 1.6)}〜${r1(w * 1.7)} g`;
+  $('bf165').textContent = r1(w * 1.65) + ' g';
+  $('bf17').textContent  = r1(w * 1.7) + ' g';
 
-  // 現在の設定で「運動なしの日」「運動した日」がそれぞれ何gになるかを表示
-  const bf   = st.baseFactor;
-  const capF = capOf(bf);
-  const maxF = Math.min(r2(bf + BONUS_MAX), capF);
+  const bf = st.baseFactor;
   $('baseNote').innerHTML =
-    `現在の設定 → 運動しなかった日：${r1(w)}kg × ${bf.toFixed(2)} = <b>${r1(w * bf)}g</b>　／　` +
-    `運動した日：最大 ${maxF.toFixed(2)} = <b>${r1(w * maxF)}g</b>` +
-    `（運動内容に応じて <b>+0.10〜+${BONUS_MAX.toFixed(2)}</b> を加算。上限 ${capF.toFixed(2)}）`;
+    `現在の設定 → 1日の目標：${r1(w)}kg × ${bf.toFixed(2)} = <b>${r1(w * bf)}g</b>` +
+    `（運動した日も同じです。運動量はエネルギーの必要量に反映します）`;
 }
 
 /* ============================================================
@@ -3226,7 +3313,7 @@ const storageOk = (() => {
 })();
 // 入力欄の既定値を変更したら上げる。番号が違う保存データでは、
 // 下記の欄だけ復元せず新しい既定値に戻す（体重や食事回数などの他の設定は保持）。
-const DEFAULTS_VER = 11;
+const DEFAULTS_VER = 12;
 // v6：体重の初期値を 75kg → 74kg に変更。
 // 次に既定値を変えるときは、実際に変えた欄だけをこの一覧に残すこと
 // （体重を入れたままにすると、以後の更新で入力済みの体重まで戻ってしまう）。
@@ -3239,7 +3326,8 @@ const DEFAULTS_VER = 11;
 //      3食では「2食の日は8杯固定」が働かず1回4杯までになるため、
 //      「SAVASを1日2回まで摂る」も初期値オンにして8杯を保つ。
 const RESET_IDS = () =>
-  EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]).concat(['meals']);
+  EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id])
+           .concat(['meals', 'baseFactor', 'fixSpoons']);
 const ALL_IDS = () => ['weight','height','age','baseFactor','meals','savasShare','walk','cycle',
    'otherP','otherNote','otherFat','otherSat','otherSalt','otherCarb','otherFiber','otherKcal','otherPrice',
    'startTime','breakfastTime','lunchTime','dinnerTime','fixSpoons']
@@ -3598,7 +3686,7 @@ $('foods').addEventListener('click', e => {
 });
 
 // 自動計算する品目（納豆）を手で書き換えたら、その日は手入力を優先する
-FOODS.filter(f => f.autoNatto || f.autoEnergy).forEach(f => {
+FOODS.filter(f => f.autoFill || f.autoEnergy).forEach(f => {
   const el = $('f_' + f.id), btn = $('autoBack_' + f.id);
   if(el) el.addEventListener('input', () => { setAutoOverride(f.id, true); onInputChanged(); });
   if(btn) btn.addEventListener('click', () => { setAutoOverride(f.id, false); onInputChanged(); });
