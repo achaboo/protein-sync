@@ -671,7 +671,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.112';
+const APP_VERSION = '2026-09-01.113';
 
 /* SAVASの1食分は28g＝付属スプーン4杯（明治の公式値。1杯は約7g）。
    1食分28gあたり たんぱく質19.5g・108kcal・脂質2.0g・炭水化物3.7g
@@ -770,7 +770,6 @@ const FOODS = [
    slots:['s'], lock:true, home:true, homeMeal:true, homeBreakfast:true, first:true},
   // 1杯＝100g として数える（表示値が100gあたりのため）
   {id:'yogurt',  name:'無脂肪ヨーグルト',      short:'無脂肪ヨーグルト', note:'1杯100g 約4.6g',
-   ruleNote:'1カップ400g・139円（100gあたり35円）',
    price:35, p:4.6, unit:'杯', sat:0.2, salt:0.1, carbG:4.9, fiber:0, kcal:40, fat:0.3,
    slots:['s'], lock:true, home:true, autoFill:true, fillMax:3},
   {id:'chicken', name:'サラダチキン',          short:'サラダチキン',   note:'1P 約20.9g',
@@ -1440,7 +1439,7 @@ function refreshAutoNotes(){
   AUTO_IDS().forEach(fid => {
     const note = $('autoNote_' + fid), btn = $('autoBack_' + fid), wrap = $('autoWrap_' + fid);
     if(note) note.innerHTML = autoOff(fid)
-      ? `<b>手入力に切り替えています</b>（自動計算は止まっています）。 `
+      ? `<b>手入力に切り替えています。</b><br>（自動計算は止まっています） `
       : '';
     if(btn)  btn.hidden  = !autoOff(fid);
     if(wrap) wrap.hidden = !autoOff(fid);   // 行ごと消して、空の行を残さない
