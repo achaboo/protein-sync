@@ -257,6 +257,7 @@ table.nutri .tag.warn{background:#fdf0dc;color:#b45309}
 .other-add{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
 .other-add small{flex:1 1 260px;color:var(--muted);line-height:1.5}
 .row .del-btn{margin-top:4px}
+small.pair{display:block;margin-top:3px;color:var(--ok)}
 .satbox .advice{margin:4px 0;font-size:.8rem}
 .satbox .advice ul.engy{margin:5px 0 4px;padding-left:1.2em}
 .satbox .advice ul.engy li{margin:2px 0}
@@ -663,7 +664,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.109';
+const APP_VERSION = '2026-09-01.110';
 
 /* SAVASの1食分は28g＝付属スプーン4杯（明治の公式値。1杯は約7g）。
    1食分28gあたり たんぱく質19.5g・108kcal・脂質2.0g・炭水化物3.7g
@@ -844,6 +845,33 @@ const KCAL_PER_SPOON  = 27;
 
 // 食物繊維の目標量（日本人の食事摂取基準・64歳以下の男性は21g以上）
 const FIBER_TARGET = 21;
+
+/* ⑤の1食の中で品目を並べる順。関連するものを隣どうしに置くための順番で、
+   栄養計算には影響しない。
+   サラダ→ドレッシング→油（サラダ一式）、トマトジュース→乳製品、主菜、主食の順。 */
+const SCHED_ORDER = ['salad','dressing','olive','tomato','yogurt','egg','natto',
+                     'chicken','tuna','saba','saba_aji','saba_miso','katsuju'];
+const SCHED_RANK = (() => {
+  const r = {};
+  SCHED_ORDER.forEach((id, i) => r[id] = i);
+  r.rice = 30; r.banana = 40;            // 主食と果物は最後
+  return key => (r[key] !== undefined ? r[key] : 20);   // 指定のないもの（店のメニュー）は主菜のあと
+})();
+
+/* 一緒に摂ると効きがよくなる組み合わせ。⑤で同じ時間帯に入っていたら一言そえる。
+   ・リコピン（トマトジュース）は脂溶性なので、油や乳脂肪と一緒だと吸収が上がる
+   ・カルシウム（乳製品）はビタミンD（魚）と一緒だと骨に届きやすい */
+const PAIRS = [
+  {a:['tomato'], b:['olive','yogurt'],
+   msg:'トマトジュースは油・乳製品と一緒に摂ると<b>リコピンの吸収が上がります</b>。'},
+  {a:['yogurt'], b:['saba','saba_aji','saba_miso','tuna'],
+   msg:'ヨーグルトのカルシウムは、魚の<b>ビタミンDと一緒だと骨に届きやすくなります</b>。'}
+];
+function pairNote(bin){
+  const has = id => bin.items.some(u => u.key === id);
+  return PAIRS.filter(p => p.a.some(has) && p.b.some(has))
+              .map(p => `<br><small class="pair">〇 ${p.msg}</small>`).join('');
+}
 
 /* 1食あたりのたんぱく質の評価帯。40gは「これ以上は使えない上限」ではなく目安。
    25〜35gで筋タンパク合成はほぼ最大になり、それを超えた分が無駄になるわけではない。 */
@@ -2028,12 +2056,14 @@ function distributeFoods(st, mealTargets, planIds, trained){
   Object.values(bins).forEach(bin => {
     const map = new Map();
     bin.items.forEach(u => {
-      const cur = map.get(u.key) || {short:u.short, unit:u.unit, n:0, g:0, isOther:u.isOther, first:u.first};
+      const cur = map.get(u.key) || {key:u.key, short:u.short, unit:u.unit, n:0, g:0, isOther:u.isOther, first:u.first};
       cur.n += 1; cur.g = r1(cur.g + u.g);
       map.set(u.key, cur);
     });
     bin.label = [...map.values()]
-      .sort((a, b) => (b.first ? 1 : 0) - (a.first ? 1 : 0))
+      // 「最初に食べる」野菜を先頭に。そのあとは SCHED_RANK の順（関連するものを隣に）
+      .sort((a, b) => ((b.first ? 1 : 0) - (a.first ? 1 : 0)) ||
+                      (SCHED_RANK(a.key) - SCHED_RANK(b.key)))
       .map(v => v.isOther ? `その他（${v.g}g）`
                 : v.first ? `<u>${v.short} ${v.n}${v.unit}</u>（${v.g}g）`
                 : `${v.short} ${v.n}${v.unit}（${v.g}g）`)
@@ -2354,12 +2384,13 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   const labelOf = items => {
     const map = new Map();
     items.forEach(u => {
-      const cur = map.get(u.key) || {short:u.short, unit:u.unit, n:0, g:0, isOther:u.isOther, first:u.first};
+      const cur = map.get(u.key) || {key:u.key, short:u.short, unit:u.unit, n:0, g:0, isOther:u.isOther, first:u.first};
       cur.n += 1; cur.g = r1(cur.g + u.g);
       map.set(u.key, cur);
     });
     return [...map.values()]
-      .sort((a, b) => (b.first ? 1 : 0) - (a.first ? 1 : 0))
+      .sort((a, b) => ((b.first ? 1 : 0) - (a.first ? 1 : 0)) ||
+                      (SCHED_RANK(a.key) - SCHED_RANK(b.key)))
       .map(v => v.isOther ? `その他（${v.g}g）`
               : v.first ? `<u>${v.short} ${v.n}${v.unit}</u>（${v.g}g）`
               : `${v.short} ${v.n}${v.unit}（${v.g}g）`)
@@ -2448,8 +2479,8 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
     }
     if(bin.items.length){
       return detail
-        ? `${head}<b>${bin.label}</b> ＝ 合計 <b>${bin.total}g</b><br>${mealAdvice(bin, targetG, st, dayCovered)}${tail}`
-        : `<b>${bin.label}</b>`;
+        ? `${head}<b>${bin.label}</b> ＝ 合計 <b>${bin.total}g</b>${pairNote(bin)}<br>${mealAdvice(bin, targetG, st, dayCovered)}${tail}`
+        : `<b>${bin.label}</b>${pairNote(bin)}`;
     }
     if(bin.addTotal){
       return detail
