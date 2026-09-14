@@ -664,7 +664,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.110';
+const APP_VERSION = '2026-09-01.111';
 
 /* SAVASの1食分は28g＝付属スプーン4杯（明治の公式値。1杯は約7g）。
    1食分28gあたり たんぱく質19.5g・108kcal・脂質2.0g・炭水化物3.7g
@@ -791,7 +791,7 @@ const FOODS = [
    weekName:'ご飯', ruleNote:'自宅の食事に1.5合（0.5合×3杯）',
    price:33, p:4.5, unit:'杯', sat:0.1, salt:0, carbG:58.0, fiber:2.5, kcal:257, fat:0.7,
    slots:['d'], lock:true, slot:'d', home:true, homeMeal:true, homeBreakfast:true, fixedMenu:true,
-   carb:true, group:'staple', slotLimit:3},
+   carb:true, group:'staple', slotLimit:3, spread:true},   // spread: 自宅の食事へ均等に配る
   {id:'natto',   name:'納豆',                short:'納豆',         note:'1パック 約8.3g',
    price:32, p:8.3, unit:'P', sat:0.8, salt:0.7, carbG:7.3, fiber:3.6, kcal:99, fat:4.9,
    slots:['s'], lock:true, home:true, autoFill:true, fillMax:3}
@@ -1922,8 +1922,27 @@ function distributeFoods(st, mealTargets, planIds, trained){
        昼のサラダはオリーブオイル、夕のサラダはドレッシングと決めているため。 */
     const splitLD = hasLunch && homeDinnerDay(st) && f.home && !f.homeSlot && (q - bq) >= 2;
     const toDinner = splitLD ? Math.ceil((q - bq) / 2) : 0;
+    /* ご飯のように「食事ごとに1杯ずつ」食べるものは、その日の自宅の食事へ均等に配る。
+       割り切れない分は 夕食 → 昼食 → 朝食 の順に足して、夕食を厚くする。
+       以前は昼と夕で半分ずつに分けていたため、朝食も自宅の日に朝だけ0杯になっていた。 */
+    const plan = [];
+    if(f.spread && q > 0){
+      const ms = homeMealsOf(st);
+      if(ms.length){
+        const per = Math.floor(q / ms.length);
+        let extra = q % ms.length;
+        ms.forEach(sl => plan.push({sl, n:per}));
+        ['d','l','b'].forEach(sl => {
+          const e = plan.find(x => x.sl === sl);
+          if(e && extra > 0){ e.n++; extra--; }
+        });
+      }
+    }
     for(let i = 0; i < q; i++){
-      const slot = i < bq ? ['b']
+      const nextSpread = plan.find(x => x.n > 0);
+      if(nextSpread) nextSpread.n--;
+      const slot = nextSpread ? [nextSpread.sl]
+                 : i < bq ? ['b']
                  : splitLD ? ((i - bq) < toDinner ? ['d'] : ['l'])
                  : slotsOf(f, st);
       const u = {key:f.id, short:f.short, unit:f.unit, g:f.p,
@@ -2051,6 +2070,37 @@ function distributeFoods(st, mealTargets, planIds, trained){
   });
 
   ORDER.forEach(s => { bins[s].addLabel = formatPlan(bins[s].adds.map(u => u.key)); });
+
+  /* サラダ一式（サラダ＋ノンオイルドレッシング＋オリーブオイル）は一緒に食べるので、
+     ドレッシング類はサラダのある食事へ寄せる。
+     自宅で朝食をとる日に、サラダが昼・夕、ドレッシングが朝、と離れるのを防ぐ。 */
+  (() => {
+    const COND = ['olive', 'dressing'];
+    const saladAt = ORDER.filter(sl => bins[sl].items.some(u => u.key === 'salad'));
+    if(!saladAt.length) return;
+    COND.forEach(id => {
+      // サラダのない食事に入ってしまった分を集める
+      const stray = [];
+      ORDER.forEach(from => {
+        if(saladAt.indexOf(from) >= 0) return;
+        bins[from].items.filter(u => u.key === id).forEach(u => stray.push({from, u}));
+      });
+      if(!stray.length) return;
+      /* 置き先は1か所にまとめる（1つのサラダにかける調味料なので分けない）。
+         オリーブオイルは昼、ノンオイルドレッシングは夕を優先し、
+         まだ調味料の付いていないサラダを選ぶ。 */
+      const pref = id === 'olive' ? ['l','d','b'] : ['d','l','b'];
+      const to = pref.find(t => saladAt.indexOf(t) >= 0 && !bins[t].items.some(x => COND.indexOf(x.key) >= 0))
+              || pref.find(t => saladAt.indexOf(t) >= 0)
+              || saladAt[0];
+      stray.forEach(({from, u}) => {
+        bins[from].items = bins[from].items.filter(x => x !== u);
+        bins[from].total = r1(bins[from].total - u.g);
+        bins[to].items.push(u);
+        bins[to].total   = r1(bins[to].total + u.g);
+      });
+    });
+  })();
 
   // 同じ食品をまとめて「納豆 1P（8g）」の形に整形（最初に食べるものを先頭に並べる）
   Object.values(bins).forEach(bin => {
@@ -2722,6 +2772,10 @@ const homeDinnerDay    = st => homeMealDay('d', st);
    全部を朝食に寄せて空にしてしまわないため。 */
 const HOME_B_QUOTA = {egg:2, natto:1};            // 朝食の枠へ回す単位数の上限
 const bQuota = (f, st) => homeBreakfastDay(st) ? (HOME_B_QUOTA[f.id] || 0) : 0;
+/* その日、自宅で食べる食事の枠。昼食は外食メニューを置いていないので常に自宅。 */
+const homeMealsOf = st => ['b','l','d'].filter(sl =>
+  sl !== st.skip &&
+  (sl === 'l' ? true : sl === 'b' ? homeBreakfastDay(st) : homeDinnerDay(st)));
 
 /* その日、自宅の食材を置ける食事の枠。
    昼食には外食メニューが無いので、3食の日の昼食は必ず自宅になる。
