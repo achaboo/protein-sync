@@ -711,7 +711,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.114';
+const APP_VERSION = '2026-09-01.115';
 
 /* SAVASの1食分は28g＝付属スプーン4杯（明治の公式値。1杯は約7g）。
    1食分28gあたり たんぱく質19.5g・108kcal・脂質2.0g・炭水化物3.7g
@@ -1743,12 +1743,27 @@ function energyAdvice(st, gap, satTotal, saltTotal){
   // 店のメニュー（朝食・夕食）は曜日で決まっているので候補にしない。
   // 候補にするのは、その店に行く日のご飯のおかわり（無料）だけ。
   const pick = f => !f.shop || (f.shopSlot && atShop(f, st));
-  /* 飽和脂肪酸と食塩の残り枠を超えない数までにする。1単位の量がわずかな品目
-     （ご飯0.1g・バナナ0.1gなど）は、枠の計算に入れると数え負けするので対象外。
-     枠が1単位も無い品目はここで外し、代わりに次の候補を繰り上げる。 */
+  /* 自動で数量を決めている品目（ご飯・オリーブオイル）は、その上限までしか勧めない。
+     上限に達している日に「ご飯をあと3杯」と出すと、②に入れた数量と食い違うため。 */
+  const autoLeft = f => {
+    const now = Math.round(st.foods[f.id] || 0);
+    if(f.autoRice){
+      // 自宅のご飯は「1食 slotLimit 杯 × 自宅で食べる食事の数」が上限。
+      // 置ける食事が無い日（朝も夕も外食で昼食も無い日）は勧めない。
+      const meals = homeMealsOf(st).length;
+      return Math.max(0, (meals ? Math.min(f.autoMax, (f.slotLimit || 4) * meals) : 0) - now);
+    }
+    if(f.autoFat) return Math.max(0, (f.autoMax || 0) - now);
+    return 99;
+  };
+  /* 飽和脂肪酸と食塩の残り枠を超えない数までにする。枠は毎日クリアしたい線
+     （飽和15g・食塩7.5g）で見る。自動計算がその線を越えない以上、
+     手で足す提案も同じ線で止めないと食い違うため。
+     1単位の量がわずかな品目（ご飯0.1g・バナナ0.1gなど）は、枠の計算に入れると
+     数え負けするので対象外。枠が1単位も無い品目はここで外し、次の候補を繰り上げる。 */
   const capOfFood = f => {
-    let cap = roomFor(f, st);
-    if(f.sat  >= SAT_PER_UNIT_MIN)  cap = Math.min(cap, Math.floor((SAT_LIMIT  - satTotal)  / f.sat));
+    let cap = Math.min(roomFor(f, st), autoLeft(f));
+    if(f.sat  >= SAT_PER_UNIT_MIN)  cap = Math.min(cap, Math.floor((SAT_GOOD   - satTotal)  / f.sat));
     if(f.salt >= SALT_PER_UNIT_MIN) cap = Math.min(cap, Math.floor((SALT_LIMIT - saltTotal) / f.salt));
     return cap;
   };
@@ -1757,7 +1772,17 @@ function energyAdvice(st, gap, satTotal, saltTotal){
                      .filter(x => x.net >= ENERGY_MIN_NET && x.cap >= 1)
                      .sort((a, b) => b.net - a.net)
                      .slice(0, 3);
-  if(!cands.length) return '';
+  // 自動計算が上限まで入っている品目は、勧める代わりにその旨を書く
+  const maxed = FOODS.filter(f => (f.autoRice || f.autoFat) &&
+                                  autoLeft(f) <= 0 && Math.round(st.foods[f.id] || 0) > 0)
+                     .map(f => `${f.short} ${Math.round(st.foods[f.id])}${f.unit}`);
+  const capNote = maxed.length
+    ? `<small><b>${maxed.join('・')}</b>は自動計算の上限まで入っています。` +
+      `これ以上は②のほかの品目か「その他（自由入力）」で補ってください。</small>`
+    : '';
+  if(!cands.length) return capNote
+    ? `<div class="advice"><b>エネルギー：あと ${gap.toLocaleString()}kcal。</b>${capNote}</div>`
+    : '';
   const rows = cands.map(({f, net, cap}) => {
     const n    = Math.min(cap, Math.ceil(gap / net));
     const left = gap - n * net;
@@ -1783,7 +1808,7 @@ function energyAdvice(st, gap, satTotal, saltTotal){
          (flat.length
            ? `<small>${flat.join('・')}は、足すと自動計算の${esc(filler ? filler.short : '')}がそのぶん減るため、` +
              `合計はほとんど増えません。エネルギーを増やすなら、たんぱく質の少ない品目を選びます。</small>`
-           : '') + `</div>`;
+           : '') + capNote + `</div>`;
 }
 
 
@@ -2004,7 +2029,7 @@ function render(opts){
         : sv.twoFixed
           ? `<br><small><b>2食の日は不足をまずSAVASで埋める設定のため、上限の ${sv.spoons}杯` +
             `（${r1(sv.spoons * SPOON_G)}g・1回${MAX_PER_SERVE}杯×${sv.sessions.length}回）に固定しています。</b>` +
-            `残る不足は納豆のパック数として「② 今日の食事」に自動入力されます。</small>`
+            `残る不足は自動計算の候補（無脂肪ヨーグルト・納豆など）として「② 今日の食事」に自動入力されます。</small>`
           : sv.forced
             ? `<br><small>筋トレをした日はSAVASを必ず摂る設定のため、` +
               `不足の有無にかかわらず最低 ${MIN_SPOONS_TRAINED}杯（${r1(MIN_SPOONS_TRAINED * SPOON_G)}g）を確保しています。</small>`
@@ -2880,7 +2905,7 @@ function renderAltFoods(toFoodG, sv, st, plan, capBinds){
     box.innerHTML =
       `<div class="alt"><h4>残り ${toFoodG}g をどうするか` +
       `<small>（上のSAVAS ${sv.spoons}杯・${sv.totalG}g を摂った前提）</small></h4>` +
-      `<p class="hint" style="margin:0">朝食・夕食は曜日ごとの固定メニューなので、この表では増減させません。` +
+      `<p class="hint" style="margin:0">朝食・夕食は曜日ごとに決めたメニュー（外食・サバ缶）なので、この表では増減させません。` +
       `残りは` + (st.twoDoses ? '' : `<b>「SAVASを1日2回まで摂る」をオンにする</b>か、`) +
       `固定メニュー以外に食べたものを<b>「その他（自由入力）」</b>にg数で入れて調整してください。` +
       savasCapNote(sv, st, capBinds) + `</p></div>`;
@@ -3249,7 +3274,7 @@ function suggestFoods(g, st){ return formatPlan(suggestPlan(g, st)); }
 function addAdvice(g, st){
   const plan = suggestPlan(g, st);
   if(plan.length) return `例：<b>${formatPlan(plan)}</b> を「② 今日の食事」に追加すると、この指摘は消えます。`;
-  return `朝食・夕食は固定メニューなので、` +
+  return `朝食・夕食は曜日ごとに決めたメニューなので、` +
     (st.twoDoses
       ? `固定メニュー以外に食べたものを<b>「その他（自由入力）」</b>にg数で入れてください。`
       : `<b>「① 基本設定」の「SAVASを1日2回まで摂る」をオンにする</b>か、` +
