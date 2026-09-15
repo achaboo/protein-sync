@@ -13,9 +13,13 @@
       ご飯・オリーブオイル・たんぱく質の候補は、その日のエネルギーと脂質の不足から自動で決まります。
       違うものを食べた日は数量を書き換えてください。
       リストにないものは「その他（自由入力）」にたんぱく質 g を直接入力してください。
-   4. 「③ 今日の運動」で有酸素の距離を入力します。筋トレは全8種目に最初からチェックが
-      入っているので、やらなかった種目だけチェックを外します。
-      重量 / 回数 / セット数も普段の値が既定で入っているので、変えた日だけ書き換えます。
+   4. 「③ 今日の運動」で、その日に実際にやった運動を入れます。
+      有酸素は「なし / ウォーキング10km / サイクリング20km」のボタンか、距離を直接入力。
+      筋トレは部位分けのボタン（全種目 / 背中・腕 / 胸・肩 / 胸・腕・肩（後）/ なし）で
+      その日にやった種目だけを残します。消費エネルギーはチェックの入った種目だけから計算します。
+      8種目×3セットを毎日の標準とはしていません。
+      重量 / 回数 / セット数は普段の値が既定で入っているので、変えた日だけ書き換えます。
+      日付が変わると「今日の運動はまだ入力していません」と出ます。
    5. 「計算する」を押すと、
         ・今日の目標たんぱく質（体重 × 基本係数。運動量では変わりません）
         ・食事からの合計たんぱく質
@@ -311,8 +315,16 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
 #weekPlan td.amt{text-align:center;vertical-align:middle}
 /* 列幅を決めておく。指定しないと文字数の多い「追加」列が幅を取り、
    朝食・夕食の店名が1文字ずつ折り返してしまう。 */
+.preset{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 10px}
+.ex-head label small.part{margin-left:6px;opacity:.65;font-weight:400}
+.preset .mini-btn{margin:0}
 #weekPlan{table-layout:fixed}
 #weekNutri th,#weekNutri td{text-align:center;white-space:nowrap;padding:5px 4px;font-size:.86em}
+#weekEnergy{table-layout:fixed}
+#weekEnergy th,#weekEnergy td{text-align:center;white-space:nowrap;padding:5px 3px;font-size:.84em}
+#weekEnergy th:first-child,#weekEnergy td:first-child{width:31%;white-space:normal;text-align:left;line-height:1.35}
+#weekEnergy th small{font-weight:400;opacity:.75;font-size:.85em}
+#weekEnergy tr.today td{background:#eef4fb;font-weight:700}
 #weekNutri th small{font-weight:400;opacity:.75;font-size:.85em}
 #weekNutri td.ng{color:#c2410c;font-weight:700}
 #weekNutri tr.avg{background:#eef4fb;font-weight:700}
@@ -358,6 +370,8 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
   table.mini th,table.mini td{padding:7px 4px}
   /* 画面が狭いときは曜日をさらに詰めて、朝食・夕食に幅を回す */
   #weekNutri th,#weekNutri td{padding:4px 2px;font-size:.72em}
+  #weekEnergy th,#weekEnergy td{padding:4px 2px;font-size:.7em}
+  #weekEnergy th:first-child,#weekEnergy td:first-child{width:34%}
   #weekPlan th,#weekPlan td{padding:7px 3px}
   #weekPlan th:nth-child(1),#weekPlan td:nth-child(1){width:8%}
   #weekPlan th:nth-child(2),#weekPlan td:nth-child(2){width:30%}
@@ -472,6 +486,25 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
     </div>
     <p class="hint" id="trendNote"></p>
 
+    <p class="hint" style="margin-top:0">
+      <b>1日だけの体重差は水分で数百g動きます。</b>7日ぶんの平均どうしを比べると、その影響が減ります。
+      下の欄に<b>最初の7日の平均</b>と<b>直近7日の平均</b>を入れて押すと、上の「体重の変化」に書き込みます。
+    </p>
+    <div class="grid2">
+      <div>
+        <label for="trendA">最初の7日の平均体重 (kg)</label>
+        <input type="number" inputmode="decimal" id="trendA" value="" step="0.1" min="30" max="200" placeholder="未入力">
+      </div>
+      <div>
+        <label for="trendB">直近7日の平均体重 (kg)</label>
+        <input type="number" inputmode="decimal" id="trendB" value="" step="0.1" min="30" max="200" placeholder="未入力">
+      </div>
+    </div>
+    <div class="actions" style="margin:6px 0 0">
+      <button type="button" id="trendCalc" class="sub-btn">この2つから「体重の変化」を入れる</button>
+    </div>
+    <p class="hint" id="trendCalcNote" style="margin-top:6px"></p>
+
     <h3>基本係数の入力目安</h3>
     <div class="table-wrap">
       <table class="mini" id="bfTable">
@@ -581,10 +614,25 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
     <p class="hint" id="dailyNote" style="margin-top:0"></p>
     <div class="table-wrap"><table class="mini" id="weekPlan"></table></div>
 
-    <h3>1週間の型の栄養（各日と週平均）</h3>
+    <h3>1週間の型の栄養（食事だけの値）</h3>
     <p class="hint" id="weekNutriNote" style="margin-top:0"></p>
     <div class="table-wrap"><table class="mini" id="weekNutri"></table></div>
     <p class="hint" id="weekNutriSum" style="margin-top:0"></p>
+
+    <h3>運動の実績と、必要エネルギー</h3>
+    <p class="hint" style="margin-top:0">
+      <b>運動は曜日で固定していません。</b>必要エネルギーはその日に実際にやった運動（③）で決まります。
+      下の表は、いつもの運動パターンごとに<b>必要量と、この献立のエネルギーがどれだけ離れるか</b>を並べたものです。
+      上の表の「ご飯の杯数」もここで選んだ前提に合わせて動きます。
+    </p>
+    <div class="grid2" style="margin-bottom:8px">
+      <div>
+        <label for="weekExSel">上の表を計算するときの運動の前提</label>
+        <select id="weekExSel"></select>
+      </div>
+    </div>
+    <div class="table-wrap"><table class="mini" id="weekEnergy"></table></div>
+    <p class="hint" id="weekEnergyNote" style="margin-top:0"></p>
 
     <p class="hint">
       毎日その日の型が自動で入ります。実際に食べたものが違えば数量を書き換えてください
@@ -596,6 +644,11 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
   <!-- ③ 運動 -->
   <section>
     <h2>③ 今日の運動</h2>
+    <p class="hint" id="exTodayNote" style="margin-top:0"></p>
+    <div class="actions" style="margin:0 0 12px">
+      <button type="button" id="exConfirm" class="sub-btn">今日はこの内容で確定</button>
+      <button type="button" id="exRest" class="sub-btn">今日は運動していない</button>
+    </div>
 
     <div class="row">
       <div class="name"><b>運動を終える時刻</b><small>SAVASを飲む時刻。⑤の表に実時刻を出します</small></div>
@@ -636,12 +689,19 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
       <div class="qty"><input type="number" inputmode="decimal" id="cycle" value="0" min="0" step="1"></div>
       <div class="unit">km</div>
     </div>
+    <div class="preset" id="cardioPreset"></div>
+    <p class="hint" style="margin-top:0">
+      よく使う距離はボタンで入れられます。違う距離の日は上の欄に直接入れてください。
+    </p>
 
-    <h3>筋トレ（初期状態は全種目オン。やらなかった種目はチェックを外す）</h3>
+    <h3>筋トレ（その日に実際にやった種目だけを残す）</h3>
     <p class="hint">
-      <b>RIR（Reps In Reserve）1〜2</b>を基準に重量を設定。<br>
+      <b>8種目を毎日すべて行う前提にはしていません。</b>部位分けの日は下のボタンで
+      その組み合わせだけを残せます。消費エネルギーは<b>チェックの入っている種目のセット数だけ</b>から計算します。<br>
+      <b>RIR（Reps In Reserve）1〜2</b>を基準に重量を設定。
       ※各セット終了時に「あと1〜2回できる」程度。
     </p>
+    <div class="preset" id="exPreset"></div>
     <div id="exercises"></div>
     <p class="hint" id="volNote"></p>
   </section>
@@ -711,7 +771,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.115';
+const APP_VERSION = '2026-09-01.116';
 
 /* SAVASの1食分は28g＝付属スプーン4杯（明治の公式値。1杯は約7g）。
    1食分28gあたり たんぱく質19.5g・108kcal・脂質2.0g・炭水化物3.7g
@@ -850,14 +910,33 @@ const WATER_ML = 300;   // 1回あたりに溶かす水の量（表示用）
 
 // 筋トレマスタ（普段の値をデフォルトとしてセット）
 const EXERCISES = [
-  {id:'lat',      name:'ラットプルダウン',     w:25, r:15, s:3},
-  {id:'row',      name:'シーテッドローイング', w:20, r:15, s:3},
-  {id:'chest',    name:'チェストプレス',       w:20, r:15, s:3},
-  {id:'shoulder', name:'ショルダープレス',     w:10, r:15, s:3},
-  {id:'dips',     name:'ディップス',           w:35, r:15, s:3},
-  {id:'curl',     name:'バイセップスカール',   w:10, r:15, s:3},
-  {id:'side',     name:'サイドレイズ',         w:5.75, r:10, s:3},
-  {id:'rear',     name:'リアレイズ',           w:5.75, r:5,  s:3}
+  {id:'lat',      name:'ラットプルダウン',     part:'背中', w:25, r:15, s:3},
+  {id:'row',      name:'シーテッドローイング', part:'背中', w:20, r:15, s:3},
+  {id:'chest',    name:'チェストプレス',       part:'胸',   w:20, r:15, s:3},
+  {id:'shoulder', name:'ショルダープレス',     part:'肩',   w:10, r:15, s:3},
+  {id:'dips',     name:'ディップス',           part:'胸',   w:35, r:15, s:3},
+  {id:'curl',     name:'バイセップスカール',   part:'腕',   w:10, r:15, s:3},
+  {id:'side',     name:'サイドレイズ',         part:'肩',   w:5.75, r:10, s:3},
+  {id:'rear',     name:'リアレイズ',           part:'背中', w:5.75, r:5,  s:3}
+];
+
+/* 部位分けで実施する日のためのプリセット。
+   「8種目すべて」を毎日の標準とは考えず、その日に実際にやった組み合わせを1押しで入れる。
+   ここに無い組み合わせは、種目ごとのチェックで作れる。 */
+const EX_PRESETS = [
+  {label:'全種目',   ids:['lat','row','chest','shoulder','dips','curl','side','rear']},
+  {label:'背中・腕', ids:['lat','row','curl']},
+  {label:'胸・肩',   ids:['chest','shoulder','side']},
+  {label:'胸・腕・肩（後）', ids:['dips','curl','rear']},
+  {label:'なし',     ids:[]}
+];
+
+/* 有酸素のプリセット。利用者の実際のパターンは
+   「ウォーキング10kmの日」と「サイクリング20kmの日」と「休む日」の3通り。 */
+const CARDIO_PRESETS = [
+  {label:'なし',              walk:0,  cycle:0},
+  {label:'ウォーキング10km',  walk:10, cycle:0},
+  {label:'サイクリング20km',  walk:0,  cycle:20}
 ];
 
 const $  = id => document.getElementById(id);
@@ -868,8 +947,10 @@ const r2 = n  => Math.round(n * 100) / 100;
 
 // 運動による係数の加算量（基本係数に上乗せする）と、その日の上限
 const FLOOR_FACTOR  = 1.2;    // 最低ライン（これを超えていればその日は十分とみなす）g/kg
+/* ④のバッジ（休養日／軽運動日／トレーニング日／ハード日）に使う目安。
+   たんぱく質の目標には影響しない。部位分けの日は総負荷量が下がるので、
+   バッジもその日の実績に応じて変わる（8種目ぶんを標準としているわけではない）。 */
 const STRENGTH_FULL = 6500;   // この総負荷量(kg)で筋トレ側の加算が満点になる
-                              // （8種目の初期値＝5,658.75kg でスコア87%になる値）
 const CARDIO_FULL   = 10;     // ウォーキング換算 10km で有酸素側の加算が満点になる
 
 // 飽和脂肪酸（LDLコレステロールを上げる脂）の1日の目安。
@@ -1191,11 +1272,18 @@ $('ratioTable').innerHTML = SAT_RATIO
 $('satRatio').innerHTML = SAT_RATIO
   .map(([name, pct, r], i) => `<option value="${r}">${name}（${pct}）</option>`).join('');
 
+/* 有酸素と筋トレのプリセット。押すとその内容を入力欄に書き込み、
+   「今日の運動を入力した」印も同時に付ける。 */
+$('cardioPreset').innerHTML = CARDIO_PRESETS.map((p, i) =>
+  `<button type="button" class="mini-btn" data-cardio="${i}">${esc(p.label)}</button>`).join('');
+$('exPreset').innerHTML = EX_PRESETS.map((p, i) =>
+  `<button type="button" class="mini-btn" data-expreset="${i}">${esc(p.label)}</button>`).join('');
+
 $('exercises').innerHTML = EXERCISES.map(e => `
   <div class="ex" id="ex_${e.id}">
     <div class="ex-head">
       <input type="checkbox" id="c_${e.id}" checked>
-      <label for="c_${e.id}">${e.name}</label>
+      <label for="c_${e.id}">${e.name}<small class="part">${e.part}</small></label>
       <span class="ex-vol" id="v_${e.id}">0 kg</span>
     </div>
     <div class="ex-body">
@@ -3429,8 +3517,13 @@ function updateLive(){
     $('v_' + e.id).textContent = (on ? v.toLocaleString() : 0) + ' kg';
     if(on) total += v;
   });
+  const onCount = EXERCISES.filter(e => $('c_' + e.id).checked).length;
+  const setCount = EXERCISES.reduce((a, e) => a + ($('c_' + e.id).checked ? num('s_' + e.id) : 0), 0);
   $('volNote').innerHTML =
-    `本日の総負荷量：<b>${total.toLocaleString()} kg</b>（重量×回数×セット数の合計）`;
+    `本日の入力：<b>${onCount}種目 / 合計 ${setCount}セット</b>` +
+    ` ／ 総負荷量 <b>${total.toLocaleString()} kg</b>（重量×回数×セット数の合計）` +
+    `<br><small>消費エネルギーに入るのは、チェックの入っている種目だけです。</small>`;
+  refreshExNote();
 
   const st = readState();
 
@@ -3474,14 +3567,16 @@ function updateLive(){
   // 体重の推移による必要エネルギーの補正
   const trendAdj = needTrend(st);
   const trendGoal = TREND_GOAL[st.trendGoal] || TREND_GOAL.keep;
-  $('trendNote').innerHTML = trendAdj
+  // 補正が 0kcal になるのは「ちょうど目標のペース」のときで、未入力とは別物
+  const trendOn = st.trendDays >= TREND_MIN_DAYS && st.trendDays <= TREND_MAX_DAYS;
+  $('trendNote').innerHTML = trendOn
     ? `<b>${st.trendDays}日で ${st.trendKg > 0 ? '+' : ''}${r1(st.trendKg)}kg` +
       `（週 ${st.trendKg > 0 ? '+' : ''}${r1(st.trendKg / st.trendDays * 7)}kg）。</b>` +
-      `目標は「${trendGoal.label}」なので、④の必要エネルギーを` +
-      `<b>${trendAdj > 0 ? '+' : ''}${trendAdj.toLocaleString()} kcal</b> 補正します` +
+      `目標は「${trendGoal.label}」なので、` +
+      `${trendAdj === 0 ? '<b>補正はありません</b>（ちょうど目標のペースです）' : '④の必要エネルギーを<b>' + (trendAdj > 0 ? '+' : '') + trendAdj.toLocaleString() + ' kcal</b> 補正します'}` +
       `（初期推定 ${calcNeedBase(st, calcFactor(st)).toLocaleString()}kcal → <b>${calcNeed(st, calcFactor(st)).toLocaleString()}kcal</b>）。` +
       `<br><small>体脂肪1kg ≒ 7,200kcal として、目標のペースと実際のペースの差を1日あたりに直した値です` +
-      `（推定どおりに食べていた前提の概算なので、±${TREND_CAP}kcal で頭打ちにしています）。</small>`
+      `（推定どおりに食べていた前提の概算なので、±${TREND_CAP}kcal で頭打ちにしています）。1日だけの差ではなく<b>7日平均どうしの差</b>を入れると、水分変動の影響が減ります。</small>`
     : st.trendDays > 0 && st.trendDays < TREND_MIN_DAYS
       ? `<b>${st.trendDays}日ぶんでは補正しません。</b>体水分の変動で数百gは動くため、` +
         `<b>${TREND_MIN_DAYS}日以上</b>（できれば14日）の変化を入れてください。`
@@ -3544,9 +3639,12 @@ function updateLive(){
   // 1週間の型：曜日 × 朝食 / 夕食 / 追加するもの と、各日の栄養
   // ご飯・オリーブオイル・たんぱく質の候補は自動計算なので、実際に決まる数量を出す。
   // 同じ結果を栄養の表にも使うので、表示と数字は必ず一致する。
-  const week = WEEK_LABEL.map((_, i) => weekDay(i, st));
+  const weekSc = weekExOf($('weekExSel') && $('weekExSel').value);
+  const stWeek = weekExState(st, weekSc);
+  const week = WEEK_LABEL.map((_, i) => weekDay(i, stWeek));
   renderWeekPlan(week);
-  renderWeekNutri(week, st);
+  renderWeekNutri(week, stWeek, weekSc);
+  renderWeekEnergy(st, weekSc);
 
   const fc = calcFood(st);
   $('foodNote').innerHTML =
@@ -3622,7 +3720,7 @@ const RESET_IDS = () =>
   EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id])
            .concat(['meals', 'baseFactor', 'fixSpoons']);
 const ALL_IDS = () => ['weight','height','age','baseFactor','meals','savasShare','walk','cycle',
-   'trendDays','trendKg','trendGoal',
+   'trendDays','trendKg','trendGoal','trendA','trendB','weekExSel',
    'otherP','otherNote','otherFat','otherSat','otherSalt','otherCarb','otherFiber','otherKcal','otherPrice',
    'startTime','breakfastTime','lunchTime','dinnerTime','fixSpoons']
   .concat(FOODS.map(f => 'f_' + f.id))
@@ -3699,18 +3797,44 @@ function weekDay(idx, st0){
           cost:  food.cost};
 }
 
+/* 「1週間の型の栄養」を試算するときの運動の前提。
+   運動は曜日で固定していないので、週の表に1つの運動量を決め打ちできない。
+   そこで前提を選べるようにし、必要エネルギーの側は前提ごとに並べて見せる
+   （食事テンプレートの栄養と、当日の運動実績を切り離して読めるようにするため）。 */
+const WEEK_EX = [
+  {id:'today',  label:'今日の③の入力どおり'},
+  {id:'rest',   label:'運動なし（休養日）',               walk:0,  cycle:0,  strength:false},
+  {id:'walk',   label:'ウォーキング10km のみ',            walk:10, cycle:0,  strength:false},
+  {id:'cycle',  label:'サイクリング20km のみ',            walk:0,  cycle:20, strength:false},
+  {id:'train',  label:'筋トレのみ（今日の内容）',         walk:0,  cycle:0,  strength:true},
+  {id:'walkT',  label:'ウォーキング10km ＋ 今日の筋トレ', walk:10, cycle:0,  strength:true},
+  {id:'cycleT', label:'サイクリング20km ＋ 今日の筋トレ', walk:0,  cycle:20, strength:true}
+];
+const weekExOf = id => WEEK_EX.find(x => x.id === id) || WEEK_EX[0];
+// その前提に合わせて walk / cycle / 筋トレの実施有無だけ差し替えた状態を返す
+function weekExState(st, sc){
+  if(!sc || sc.id === 'today') return st;
+  const ex = {};
+  Object.keys(st.ex).forEach(k =>
+    ex[k] = Object.assign({}, st.ex[k], {on: sc.strength ? st.ex[k].on : false}));
+  return Object.assign({}, st, {walk:sc.walk, cycle:sc.cycle, ex});
+}
+
 /* 合格条件（1週間の平均ではなく「各日」で見る）。
    平均で均すと、たんぱく質88gの日と130gの日が「平均109gなので良好」になってしまう。 */
 const WEEK_P_MIN    = 120;          // たんぱく質 g（これ以上）
 const WEEK_COST_AIM = 1000;         // 食費の目安 円/日（週平均で見る）
-const weekNg = d => {
+/* 食事だけで決まる分（運動の前提が変わっても、ご飯の杯数ぶんしか動かない） */
+const weekNgFood = d => {
   const ng = [];
   if(d.p   <  WEEK_P_MIN)   ng.push('P');
   if(d.salt >= SALT_LIMIT)  ng.push('食塩');
   if(d.sat  >  SAT_GOOD)    ng.push('飽和');
-  if(d.gap  <= -ENERGY_BAD) ng.push('kcal');
   return ng;
 };
+// エネルギーは運動の前提しだいなので別に見る
+const weekNgKcal = d => d.gap <= -ENERGY_BAD ? ['kcal'] : [];
+const weekNg = d => weekNgFood(d).concat(weekNgKcal(d));
 
 // 1週間の型の表（朝食 / 夕食 / 追加）。数量は上の試算から取る
 function renderWeekPlan(week){
@@ -3744,53 +3868,90 @@ function renderWeekPlan(week){
 }
 
 // 各日の栄養と週平均、そして各日の合否
-function renderWeekNutri(week, st){
+function renderWeekNutri(week, st, sc){
   const avg = k => week.reduce((a, d) => a + d[k], 0) / week.length;
   const cell = (v, bad) => `<td${bad ? ' class="ng"' : ''}>${v}</td>`;
+  /* この表は「食事テンプレートの栄養」。エネルギーは運動の前提しだいなので、
+     下の「運動の実績と、必要エネルギー」の表に分けてある。 */
   const rows = week.map(d => {
-    const ng = weekNg(d);
+    const ng = weekNgFood(d);
     return `<tr${d.idx === todayIdx() ? ' class="today"' : ''}>` +
       `<td class="time">${WEEK_LABEL[d.idx]}</td>` +
       cell(d.p, ng.indexOf('P') >= 0) +
-      cell(d.kcal.toLocaleString(), false) +
-      cell((d.gap >= 0 ? '+' : '') + d.gap.toLocaleString(), ng.indexOf('kcal') >= 0) +
       cell(d.sat, ng.indexOf('飽和') >= 0) +
       cell(d.salt, ng.indexOf('食塩') >= 0) +
       cell(d.fiber, d.fiber < FIBER_TARGET) +
       cell(d.fat, false) +
+      cell(d.kcal.toLocaleString(), false) +
+      cell(Math.round(d.st.foods.rice || 0), false) +
       cell(d.cost.toLocaleString(), false) +
       `<td${ng.length ? ' class="ng"' : ''}>${ng.length ? '✕' : '◎'}</td></tr>`;
   }).join('');
   $('weekNutri').innerHTML =
-    `<thead><tr><th>曜日</th><th>P<br><small>g</small></th><th>エネ<br><small>kcal</small></th>` +
-    `<th>必要量<br><small>との差</small></th><th>飽和<br><small>g</small></th>` +
-    `<th>食塩<br><small>g</small></th><th>繊維<br><small>g</small></th>` +
-    `<th>脂質<br><small>g</small></th><th>食費<br><small>円</small></th><th>判定</th></tr></thead><tbody>` +
+    `<thead><tr><th>曜日</th><th>P<br><small>g</small></th><th>飽和<br><small>g</small></th>` +
+    `<th>食塩<br><small>g</small></th><th>繊維<br><small>g</small></th><th>脂質<br><small>g</small></th>` +
+    `<th>エネ<br><small>kcal</small></th><th>自宅の<br><small>ご飯</small></th>` +
+    `<th>食費<br><small>円</small></th><th>判定</th></tr></thead><tbody>` +
     rows +
     `<tr class="avg"><td class="time">平均</td><td>${r1(avg('p'))}</td>` +
-    `<td>${Math.round(avg('kcal')).toLocaleString()}</td>` +
-    `<td>${(avg('gap') >= 0 ? '+' : '') + Math.round(avg('gap')).toLocaleString()}</td>` +
     `<td>${r1(avg('sat'))}</td><td>${r1(avg('salt'))}</td><td>${r1(avg('fiber'))}</td>` +
-    `<td>${r1(avg('fat'))}</td><td>${Math.round(avg('cost')).toLocaleString()}</td>` +
-    `<td>—</td></tr></tbody>`;
+    `<td>${r1(avg('fat'))}</td><td>${Math.round(avg('kcal')).toLocaleString()}</td>` +
+    `<td>${r1(week.reduce((a, d) => a + Math.round(d.st.foods.rice || 0), 0) / 7)}</td>` +
+    `<td>${Math.round(avg('cost')).toLocaleString()}</td><td>—</td></tr></tbody>`;
 
-  const bad = week.filter(d => weekNg(d).length);
-  const ex  = calcFactor(st);
+  const bad = week.filter(d => weekNgFood(d).length);
   $('weekNutriNote').innerHTML =
-    `いまの<b>①の設定と③の運動</b>（${r1(st.weight)}kg ／ 基本係数 ${st.baseFactor.toFixed(2)} ／ ${st.meals}食 ／ ` +
-    (ex.cardio > 0 ? `有酸素 ウォーキング換算 ${r1(ex.cardio)}km` : `有酸素なし`) +
-    `）でこの型を7日間続けた場合の試算です。③の距離を変えると必要量が動くので、この表も変わります。<br>` +
+    `<b>この表は食事の側だけの値です。</b>たんぱく質・飽和脂肪酸・食塩・食物繊維・脂質・食費は、` +
+    `運動の量が変わってもほとんど動きません（動くのはご飯の杯数と、そのぶんのエネルギーだけです）。<br>` +
     `<b>合格条件は「週平均」ではなく「各日」で見ます</b>（P ${WEEK_P_MIN}g以上 ／ 食塩 ${SALT_LIMIT}g未満 ／ ` +
-    `飽和脂肪酸 ${SAT_GOOD}g以下 ／ 必要量を ${ENERGY_BAD}kcal 以上下回らない）。`;
+    `飽和脂肪酸 ${SAT_GOOD}g以下）。エネルギーの過不足は下の表で見てください。<br>` +
+    `<small>①の設定（${r1(st.weight)}kg ／ 基本係数 ${st.baseFactor.toFixed(2)} ／ ${st.meals}食）と、` +
+    `運動の前提「<b>${esc(sc.label)}</b>」で試算しています` +
+    (sc.id === 'today' && !exEntered()
+      ? `<b class="warn-inline">（③の運動は今日の分が未入力です）</b>`
+      : '') + `。</small>`;
   $('weekNutriSum').innerHTML =
     (bad.length
-      ? `<b class="warn-inline">✕ ${bad.map(d => WEEK_LABEL[d.idx] + '（' + weekNg(d).join('・') + '）').join('・')}` +
+      ? `<b class="warn-inline">✕ ${bad.map(d => WEEK_LABEL[d.idx] + '（' + weekNgFood(d).join('・') + '）').join('・')}` +
         ` が条件を外れています。</b>`
-      : `<b>◎ 7日すべて条件を満たしています。</b>`) +
+      : `<b>◎ 食事の条件は7日すべて満たしています。</b>`) +
     `　週の食費 <b>${week.reduce((a, d) => a + d.cost, 0).toLocaleString()}円</b>` +
     `（1日平均 ${Math.round(week.reduce((a, d) => a + d.cost, 0) / 7).toLocaleString()}円／目安 ${WEEK_COST_AIM.toLocaleString()}円）。` +
     `<br><small>SAVASの粉代は食費に含めていません（実勢価格で1杯 約30円・8杯で約240円）。` +
     `ご飯・オリーブオイル・たんぱく質の候補は自動計算なので、曜日によって数量が変わります。</small>`;
+}
+
+/* 運動の前提ごとに、必要エネルギーとこの献立のエネルギーを並べる。
+   曜日で運動を固定していないので、「どの運動をした日ならどうなるか」を
+   一覧で見られるようにしてある。代表として自宅の夕食の日（月）で計算する。 */
+const WEEK_EX_DAY = 1;              // 月＝自宅の夕食の標準日
+function renderWeekEnergy(st, sc){
+  const rows = WEEK_EX.map(x => {
+    const t  = weekExState(st, x);
+    const d  = weekDay(WEEK_EX_DAY, t);
+    const ng = weekNgKcal(d).length;
+    const ex = calcFactor(t);
+    return `<tr${x.id === sc.id ? ' class="today"' : ''}>` +
+      `<td style="text-align:left">${esc(x.label)}${x.id === 'today' && !exEntered() ? '<small>（未入力）</small>' : ''}</td>` +
+      `<td>${ex.volume ? Math.round(ex.volume).toLocaleString() : '—'}</td>` +
+      `<td>${calcEnergy(t, ex).kcal.toLocaleString()}</td>` +
+      `<td>${calcNeed(t, ex).toLocaleString()}</td>` +
+      `<td>${d.kcal.toLocaleString()}</td>` +
+      `<td${ng ? ' class="ng"' : ''}>${(d.gap >= 0 ? '+' : '') + d.gap.toLocaleString()}</td>` +
+      `<td>${Math.round(d.st.foods.rice || 0)}</td>` +
+      `<td${ng ? ' class="ng"' : ''}>${ng ? '✕' : '◎'}</td></tr>`;
+  }).join('');
+  $('weekEnergy').innerHTML =
+    `<thead><tr><th>運動の前提</th><th>総負荷<br><small>kg</small></th><th>運動<br><small>kcal</small></th>` +
+    `<th>必要量<br><small>kcal</small></th><th>献立<br><small>kcal</small></th><th>差<br><small>kcal</small></th>` +
+    `<th>自宅の<br><small>ご飯</small></th><th>判定</th></tr></thead><tbody>${rows}</tbody>`;
+  $('weekEnergyNote').innerHTML =
+    `自宅の夕食の日（${WEEK_LABEL[WEEK_EX_DAY]}曜の型）で計算しています。` +
+    `<b>ご飯がその日の必要量に合わせて動く</b>ので、どの前提でも差は小さく収まります` +
+    `（${ENERGY_BAD}kcal 以上足りない日だけ ✕ にしています）。<br>` +
+    `<small>「筋トレ」は③でチェックの入っている種目だけを数えます` +
+    `（いまは ${calcFactor(st).done}種目・総負荷量 ${calcFactor(st).volume.toLocaleString()}kg）。` +
+    `8種目すべてを毎日行う前提にはしていません。</small>`;
 }
 
 // 1週間の型の「追加」列に並べる順番。折り返しは列幅に任せる
@@ -3814,10 +3975,43 @@ const applyDailyDefaults = () => DAILY_IDS().forEach(id => { if($(id)) $(id).val
 const todayKey  = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
 
 function save(){
-  const d = {v:{}, c:{}, date:todayKey(), dv:DEFAULTS_VER, rest:$('restSavas').checked, two:$('twoDoses').checked, ab:$('savasAfterB').checked, sd:$('schedDetail').checked, ao:autoOverride, calc:calculated, cf:customData(), ov:foodOverride};
+  const d = {v:{}, c:{}, date:todayKey(), dv:DEFAULTS_VER, exd:exDate, rest:$('restSavas').checked, two:$('twoDoses').checked, ab:$('savasAfterB').checked, sd:$('schedDetail').checked, ao:autoOverride, calc:calculated, cf:customData(), ov:foodOverride};
   ALL_IDS().forEach(id => d.v[id] = $(id).value);
   EXERCISES.forEach(e => d.c[e.id] = $('c_' + e.id).checked);
   try{ localStorage.setItem(KEY, JSON.stringify(d)); }catch(err){}
+}
+
+/* ③の運動を「今日の分として入力したか」。
+   運動は日によって変わるのに、入力欄の値は前回のまま残る。
+   黙って前日の距離やチェックで計算すると、
+   「運動していない日」と「まだ入力していない日」の区別が付かなくなるため、
+   最後に確定した日付を持っておき、今日でなければ画面ではっきり知らせる。 */
+let exDate = '';
+const exEntered = () => exDate === todayKey();
+function markExToday(){
+  if(exEntered()) return;
+  exDate = todayKey();
+  refreshExNote();
+  save();
+}
+function refreshExNote(){
+  const el = $('exTodayNote');
+  if(!el) return;
+  const ex = calcFactor(readState());
+  const done = ex.done, vol = ex.volume, cardio = ex.cardio;
+  const has = done > 0 || cardio > 0;
+  el.innerHTML = exEntered()
+    ? `<b>今日の運動を入力済みです。</b>` +
+      (has
+        ? `（${done > 0 ? done + '種目 / 総負荷量 ' + vol.toLocaleString() + 'kg' : '筋トレなし'}` +
+          `${cardio > 0 ? ' / 有酸素 ウォーキング換算 ' + r1(cardio) + 'km' : ' / 有酸素なし'}）`
+        : `<b>運動なし（休養日）</b>として計算しています。`)
+    : `<b class="warn-inline">今日の運動はまだ入力していません。</b>` +
+      `下の内容は前回入力したときのままです。今日の内容に直すか、` +
+      `「今日はこの内容で確定」「今日は運動していない」のどちらかを押してください` +
+      `（④の必要エネルギーは、いまは下の内容で<b>仮に</b>計算しています）。`;
+  const badge = $('exBadge');
+  if(badge) badge.hidden = exEntered();
 }
 
 // 一度でも計算していれば、次に開いたときも結果を出したままにする。
@@ -3864,6 +4058,7 @@ function load(){
       if(daily.includes(id) && $(id)) $(id).value = dailyDefault(id);
     });
     EXERCISES.forEach(e => { if($('c_' + e.id)) $('c_' + e.id).checked = !!d.c[e.id]; });
+    if(d.exd !== undefined) exDate = d.exd;      // ③の運動を最後に確定した日
     if(d.rest !== undefined) $('restSavas').checked = !!d.rest;
     // 既定値を変えた版では、チェックの状態も新しい初期値に合わせる
     if(d.two  !== undefined && !staleEx) $('twoDoses').checked = !!d.two;
@@ -3889,7 +4084,7 @@ function load(){
    前日以前のリンクなら設定だけを反映し、食事はその日の型に戻す
    （この端末の localStorage が日付をまたぐと食事を 0 に戻すのと同じ扱い）。
    ------------------------------------------------------------ */
-const SETTING_IDS = () => ['weight','height','age','baseFactor','meals','savasShare','startTime','breakfastTime','lunchTime','dinnerTime','fixSpoons','trendDays','trendKg','trendGoal']
+const SETTING_IDS = () => ['weight','height','age','baseFactor','meals','savasShare','startTime','breakfastTime','lunchTime','dinnerTime','fixSpoons','trendDays','trendKg','trendGoal','trendA','trendB']
   .concat(EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]));
 // 当日の入力（食事＋その他＋有酸素の距離）。実施種目のチェックは d.c で持ち運ぶ。
 const LINK_DAILY_IDS = () => DAILY_IDS().concat(['walk','cycle']);
@@ -4125,6 +4320,49 @@ $('meals').addEventListener('change', () => {
   });
   onInputChanged();
 });
+/* ③の運動：プリセットと「今日の内容で確定」「今日は運動していない」 */
+$('cardioPreset').addEventListener('click', e => {
+  const b = e.target.closest('[data-cardio]');
+  if(!b) return;
+  const p = CARDIO_PRESETS[+b.getAttribute('data-cardio')];
+  $('walk').value = p.walk; $('cycle').value = p.cycle;
+  markExToday(); onInputChanged();
+});
+$('exPreset').addEventListener('click', e => {
+  const b = e.target.closest('[data-expreset]');
+  if(!b) return;
+  const p = EX_PRESETS[+b.getAttribute('data-expreset')];
+  EXERCISES.forEach(x => { $('c_' + x.id).checked = p.ids.indexOf(x.id) >= 0; });
+  markExToday(); onInputChanged();
+});
+/* 7日平均どうしの差から「体重の変化」を入れる。
+   日数は2つの平均の「中心どうしの間隔」なので、14日ぶん記録したなら7日になる。 */
+$('trendCalc').addEventListener('click', () => {
+  const a = num('trendA'), b = num('trendB');
+  if(!(a > 0 && b > 0)){
+    $('trendCalcNote').innerHTML =
+      `<b class="warn-inline">2つの平均体重を両方とも入れてください。</b>`;
+    return;
+  }
+  const diff = r1(b - a);
+  $('trendKg').value = diff;
+  $('trendCalcNote').innerHTML =
+    `<b>${r1(a)}kg → ${r1(b)}kg（${diff > 0 ? '+' : ''}${diff}kg）</b>を「体重の変化」に入れました。` +
+    `<br><small>「記録した日数」には<b>2つの平均の中心どうしの間隔</b>を入れてください` +
+    `（14日ぶん記録して前半7日と後半7日を平均したなら <b>7日</b>、21日なら14日です）。</small>`;
+  onInputChanged();
+});
+
+$('exConfirm').addEventListener('click', () => { markExToday(); onInputChanged(); });
+$('exRest').addEventListener('click', () => {
+  $('walk').value = 0; $('cycle').value = 0;
+  EXERCISES.forEach(x => { $('c_' + x.id).checked = false; });
+  markExToday(); onInputChanged();
+});
+/* ③の中を手で触ったときも「今日の分を入力した」とみなす */
+$('exercises').closest('section').addEventListener('input',  markExToday);
+$('exercises').closest('section').addEventListener('change', markExToday);
+
 $('copyLink').addEventListener('click', copySettingsLink);
 
 $('reset').addEventListener('click', () => {
@@ -4133,7 +4371,7 @@ $('reset').addEventListener('click', () => {
     '・体重 73.5kg / 基本係数 1.65 / 3食\n' +
     '・「今日の食事」→ その日の曜日の型に戻ります\n' +
     '・ウォーキング / サイクリングの距離 → 0\n' +
-    '・筋トレのチェック → 全種目オン（重量・回数・セット数も既定値に戻ります）\n' +
+    '・筋トレのチェック → 全種目オン（初期状態であって毎日の標準ではありません）\n' +
     '・「運動しなかった日もSAVASを摂る」→ オフ\n' +
     '・「SAVASの杯数を指定」→ 8杯\n' +
     '・「SAVASを1日2回まで摂る」→ オン\n' +
@@ -4141,6 +4379,7 @@ $('reset').addEventListener('click', () => {
     '・ブラウザに保存された前回の入力内容も削除されます\n\n' +
     'よろしいですか？';
   if(!confirm(msg)) return;
+  exDate = '';
   try{ localStorage.removeItem(KEY); }catch(err){}
   location.reload();
 });
@@ -4155,6 +4394,11 @@ if(!storageOk){
 }
 
 $('ver').textContent = `バージョン ${APP_VERSION}　（表示が古い場合はページを再読み込みしてください）`;
+
+/* 「1週間の型の栄養」の運動の前提。選択肢は load() より先に作っておく
+   （空のまま load() が値を入れても、選択が戻らないため）。 */
+$('weekExSel').innerHTML = WEEK_EX.map(x =>
+  `<option value="${x.id}"${x.id === 'today' ? ' selected' : ''}>${esc(x.label)}</option>`).join('');
 
 load();
 // URL に設定が埋め込まれていれば、保存内容より優先して適用しこの端末にも保存する
