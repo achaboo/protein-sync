@@ -771,7 +771,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.116';
+const APP_VERSION = '2026-09-01.117';
 
 /* SAVASの1食分は28g＝付属スプーン4杯（明治の公式値。1杯は約7g）。
    1食分28gあたり たんぱく質19.5g・108kcal・脂質2.0g・炭水化物3.7g
@@ -917,7 +917,7 @@ const EXERCISES = [
   {id:'dips',     name:'ディップス',           part:'胸',   w:35, r:15, s:3},
   {id:'curl',     name:'バイセップスカール',   part:'腕',   w:10, r:15, s:3},
   {id:'side',     name:'サイドレイズ',         part:'肩',   w:5.75, r:10, s:3},
-  {id:'rear',     name:'リアレイズ',           part:'背中', w:5.75, r:5,  s:3}
+  {id:'rear',     name:'リアレイズ',           part:'肩',   w:5.75, r:5,  s:3}
 ];
 
 /* 部位分けで実施する日のためのプリセット。
@@ -2050,7 +2050,7 @@ function render(opts){
         (Math.abs(kcalGap) > 100
           ? `このままなら週 約${r1(Math.abs(kcalGap) * 7 / 7200)}kg ${kcalGap < 0 ? '減' : '増'}`
           : '') +
-        `（基礎代謝 ${calcBMR(st).toLocaleString()} × 1.50 ＋ 運動 ${calcEnergy(st, ex).kcal} ＝ 初期推定 ${calcNeedBase(st, ex).toLocaleString()}kcal${needTrend(st) ? ' ／ 体重の推移から ' + (needTrend(st) > 0 ? '+' : '') + needTrend(st).toLocaleString() + 'kcal 補正' : ''}）`, kcalTag) +
+        `（基礎代謝 ${calcBMR(st).toLocaleString()} × 1.50 ＋ 運動 ${calcEnergy(st, ex).kcal} ＝ 初期推定 ${calcNeedBase(st, ex).toLocaleString()}kcal${needTrend(st) ? ' ／ 体重の推移から ' + (needTrend(st) > 0 ? '+' : '') + needTrend(st).toLocaleString() + 'kcal 補正' : ''}）${exEntered() ? '' : '<br><b class="warn-inline">⚠ ③の運動は今日の分が未入力です。</b>前回の内容で仮に計算しています。'}`, kcalTag) +
     `</tbody></table>` +
     (kcalGap <= -ENERGY_CARE ? energyAdvice(st, -kcalGap, sat.total, salt.total) : '') +
     (satOver > 0 && satAlts.length
@@ -4006,7 +4006,7 @@ function refreshExNote(){
         ? `（${done > 0 ? done + '種目 / 総負荷量 ' + vol.toLocaleString() + 'kg' : '筋トレなし'}` +
           `${cardio > 0 ? ' / 有酸素 ウォーキング換算 ' + r1(cardio) + 'km' : ' / 有酸素なし'}）`
         : `<b>運動なし（休養日）</b>として計算しています。`)
-    : `<b class="warn-inline">今日の運動はまだ入力していません。</b>` +
+    : `<b class="warn-inline">⚠ 今日の運動はまだ入力していません。</b>` +
       `下の内容は前回入力したときのままです。今日の内容に直すか、` +
       `「今日はこの内容で確定」「今日は運動していない」のどちらかを押してください` +
       `（④の必要エネルギーは、いまは下の内容で<b>仮に</b>計算しています）。`;
@@ -4359,9 +4359,13 @@ $('exRest').addEventListener('click', () => {
   EXERCISES.forEach(x => { $('c_' + x.id).checked = false; });
   markExToday(); onInputChanged();
 });
-/* ③の中を手で触ったときも「今日の分を入力した」とみなす */
-$('exercises').closest('section').addEventListener('input',  markExToday);
-$('exercises').closest('section').addEventListener('change', markExToday);
+/* 有酸素の距離か筋トレの欄を手で触ったときも「今日の分を入力した」とみなす。
+   ③には食事の時刻も入っているので、そちらを触っただけでは入力済みにしない。 */
+['input', 'change'].forEach(ev => {
+  $('exercises').addEventListener(ev, markExToday);
+  $('walk').addEventListener(ev, markExToday);
+  $('cycle').addEventListener(ev, markExToday);
+});
 
 $('copyLink').addEventListener('click', copySettingsLink);
 
@@ -4375,7 +4379,7 @@ $('reset').addEventListener('click', () => {
     '・「運動しなかった日もSAVASを摂る」→ オフ\n' +
     '・「SAVASの杯数を指定」→ 8杯\n' +
     '・「SAVASを1日2回まで摂る」→ オン\n' +
-    '・「体重の推移で補正」→ 空欄\n' +
+    '・「体重の推移で補正」→ 空欄（7日平均の欄も）\n' +
     '・ブラウザに保存された前回の入力内容も削除されます\n\n' +
     'よろしいですか？';
   if(!confirm(msg)) return;
