@@ -31,8 +31,8 @@
      3  目標たんぱく質が運動量で動かないこと（＝体重×基本係数のまま）
      4  1日の上限：卵2個（メニューの卵込み）／SAVASの杯数（1回4杯×回数）／
         ご飯（6杯かつ1食4杯×自宅の食事数）／オリーブオイル7さじ／候補の fillMax
-     5  自動計算が食塩7.5g・飽和脂肪酸15gの線を越えないこと
-        （自動計算ぶんを0にした状態で線の内側だった日だけを見る）
+     5  自動計算の線（自動計算ぶんを0にした状態で線の内側だった日だけを見る）
+        候補と油は 食塩7.5g・飽和脂肪酸15g ／ ご飯は上限の17g ／ 上限17gは絶対に越えない
      6  総負荷量＝チェックの入っている種目だけの合計
      7  ④の「③の運動は今日の分が未入力です」が、未入力のときだけ出ること
      8  ⑤のSAVAS1回目の行に時刻が出ていないこと
@@ -186,8 +186,11 @@ function checkOne(c, fail){
       fail(`${f.short} が上限超過：${st.foods[f.id]} > ${f.fillMax}`);
   });
 
-  // 5. 自動計算が食塩7.5g・飽和15gの線を越えないこと。
-  //    自動計算ぶんを0にした状態（＝手入力と固定メニューだけ）が線の内側だった日だけを見る。
+  /* 5. 自動計算の線。品目によって線が違う。
+        ・候補（ヨーグルト等）と油 … 食塩7.5g・飽和脂肪酸15g（毎日クリアしたい線）
+        ・ご飯 … 飽和は上限の17gまで許す（1杯0.1gで、エネルギーの唯一の調整手段のため）
+        ・どの品目でも上限17gは絶対に越えない
+        自動計算ぶんを0にした状態（＝手入力と固定メニューだけ）が線の内側だった日だけを見る。 */
   const zero = {};
   FOODS.filter(isAuto).forEach(f => zero[f.id] = 0);
   const base   = withFoods(st, zero);
@@ -202,8 +205,19 @@ function checkOne(c, fail){
   if(saltB <= SALT_LIMIT && salt > SALT_LIMIT + 0.05)
     fail(`自動計算で食塩が線を越えました：${saltB}g → ${salt}g（線 ${SALT_LIMIT}g／` +
          `${blame('salt')}${spoonNote}）`);
-  if(satB <= SAT_GOOD && sat > SAT_GOOD + 0.05)
-    fail(`自動計算で飽和脂肪酸が線を越えました：${satB}g → ${sat}g（線 ${SAT_GOOD}g／` +
+  /* 候補と油は15gの線の内側であること。
+     ご飯を0にした状態を作り直して測ってはいけない（たんぱく質が変わってSAVASの杯数が動き、
+     アプリが実際には作らない状態になる）。実際の最終状態から、ご飯のぶんの
+     飽和脂肪酸（1杯0.1g）だけを引いて見る。 */
+  const satRice = r1(FOODS.filter(f => f.autoRice || f.autoEnergy)
+    .reduce((a, f) => a + (st.foods[f.id] || 0) * (f.sat || 0), 0));
+  const satNoRice = r1(sat - satRice);
+  if(satB <= SAT_GOOD && satNoRice > SAT_GOOD + 0.05)
+    fail(`候補・油で飽和脂肪酸が${SAT_GOOD}gの線を越えました：${satB}g → ${satNoRice}g` +
+         `（ご飯ぶん ${satRice}g を除いた値／${blame('sat')}${spoonNote}）`);
+  // ご飯を含めても、上限の17gは自動計算では絶対に越えない
+  if(satB <= SAT_LIMIT && sat > SAT_LIMIT + 0.05)
+    fail(`自動計算で飽和脂肪酸が上限を越えました：${satB}g → ${sat}g（上限 ${SAT_LIMIT}g／` +
          `${blame('sat')}${spoonNote}）`);
 
   // 6. 総負荷量はチェックの入っている種目だけ

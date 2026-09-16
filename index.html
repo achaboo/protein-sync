@@ -761,7 +761,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.120';
+const APP_VERSION = '2026-09-01.121';
 
 /* SAVASの1食分は28g＝付属スプーン4杯（明治の公式値。1杯は約7g）。
    1食分28gあたり たんぱく質19.5g・108kcal・脂質2.0g・炭水化物3.7g
@@ -1711,8 +1711,24 @@ function fillProtein(st, ex, keep){
 /* ご飯の杯数。エネルギーの主な調整手段にする（0.5合＝257kcal・33円）。
    たんぱく質を合わせるための手段ではないが、杯数を選ぶときに
    「たんぱく質の目標に届かない日」は避けたいので、不足1gを100kcalぶんの
-   ペナルティとして足し、エネルギーの近さと一緒に比べている。 */
+   ペナルティとして足し、エネルギーの近さと一緒に比べている。
+
+   飽和脂肪酸は SAT_GOOD(15g) ではなく上限の SAT_LIMIT(17g) で止める。
+   候補（ヨーグルト・納豆など）とオリーブオイルを15gで止めているのは、
+   それらがたんぱく質・脂質のために選ばれていて代わりがあるから。
+   ご飯はエネルギーの唯一の調整手段で代わりが無く、しかも1杯あたりの
+   飽和脂肪酸は0.1g（自宅6杯＋店1杯でも0.7g）しかない。
+   0.1gのために257kcalを捨てると、v.114で解消した「献立が1日1,993kcalしか
+   供給しない」状態に逆戻りする。15gは毎日クリアしたい線であって上限ではない。
+   ただし上限の17gは自動計算では絶対に越えない。 */
 const RICE_P_WEIGHT = 100;
+/* その数量を足しても飽和脂肪酸が上限（SAT_LIMIT・17g）に収まるか。
+   ご飯はこの線で止める（候補と油は SAT_GOOD・15g で止めている）。 */
+function satFits(st, add, ex, keep){
+  const t = withFoods(st, add);
+  const t2 = withFoods(t, fillProtein(t, ex, keep));
+  return calcSat(t2, savasOf(t2, ex)).total <= SAT_LIMIT + 0.05;
+}
 function fitRice(st, ex, keep){
   const out  = {};
   const shop = FOODS.filter(f => f.autoEnergy && !keep[f.id]);
@@ -1721,11 +1737,13 @@ function fitRice(st, ex, keep){
   const base = withFoods(st, out);
   const need = calcNeed(base, ex);
 
-  // ① 無料の店のご飯（おかわり）。定食を食べる日で、それでも不足が大きいときだけ1杯
+  // ① 無料の店のご飯（おかわり）。定食を食べる日で、それでも不足が大きいときだけ1杯。
+  //    こちらも飽和脂肪酸の上限（SAT_LIMIT）を越える日には入れない。
   const shopRice = shop.find(f => atShop(f, base));
   if(shopRice){
     const t = withFoods(base, fillProtein(base, ex, keep));
-    if(need - calcKcal(t, savasOf(t, ex)).total > ENERGY_CARE) out[shopRice.id] = 1;
+    if(need - calcKcal(t, savasOf(t, ex)).total > ENERGY_CARE && satFits(t, {[shopRice.id]:1}, ex, keep))
+      out[shopRice.id] = 1;
   }
   if(!home) return out;
 
@@ -1742,6 +1760,10 @@ function fitRice(st, ex, keep){
     const t1   = withFoods(base2, {[home.id]:q});
     const t2   = withFoods(t1, fillProtein(t1, ex, keep));
     const sv   = savasOf(t2, ex);
+    /* 飽和脂肪酸が上限（17g）を越える杯数は選ばない。
+       0杯だけは必ず候補に残す（手入力だけで既に17gを越えている日に
+       best が null になり、杯数が決まらなくなるのを防ぐため）。 */
+    if(q > 0 && calcSat(t2, sv).total > SAT_LIMIT + 0.05) continue;
     const gap  = Math.round(calcKcal(t2, sv).total - calcNeed(t2, ex));
     const shortP = Math.max(0, r1(target - r1(calcFood(t2).total + sv.totalG)));
     const score  = Math.abs(gap) + RICE_P_WEIGHT * shortP;
