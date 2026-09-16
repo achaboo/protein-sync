@@ -13,6 +13,7 @@
      ・たんぱく質10gあたりの飽和脂肪酸を sat ÷ p × 10 で再計算（並びが昇順かも見る）
      ・丼の比較表・自動候補の表・基本係数表・SAVAS上限%の表の数値を再計算
      ・マークダウン表の列数、** と括弧の対応、キリル文字の混入
+     ・README の引用（> の行）が実際の画面の文言と一致しているか
      ・CLAUDE.md の v.NNN と APP_VERSION、README の DEFAULTS_VER 記述と RESET_IDS
 
    このファイルは開発用で、index.html はこれに一切依存しない。 */
@@ -493,6 +494,41 @@ tables.forEach(t => {
   const ids = eval(js.match(/const RESET_IDS = \(\) => (\[[^\]]*\])/)[1]);
   ids.forEach(id => { if(!readme.includes(`'${id}'`))
     bad('バージョン', `RESET_IDS の ${id} が README に書かれていません`); });
+})();
+
+/* ============================================================
+   13. README の引用（> の行）が、実際に画面へ出る文言と一致しているか
+   ------------------------------------------------------------
+   画面の文言を直したのに README の引用を直し忘れる、という抜けが
+   実際に起きた（v.123 で⚠の文言を変えたとき）。テンプレートリテラルの
+   ${...} と数字・時刻・タグを伏せ字にしてから突き合わせる。
+   ============================================================ */
+(() => {
+  const MASK = '';
+  const norm = t => t
+    .replace(/\$\{[^}]*\}/g, MASK)          // 埋め込み式
+    .replace(/<[^>]+>/g, '')                 // タグ
+    .replace(/`\s*\+\s*`/g, '')             // 文字列連結の継ぎ目
+    .replace(/\n/g, '')
+    .replace(/[0-9,:]+/g, MASK)              // 数字・時刻は変わりうる
+    .replace(/[「」（）()]/g, '')
+    .replace(/\s+/g, '')
+    .replace(new RegExp(MASK + '+', 'g'), MASK);
+  const hay = norm(js);
+  const blocks = [];
+  let cur = [];
+  lines.forEach((l, i) => {
+    if(/^> /.test(l)) cur.push({line: i + 1, text: l.slice(2)});
+    else if(cur.length){ blocks.push(cur); cur = []; }
+  });
+  if(cur.length) blocks.push(cur);
+  blocks.forEach(b => {
+    const text = b.map(x => x.text).join('').replace(/\*\*/g, '');
+    text.split('。').map(x => x.trim()).filter(x => x.length > 8).forEach(sent => {
+      if(hay.indexOf(norm(sent)) < 0)
+        bad('引用', `README:${b[0].line} の引用が画面の文言と違います：「${sent.slice(0, 60)}」`);
+    });
+  });
 })();
 
 /* ---------- 照合できた表の一覧 ---------- */
