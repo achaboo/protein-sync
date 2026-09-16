@@ -8,7 +8,7 @@
      ・食品マスタ表 ↔ FOODS の全項目（SAVASの行は *_PER_SPOON 定数と突合）
      ・「調整できる定数」の表 ↔ コードの実値／表に載っていない定数の洗い出し
      ・1週間の型の表 ↔ WEEKLY_PLAN（サバ缶の缶数・ドレッシングの日数・外食の曜日）
-     ・筋トレ種目と初期値 / EX_PRESETS / CARDIO_PRESETS / WEEK_EX
+     ・筋トレ種目と初期値 / WEEK_EX（プリセットは v.122 で廃止。復活していないかを見る）
      ・たんぱく質10gあたりの飽和脂肪酸を sat ÷ p × 10 で再計算（並びが昇順かも見る）
      ・丼の比較表・自動候補の表・基本係数表・SAVAS上限%の表の数値を再計算
      ・マークダウン表の列数、** と括弧の対応、キリル文字の混入
@@ -40,8 +40,6 @@ const evalBlock = (name, open, close) => eval('(' + block(name, open, close) + '
 
 const FOODS          = evalBlock('FOODS', '[', ']');
 const EXERCISES      = evalBlock('EXERCISES', '[', ']');
-const EX_PRESETS     = evalBlock('EX_PRESETS', '[', ']');
-const CARDIO_PRESETS = evalBlock('CARDIO_PRESETS', '[', ']');
 const WEEK_EX        = evalBlock('WEEK_EX', '[', ']');
 const SAT_RATIO      = evalBlock('SAT_RATIO', '[', ']');
 const WEEKLY_PLAN    = evalBlock('WEEKLY_PLAN', '{', '}');
@@ -192,8 +190,6 @@ const eq = (a, b) => Math.abs(a - b) < 1e-6;
     'WALK_KCAL / CYCLE_KCAL': () => [scalar('WALK_KCAL'), scalar('CYCLE_KCAL')],
     'WATER / WATER_ML': () => null,
     TREND_GOAL: () => null,
-    EX_PRESETS: () => EX_PRESETS.length,
-    CARDIO_PRESETS: () => CARDIO_PRESETS.length,
     WEEK_EX: () => WEEK_EX.length
   };
   t.rows.forEach(({cells, line}) => {
@@ -309,43 +305,16 @@ const eq = (a, b) => Math.abs(a - b) < 1e-6;
   if(!readme.includes(vol.toLocaleString()))
     bad('筋トレ表', `8種目の総負荷量 ${vol.toLocaleString()} kg が README に出てきません`);
 
-  // プリセット
-  const tp = findTable('ボタン', '種目');
-  if(!tp){ bad('プリセット', '筋トレプリセットの表が見つかりません'); }
-  else {
-    if(tp.rows.length !== EX_PRESETS.length)
-      bad('プリセット', `プリセット数：README ${tp.rows.length} / コード ${EX_PRESETS.length}`);
-    tp.rows.forEach(({cells, line}) => {
-      const p = EX_PRESETS.find(x => x.label === plain(cells[0]));
-      if(!p){ bad('プリセット', `README:${line} 「${plain(cells[0])}」がコードにありません`); return; }
-      const names = p.ids.map(id => (EXERCISES.find(e => e.id === id) || {}).name);
-      const text = plain(cells[1]);
-      if(p.ids.length === 0) return;
-      if(p.ids.length === EXERCISES.length){
-        if(!/すべて/.test(text)) bad('プリセット', `README:${line} 「${p.label}」の説明が全種目になっていません`);
-        return;
-      }
-      names.forEach(n => { if(!text.includes(n))
-        bad('プリセット', `README:${line} 「${p.label}」に ${n} が書かれていません`); });
-      const cnt = text.split('／').length;
-      if(cnt !== p.ids.length)
-        bad('プリセット', `README:${line} 「${p.label}」の種目数：README ${cnt} / コード ${p.ids.length}`);
-    });
-  }
-
-  // 有酸素プリセット
-  const tc = findTable('ボタン', 'ウォーキング', 'サイクリング');
-  if(!tc){ bad('有酸素', '有酸素プリセットの表が見つかりません'); }
-  else {
-    if(tc.rows.length !== CARDIO_PRESETS.length)
-      bad('有酸素', `プリセット数：README ${tc.rows.length} / コード ${CARDIO_PRESETS.length}`);
-    tc.rows.forEach(({cells, line}) => {
-      const p = CARDIO_PRESETS.find(x => x.label === plain(cells[0]));
-      if(!p){ bad('有酸素', `README:${line} 「${plain(cells[0])}」がコードにありません`); return; }
-      if(!eq(numOf(cells[1]), p.walk) || !eq(numOf(cells[2]), p.cycle))
-        bad('有酸素', `README:${line} ${p.label}：README ${plain(cells[1])}/${plain(cells[2])} / コード ${p.walk}/${p.cycle}`);
-    });
-  }
+  /* 筋トレ・有酸素のプリセットは v.122 で廃止した（毎日手で入れるため）。
+     ボタンが復活していないかだけ見ておく。 */
+  ['EX_PRESETS', 'CARDIO_PRESETS', 'cardioPreset', 'exPreset', 'exConfirm', 'exRest']
+    .forEach(name => { if(js.includes(name))
+      bad('廃止済み', `${name} が index.html に残っています（v.122で削除したはず）`); });
+  ['ボタン'].forEach(col => {
+    const t2 = tables.find(x => x.head.includes(col) && x.section.indexOf('運動') < 0);
+    if(t2 && /プリセット|全種目|ウォーキング10km/.test(t2.rows.map(r => r.cells.join()).join()))
+      bad('廃止済み', `README:${t2.line} プリセットの表が残っています（${t2.section}）`);
+  });
 
   // 運動の前提
   const tw = findTable('前提', '内容');

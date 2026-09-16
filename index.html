@@ -316,9 +316,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
 #weekPlan td.amt{text-align:center;vertical-align:middle}
 /* 列幅を決めておく。指定しないと文字数の多い「追加」列が幅を取り、
    朝食・夕食の店名が1文字ずつ折り返してしまう。 */
-.preset{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 10px}
 .ex-head label small.part{margin-left:6px;opacity:.65;font-weight:400}
-.preset .mini-btn{margin:0}
 #weekPlan{table-layout:fixed}
 #weekNutri th,#weekNutri td{text-align:center;white-space:nowrap;padding:5px 4px;font-size:.86em}
 #weekEnergy{table-layout:fixed}
@@ -640,10 +638,6 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
   <section>
     <h2>③ 今日の運動・食事の時刻</h2>
     <p class="hint" id="exTodayNote" style="margin-top:0"></p>
-    <div class="actions" style="margin:0 0 12px">
-      <button type="button" id="exConfirm" class="sub-btn">今日はこの内容で確定</button>
-      <button type="button" id="exRest" class="sub-btn">今日は運動していない</button>
-    </div>
 
     <h3>食事の時刻</h3>
     <p class="hint" style="margin-top:0">
@@ -679,19 +673,17 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
       <div class="qty"><input type="number" inputmode="decimal" id="cycle" value="0" min="0" step="1"></div>
       <div class="unit">km</div>
     </div>
-    <div class="preset" id="cardioPreset"></div>
     <p class="hint" style="margin-top:0">
-      よく使う距離はボタンで入れられます。違う距離の日は上の欄に直接入れてください。
+      その日に歩いた距離・走った距離を入れてください。やらなかった種目は 0 のままにします。
     </p>
 
     <h3>筋トレ（その日に実際にやった種目だけを残す）</h3>
     <p class="hint">
-      <b>8種目を毎日すべて行う前提にはしていません。</b>部位分けの日は下のボタンで
-      その組み合わせだけを残せます。消費エネルギーは<b>チェックの入っている種目のセット数だけ</b>から計算します。<br>
+      <b>8種目を毎日すべて行う前提にはしていません。</b>その日にやった種目だけチェックを残してください。
+      消費エネルギーは<b>チェックの入っている種目のセット数だけ</b>から計算します。<br>
       <b>RIR（Reps In Reserve）1〜2</b>を基準に重量を設定。
       ※各セット終了時に「あと1〜2回できる」程度。
     </p>
-    <div class="preset" id="exPreset"></div>
     <div id="exercises"></div>
     <p class="hint" id="volNote"></p>
   </section>
@@ -761,7 +753,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.121';
+const APP_VERSION = '2026-09-01.122';
 
 /* SAVASの1食分は28g＝付属スプーン4杯（明治の公式値。1杯は約7g）。
    1食分28gあたり たんぱく質19.5g・108kcal・脂質2.0g・炭水化物3.7g
@@ -908,25 +900,6 @@ const EXERCISES = [
   {id:'curl',     name:'バイセップスカール',   part:'腕',   w:10, r:15, s:3},
   {id:'side',     name:'サイドレイズ',         part:'肩',   w:5.75, r:10, s:3},
   {id:'rear',     name:'リアレイズ',           part:'肩',   w:5.75, r:5,  s:3}
-];
-
-/* 部位分けで実施する日のためのプリセット。
-   「8種目すべて」を毎日の標準とは考えず、その日に実際にやった組み合わせを1押しで入れる。
-   ここに無い組み合わせは、種目ごとのチェックで作れる。 */
-const EX_PRESETS = [
-  {label:'全種目',   ids:['lat','row','chest','shoulder','dips','curl','side','rear']},
-  {label:'背中・腕', ids:['lat','row','curl']},
-  {label:'胸・肩',   ids:['chest','shoulder','side']},
-  {label:'胸・腕・肩（後）', ids:['dips','curl','rear']},
-  {label:'なし',     ids:[]}
-];
-
-/* 有酸素のプリセット。利用者の実際のパターンは
-   「ウォーキング10kmの日」と「サイクリング20kmの日」と「休む日」の3通り。 */
-const CARDIO_PRESETS = [
-  {label:'なし',              walk:0,  cycle:0},
-  {label:'ウォーキング10km',  walk:10, cycle:0},
-  {label:'サイクリング20km',  walk:0,  cycle:20}
 ];
 
 const $  = id => document.getElementById(id);
@@ -1263,13 +1236,6 @@ $('ratioTable').innerHTML = SAT_RATIO
   .map(([name, pct]) => `<tr><td>${name}</td><td>${pct}</td></tr>`).join('');
 $('satRatio').innerHTML = SAT_RATIO
   .map(([name, pct, r], i) => `<option value="${r}">${name}（${pct}）</option>`).join('');
-
-/* 有酸素と筋トレのプリセット。押すとその内容を入力欄に書き込み、
-   「今日の運動を入力した」印も同時に付ける。 */
-$('cardioPreset').innerHTML = CARDIO_PRESETS.map((p, i) =>
-  `<button type="button" class="mini-btn" data-cardio="${i}">${esc(p.label)}</button>`).join('');
-$('exPreset').innerHTML = EX_PRESETS.map((p, i) =>
-  `<button type="button" class="mini-btn" data-expreset="${i}">${esc(p.label)}</button>`).join('');
 
 $('exercises').innerHTML = EXERCISES.map(e => `
   <div class="ex" id="ex_${e.id}">
@@ -3990,9 +3956,9 @@ function refreshExNote(){
           `${cardio > 0 ? ' / 有酸素 ウォーキング換算 ' + r1(cardio) + 'km' : ' / 有酸素なし'}）`
         : `<b>運動なし（休養日）</b>として計算しています。`)
     : `<b class="warn-inline">⚠ 今日の運動はまだ入力していません。</b>` +
-      `下の内容は前回入力したときのままです。今日の内容に直すか、` +
-      `「今日はこの内容で確定」「今日は運動していない」のどちらかを押してください` +
-      `（④の必要エネルギーは、いまは下の内容で<b>仮に</b>計算しています）。`;
+      `下の内容は前回入力したときのままです。<b>今日の内容に直してください</b>` +
+      `（有酸素の距離か筋トレの欄を触れば入力済みになります。運動しなかった日は距離を0にし、` +
+      `全種目のチェックを外します）。④の必要エネルギーは、いまは下の内容で<b>仮に</b>計算しています。`;
   const badge = $('exBadge');
   if(badge) badge.hidden = exEntered();
 }
@@ -4301,21 +4267,6 @@ $('meals').addEventListener('change', () => {
   });
   onInputChanged();
 });
-/* ③の運動：プリセットと「今日の内容で確定」「今日は運動していない」 */
-$('cardioPreset').addEventListener('click', e => {
-  const b = e.target.closest('[data-cardio]');
-  if(!b) return;
-  const p = CARDIO_PRESETS[+b.getAttribute('data-cardio')];
-  $('walk').value = p.walk; $('cycle').value = p.cycle;
-  markExToday(); onInputChanged();
-});
-$('exPreset').addEventListener('click', e => {
-  const b = e.target.closest('[data-expreset]');
-  if(!b) return;
-  const p = EX_PRESETS[+b.getAttribute('data-expreset')];
-  EXERCISES.forEach(x => { $('c_' + x.id).checked = p.ids.indexOf(x.id) >= 0; });
-  markExToday(); onInputChanged();
-});
 /* 7日平均どうしの差から「体重の変化」を入れる。
    日数は2つの平均の「中心どうしの間隔」なので、14日ぶん記録したなら7日になる。 */
 $('trendCalc').addEventListener('click', () => {
@@ -4334,12 +4285,6 @@ $('trendCalc').addEventListener('click', () => {
   onInputChanged();
 });
 
-$('exConfirm').addEventListener('click', () => { markExToday(); onInputChanged(); });
-$('exRest').addEventListener('click', () => {
-  $('walk').value = 0; $('cycle').value = 0;
-  EXERCISES.forEach(x => { $('c_' + x.id).checked = false; });
-  markExToday(); onInputChanged();
-});
 /* 有酸素の距離か筋トレの欄を手で触ったときも「今日の分を入力した」とみなす。
    ③には食事の時刻も入っているので、そちらを触っただけでは入力済みにしない。 */
 ['input', 'change'].forEach(ev => {
