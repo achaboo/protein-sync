@@ -726,7 +726,8 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
       </div>
       <p id="schedNote"></p>
       <p class="hint">※ 目安量は今日の目標値から自動配分しています（SAVASと間食を引いた残りを、食事の数で等分）。<br>
-      1食のたんぱく質は <b>25〜35g が目安</b>、45gまでは問題ありません。40gは「これ以上使えない上限」ではないため、超えた分を後ろへ回すことはしません。</p>
+      1食のたんぱく質は <b>体重×0.4g が目安</b>（体重×0.3〜0.6g なら問題ありません）。
+      「これ以上は使えない上限」という量はないため、超えた分を後ろへ回すことはしません。</p>
     </section>
 
     <section>
@@ -745,7 +746,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.132';
+const APP_VERSION = '2026-09-01.133';
 
 /* SAVASの1食分は28g＝付属スプーン4杯（明治の公式値。1杯は約7g）。
    1食分28gあたり たんぱく質19.5g・108kcal・脂質2.0g・炭水化物3.7g
@@ -956,10 +957,17 @@ function pairNote(bin){
               .map(p => `<br><small class="pair">〇 ${p.msg}</small>`).join('');
 }
 
-/* 1食あたりのたんぱく質の評価帯。40gは「これ以上は使えない上限」ではなく目安。
-   25〜35gで筋タンパク合成はほぼ最大になり、それを超えた分が無駄になるわけではない。 */
-const MEAL_P_GOOD = [25, 35];   // ◎ この範囲を基本の目標にする
-const MEAL_P_OK   = 45;         // ○ ここまでは許容。超えたときだけ「分散できるなら」と添える
+/* 1食あたりのたんぱく質の評価帯。体重あたりで持つ。
+   40gは「これ以上は使えない上限」ではなく目安で、体重あたり0.4g/食で
+   筋タンパク合成はほぼ最大になる（それを超えた分が無駄になるわけではない）。
+   固定のgにすると、1食の目安量は体重から出ているのに評価帯だけが取り残され、
+   体重の大きい人では0.4g/kgどおりの食事を「多い」と判定してしまう。 */
+const MEAL_P_OPT  = 0.40;   // 筋タンパク合成がほぼ最大になる 1食あたり g/kg
+const MEAL_P_LO   = 0.30;   // ここから上なら「問題ない」とみなす g/kg
+const MEAL_P_MUCH = 0.60;   // これを超えたときだけ「分散できるなら」と添える g/kg
+const mealPLo   = w => r1(w * MEAL_P_LO);
+const mealPOpt  = w => r1(w * MEAL_P_OPT);
+const mealPMuch = w => r1(w * MEAL_P_MUCH);
 // 脂質の目標範囲（総エネルギーの20〜30%）。脂質は1gあたり9kcal。
 const FAT_MIN_E = 0.20, FAT_MAX_E = 0.30, KCAL_PER_FAT = 9;
 // 炭水化物の目標範囲（総エネルギーの50〜65%）。炭水化物は1gあたり4kcal。
@@ -2104,9 +2112,9 @@ function render(opts){
       (sv.forced || sv.twoFixed || sv.manual ? '' : `不足 ${lack}g のうち ${sv.totalG}g を運動直後の1回に纏めています。`) +
       (sv.packed
         ? (sv.sessions.length > 1
-            ? `1回あたりは推奨の${PER_SERVE}杯より1杯多い${MAX_PER_SERVE}杯ですが、` +
-              `1回の目安（${MEAL_P_GOOD[0]}〜${MEAL_P_OK}g）の範囲内です。`
-            : `推奨の${PER_SERVE}杯より1杯多めですが、SAVASは運動直後の1回だけなので` +
+            ? `1回あたりが明治の1食分（${PER_SERVE}杯）より多めですが、` +
+              `1回の目安（${mealPLo(st.weight)}〜${mealPMuch(st.weight)}g）の範囲内です。`
+            : `明治の1食分（${PER_SERVE}杯）より多めですが、SAVASは運動直後の1回だけなので` +
               `上限の${MAX_PER_SERVE}杯（${r1(MAX_PER_SERVE * SPOON_G)}g）まで使っています。`)
         : '') +
       ((capBinds || !(sv.forced || sv.twoFixed || sv.manual)) ? `</small>` : `</span>`);
@@ -2431,10 +2439,13 @@ function mealAdvice(bin, target, st, dayCovered){
         `提案した品目は分割できないため配分に偏りが出ているだけなので、無理に足す必要はありません。`
       : `<b>それでも目安まで あと約${d}g。</b>他の食事で調整するか、少量足してください。`;
   }else if(d <= -5){
-    // 多い食事。45gを超えたときだけ「分散できるなら」と添える（上限ではない）
-    const much = after > MEAL_P_OK
-      ? `1食${MEAL_P_OK}gを超えているので、分散できるなら他の時間帯に回すとより効率よく使えます。`
-      : `${MEAL_P_GOOD[0]}〜${MEAL_P_OK}gの範囲なので、このままで問題ありません。`;
+    // 多い食事。体重×0.6 g を超えたときだけ「分散できるなら」と添える（上限ではない）
+    const much = after > mealPMuch(st.weight)
+      ? `1食 ${mealPMuch(st.weight)}g（体重×${MEAL_P_MUCH}）を超えているので、` +
+        `分散できるなら他の時間帯に回すとより効率よく使えます。` +
+        `<b>吸収されないわけではありません。</b>`
+      : `${mealPLo(st.weight)}〜${mealPMuch(st.weight)}g の範囲なので、このままで問題ありません` +
+        `（筋タンパク合成がほぼ最大になるのは 体重×${MEAL_P_OPT} ＝ ${mealPOpt(st.weight)}g 前後）。`;
     msg += (bin.locked && bin.locked.length)
       ? `目安より約${r1(-d)}g多めです（<b>${bin.locked.join('・')}</b>はこの時間帯にしか摂れません）。${much}`
       : `目安より約${r1(-d)}g多めです。${much}`;
@@ -2460,7 +2471,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   const snackG  = r1(FOODS.reduce((a, f) => a + snackQty(f, st) * f.p, 0));
   /* 食事で摂るべき量 = 目標 − SAVAS − 間食。これを食事の数で等分する。
      以前は 朝30%/昼35%/晩35% の割合で分け、1食40gで頭打ちにしていたが、
-     たんぱく質は割合ではなくgで見るほうが実態に合う（1食25〜35gが目安）。 */
+     たんぱく質は割合ではなくgで見るほうが実態に合う（1食 体重×0.4g が目安）。 */
   const byMeal  = Math.max(0, target - sv.totalG - snackG);
   const nMeals  = ['b','l','d'].filter(k => k !== st.skip).length || 1;
   const per     = Math.round(byMeal / nMeals);
@@ -2877,7 +2888,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
           ? (postSplit.second.length ? `<b>あわせて ${labelOf(postSplit.second)}</b>` : `水${WATER_ML}mlで溶かす`)
           : `夕食で摂りきれない分をここで補います。<b>水${WATER_ML}ml</b>に溶かして飲んでください。` +
         (postSplit.second.length ? `<br><b>あわせて ${labelOf(postSplit.second)}</b>。` : '') +
-        `<br><small>運動直後に全部まとめるより、1回25〜35gの範囲に分けるほうが筋肉の材料として使われます。</small>` +
+        `<br><small>運動直後に全部まとめるより、1回 ${mealPOpt(st.weight)}g（体重×${MEAL_P_OPT}）前後に分けるほうが筋肉の材料として使われます。</small>` +
         // SAVASは吸収が速く脂質も少ないため、就寝前でも食事のような負担にならない。
         // 食品の回し分・間食と違って警告は出さず、補足だけを添える。
         (late
@@ -3162,7 +3173,7 @@ function fixedSavas(spoons, st){
     spoons, sessions,
     savasG, liquidG:0, totalG:savasG,
     maxSingleG:r1(MAX_PER_SERVE * SPOON_G),
-    packed:spoons > PER_SERVE, mixed:false, remainG:0, overG:0, forced:true
+    packed:sessions.some(sn => sn.spoons > PER_SERVE), mixed:false, remainG:0, overG:0, forced:true
   };
 }
 
@@ -3377,10 +3388,10 @@ function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, pl
       `リストにない食品（卵・魚・肉・乳製品・麺・パンなど）は「その他（自由入力）」にg数を入れると反映されます。`]);
   }
 
-  tips.push(['', `<b>① 1食は25〜35gを目安に分ける。</b>1回で筋タンパク合成がほぼ最大になるのが 25〜35g（体重あたり0.4g前後）です。今日の目標 ${target}g は一気に摂らず、` +
+  tips.push(['', `<b>① 1食は ${mealPOpt(st.weight)}g を目安に分ける。</b>1回で筋タンパク合成がほぼ最大になるのが <b>体重×${MEAL_P_OPT}g</b>（${r1(st.weight)}kgなら ${mealPOpt(st.weight)}g）です。今日の目標 ${target}g は一気に摂らず、` +
     (st.meals === 3 ? `<b>朝・昼・晩＋補食</b>`
       : st.skip === 'b' ? `<b>昼・夕の2食＋SAVAS</b>` : `<b>朝・夕の2食＋SAVAS</b>`) +
-    `に分けてください。<b>これは上限ではありません。</b>1食が40gを超えても無駄になるわけではないので、45gくらいまでは気にしなくて構いません。` +
+    `に分けてください。<b>これは上限ではありません。</b>これを超えても吸収されないわけではないので、${mealPMuch(st.weight)}g（体重×${MEAL_P_MUCH}）くらいまでは気にしなくて構いません。` +
     (st.meals === 2 ? `2食だと1食あたりが増えやすいので、超えた分はSAVASの回に回すほうが無駄になりません。` : '')]);
 
   // 食物繊維が食事から足りていれば、難消化性デキストリンは要らない
