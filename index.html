@@ -318,6 +318,9 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
 /* 列幅を決めておく。指定しないと文字数の多い「追加」列が幅を取り、
    朝食・夕食の店名が1文字ずつ折り返してしまう。 */
 .ex-head label small.part{margin-left:6px;opacity:.65;font-weight:400}
+/* 入力欄の下に小さなボタンを並べる行（必要エネルギーの補正の増減） */
+.btn-row{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0}
+.btn-row .mini-btn{margin:0}
 #weekPlan{table-layout:fixed}
 #weekNutri th,#weekNutri td{text-align:center;white-space:nowrap;padding:5px 4px;font-size:.86em}
 #weekEnergy{table-layout:fixed}
@@ -466,6 +469,14 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
         <label for="kcalAdj">必要エネルギーの補正 (kcal)</label>
         <input type="number" inputmode="numeric" id="kcalAdj" value="0" step="50" min="-600" max="600" placeholder="0">
       </div>
+    </div>
+    <!-- iPhone のテンキーにはマイナスが無く、スピナーも出ないため、増減はボタンでも行えるようにする -->
+    <div class="btn-row" id="kcalAdjBtns">
+      <button type="button" class="mini-btn" data-adj="-100">−100</button>
+      <button type="button" class="mini-btn" data-adj="-50">−50</button>
+      <button type="button" class="mini-btn" data-adj="50">＋50</button>
+      <button type="button" class="mini-btn" data-adj="100">＋100</button>
+      <button type="button" class="mini-btn" data-adj="0">0に戻す</button>
     </div>
     <p class="hint" id="kcalAdjNote"></p>
 
@@ -724,7 +735,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.126';
+const APP_VERSION = '2026-09-01.127';
 
 /* SAVASの1食分は28g＝付属スプーン4杯（明治の公式値。1杯は約7g）。
    1食分28gあたり たんぱく質19.5g・108kcal・脂質2.0g・炭水化物3.7g
@@ -4225,6 +4236,20 @@ $('meals').addEventListener('change', () => {
   $('exercises').addEventListener(ev, markExToday);
   $('walk').addEventListener(ev, markExToday);
   $('cycle').addEventListener(ev, markExToday);
+});
+
+/* 必要エネルギーの補正の増減ボタン。
+   iPhone は type=number にスピナーを出さず、テンキーにマイナスも無いので、
+   キーボードを使わずに負の値まで入れられる経路をここで確保する。
+   data-adj="0" は「0に戻す」。 */
+$('kcalAdjBtns').addEventListener('click', e => {
+  const b = e.target.closest('[data-adj]');
+  if(!b) return;
+  const el = $('kcalAdj');
+  const d  = parseInt(b.getAttribute('data-adj'), 10);
+  const now = Math.max(-KCAL_ADJ_CAP, Math.min(KCAL_ADJ_CAP, parseInt(el.value, 10) || 0));
+  el.value = d === 0 ? 0 : Math.max(-KCAL_ADJ_CAP, Math.min(KCAL_ADJ_CAP, now + d));
+  onInputChanged();
 });
 
 $('copyLink').addEventListener('click', copySettingsLink);
