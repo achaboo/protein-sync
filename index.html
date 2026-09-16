@@ -453,51 +453,6 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
     </div>
     <p class="hint" id="fixNote"></p>
 
-    <h3>体重の推移で必要エネルギーを補正（任意）</h3>
-    <p class="hint" style="margin-top:0">
-      必要エネルギーは計算式から出した<b>初期推定値</b>です。人によって数百kcalずれるので、
-      <b>7〜14日ぶんの体重の変化</b>を入れると、その実測から④の必要量を補正します。
-      空欄のままなら初期推定値をそのまま使います。
-    </p>
-    <div class="grid2">
-      <div>
-        <label for="trendDays">記録した日数（7日以上）</label>
-        <input type="number" inputmode="numeric" id="trendDays" value="" min="0" max="60" step="1" placeholder="未入力">
-      </div>
-      <div>
-        <label for="trendKg">その間の体重の変化 (kg)</label>
-        <input type="number" inputmode="decimal" id="trendKg" value="" step="0.1" min="-20" max="20" placeholder="例：+0.2 / -0.5">
-      </div>
-      <div>
-        <label for="trendGoal">体重の目標</label>
-        <select id="trendGoal">
-          <option value="bulk" selected>ゆっくり増量（週 +0.2kg）</option>
-          <option value="keep">維持（増減なし）</option>
-          <option value="cut">減量（週 −0.3kg）</option>
-        </select>
-      </div>
-    </div>
-    <p class="hint" id="trendNote"></p>
-
-    <p class="hint" style="margin-top:0">
-      <b>1日だけの体重差は水分で数百g動きます。</b>7日ぶんの平均どうしを比べると、その影響が減ります。
-      下の欄に<b>最初の7日の平均</b>と<b>直近7日の平均</b>を入れて押すと、上の「体重の変化」に書き込みます。
-    </p>
-    <div class="grid2">
-      <div>
-        <label for="trendA">最初の7日の平均体重 (kg)</label>
-        <input type="number" inputmode="decimal" id="trendA" value="" step="0.1" min="30" max="200" placeholder="未入力">
-      </div>
-      <div>
-        <label for="trendB">直近7日の平均体重 (kg)</label>
-        <input type="number" inputmode="decimal" id="trendB" value="" step="0.1" min="30" max="200" placeholder="未入力">
-      </div>
-    </div>
-    <div class="actions" style="margin:6px 0 0">
-      <button type="button" id="trendCalc" class="sub-btn">この2つから「体重の変化」を入れる</button>
-    </div>
-    <p class="hint" id="trendCalcNote" style="margin-top:6px"></p>
-
     <h3>基本係数の入力目安</h3>
     <div class="table-wrap">
       <table class="mini" id="bfTable">
@@ -753,7 +708,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.123';
+const APP_VERSION = '2026-09-01.124';
 
 /* SAVASの1食分は28g＝付属スプーン4杯（明治の公式値。1杯は約7g）。
    1食分28gあたり たんぱく質19.5g・108kcal・脂質2.0g・炭水化物3.7g
@@ -989,22 +944,8 @@ const SAT_RATIO = [
    座位中心の生活を想定した初期値として置いている。そこへ入力された運動の正味消費を
    加えるのは、このツール独自の推定モデル（医学的に正確な求め方として扱わない）。
    活動係数は日常の活動量をまるごと1つの数字で表した近似で、個人の実態とは一致しないため、
-   必要エネルギーは初期推定値とし、7〜14日以上の体重推移（needTrend）で実測に合わせる。 */
+   必要エネルギーはあくまで推定値として扱う（実測に合わせる仕組みは持たない）。 */
 const ACTIVITY = 1.50;
-
-/* 必要エネルギーは固定値ではなく「初期推定値」として扱い、
-   7〜14日間の体重の推移で補正する。体脂肪1kg ≒ 7,200kcal。
-   補正 = （目標の体重変化ペース − 実際の体重変化ペース）× 7,200
-   ＝「推定どおりに食べていたのに目標のペースで増えていないなら、推定が低かった」
-   という考え方。推定と実際の食事量のずれも一緒に吸収するため、幅は ±600kcal で止める。 */
-const TREND_KCAL_PER_KG = 7200;
-const TREND_MIN_DAYS    = 7;    // これ未満の日数では補正しない（体水分の変動が大きい）
-const TREND_MAX_DAYS    = 60;
-const TREND_CAP         = 600;  // 1日あたりの補正の上限 kcal
-// 体重の目標ペース（kg/週）
-const TREND_GOAL = {bulk:{rate:0.20, label:'ゆっくり増量（週 +0.2kg）'},
-                    keep:{rate:0,    label:'維持（増減なし）'},
-                    cut: {rate:-0.30, label:'減量（週 −0.3kg）'}};
 
 // エネルギー消費の概算。たんぱく質の必要量は運動量に比例せず頭打ちになるが、
 // エネルギー（主に糖質）の必要量は運動量に比例して増えるため、こちらは上限を設けない。
@@ -1265,9 +1206,6 @@ function readState(){
     age:    num('age')    || 55,
     baseFactor: num('baseFactor') || 1.65,
     walk: num('walk'), cycle: num('cycle'), otherP: num('otherP'),
-    // 体重の推移（必要エネルギーの補正用）。変化量はマイナスもあるので numS で読む
-    trendDays: num('trendDays'), trendKg: numS('trendKg'),
-    trendGoal: ($('trendGoal') && $('trendGoal').value) || 'bulk',
     otherNote: ($('otherNote').value || '').trim(),
     // 「その他」の栄養成分。分かる範囲だけ入れてもらう（未入力は0）
     otherFat:   num('otherFat'),   otherSat:   num('otherSat'),
@@ -1356,22 +1294,11 @@ const calcFiber = (st, sv) => totalOf(st, sv, 'fiber', FIBER_PER_SPOON);
 const calcKcal  = (st, sv) => totalOf(st, sv, 'kcal',  KCAL_PER_SPOON);
 
 /* 基礎代謝（Mifflin-St Jeor・男性）と、1日に必要なエネルギー。
-   身体活動レベルは座位中心の生活を想定した I（1.50）を初期値とし、運動の正味消費を別に足す。
-   いずれも初期推定値で、体重の推移（needTrend）で補正する前提。 */
+   身体活動レベルは座位中心の生活を想定した I（1.50）を使い、運動の正味消費を別に足す。
+   体重・身長・年齢から自動で決まる推定値で、実測に合わせて補正する仕組みは持たない
+   （v.124 で「体重の推移で補正」を削除した）。 */
 const calcBMR  = st => Math.round(10 * st.weight + 6.25 * st.height - 5 * st.age + 5);
-// 初期推定値（基礎代謝 × 活動レベル ＋ 運動の正味消費）
-const calcNeedBase = (st, ex) => Math.round(calcBMR(st) * ACTIVITY) + calcEnergy(st, ex).kcal;
-/* 体重の推移から見た補正 kcal（プラスなら必要量を増やす）。
-   日数が足りない・入力が無いときは 0（＝初期推定値のまま）。 */
-function needTrend(st){
-  const d = st.trendDays;
-  if(!(d >= TREND_MIN_DAYS && d <= TREND_MAX_DAYS)) return 0;
-  const goal = (TREND_GOAL[st.trendGoal] || TREND_GOAL.keep).rate / 7;   // kg/日
-  const act  = st.trendKg / d;                                           // kg/日
-  const adj  = (goal - act) * TREND_KCAL_PER_KG;
-  return Math.max(-TREND_CAP, Math.min(TREND_CAP, Math.round(adj)));
-}
-const calcNeed = (st, ex) => calcNeedBase(st, ex) + needTrend(st);
+const calcNeed = (st, ex) => Math.round(calcBMR(st) * ACTIVITY) + calcEnergy(st, ex).kcal;
 
 // 運動量から目標係数（g/kg）を決定
 function calcFactor(st){
@@ -2030,7 +1957,7 @@ function render(opts){
         (Math.abs(kcalGap) > 100
           ? `このままなら週 約${r1(Math.abs(kcalGap) * 7 / 7200)}kg ${kcalGap < 0 ? '減' : '増'}`
           : '') +
-        `（基礎代謝 ${calcBMR(st).toLocaleString()} × 1.50 ＋ 運動 ${calcEnergy(st, ex).kcal} ＝ 初期推定 ${calcNeedBase(st, ex).toLocaleString()}kcal${needTrend(st) ? ' ／ 体重の推移から ' + (needTrend(st) > 0 ? '+' : '') + needTrend(st).toLocaleString() + 'kcal 補正' : ''}）${exEntered() ? '' : '<br><b class="warn-inline">⚠ ③の運動は今日の分が未入力です。</b>前回の内容で仮に計算しています。'}`, kcalTag) +
+        `（基礎代謝 ${calcBMR(st).toLocaleString()} × 1.50 ＋ 運動 ${calcEnergy(st, ex).kcal} ＝ 推定 ${calcNeed(st, ex).toLocaleString()}kcal）${exEntered() ? '' : '<br><b class="warn-inline">⚠ ③の運動は今日の分が未入力です。</b>前回の内容で仮に計算しています。'}`, kcalTag) +
     `</tbody></table>` +
     (kcalGap <= -ENERGY_CARE ? energyAdvice(st, -kcalGap, sat.total, salt.total) : '') +
     (satOver > 0 && satAlts.length
@@ -3520,26 +3447,6 @@ function updateLive(){
 
   // 杯数の手動指定
   const fixRaw = parseInt($('fixSpoons').value, 10);
-  // 体重の推移による必要エネルギーの補正
-  const trendAdj = needTrend(st);
-  const trendGoal = TREND_GOAL[st.trendGoal] || TREND_GOAL.keep;
-  // 補正が 0kcal になるのは「ちょうど目標のペース」のときで、未入力とは別物
-  const trendOn = st.trendDays >= TREND_MIN_DAYS && st.trendDays <= TREND_MAX_DAYS;
-  $('trendNote').innerHTML = trendOn
-    ? `<b>${st.trendDays}日で ${st.trendKg > 0 ? '+' : ''}${r1(st.trendKg)}kg` +
-      `（週 ${st.trendKg > 0 ? '+' : ''}${r1(st.trendKg / st.trendDays * 7)}kg）。</b>` +
-      `目標は「${trendGoal.label}」なので、` +
-      `${trendAdj === 0 ? '<b>補正はありません</b>（ちょうど目標のペースです）' : '④の必要エネルギーを<b>' + (trendAdj > 0 ? '+' : '') + trendAdj.toLocaleString() + ' kcal</b> 補正します'}` +
-      `（初期推定 ${calcNeedBase(st, calcFactor(st)).toLocaleString()}kcal → <b>${calcNeed(st, calcFactor(st)).toLocaleString()}kcal</b>）。` +
-      `<br><small>体脂肪1kg ≒ 7,200kcal として、目標のペースと実際のペースの差を1日あたりに直した値です` +
-      `（推定どおりに食べていた前提の概算なので、±${TREND_CAP}kcal で頭打ちにしています）。1日だけの差ではなく<b>7日平均どうしの差</b>を入れると、水分変動の影響が減ります。</small>`
-    : st.trendDays > 0 && st.trendDays < TREND_MIN_DAYS
-      ? `<b>${st.trendDays}日ぶんでは補正しません。</b>体水分の変動で数百gは動くため、` +
-        `<b>${TREND_MIN_DAYS}日以上</b>（できれば14日）の変化を入れてください。`
-      : `未入力なので、④の必要エネルギーは計算式から出した<b>初期推定値のまま</b>です` +
-        `（基礎代謝 × 1.50 ＋ 運動の正味消費）。同じ体重・身長・年齢でも実際の必要量は` +
-        `数百kcalずれるので、7〜14日ぶんの体重の変化を入れると精度が上がります。`;
-
   $('fixNote').innerHTML = st.fixSpoons
     ? `<b>${st.fixSpoons}杯（${r1(st.fixSpoons * SPOON_G)}g）</b>を毎日の基本量にします` +
       `（${serveText(Math.ceil(st.fixSpoons / MAX_PER_SERVE))}）。` +
@@ -3669,7 +3576,7 @@ const DEFAULTS_VER = 13;
 //      （空欄のままだと、後ろの食事からさかのぼった時刻が朝食に出てしまうため）。
 const RESET_IDS = () => ['breakfastTime'];
 const ALL_IDS = () => ['weight','height','age','baseFactor','meals','savasShare','walk','cycle',
-   'trendDays','trendKg','trendGoal','trendA','trendB','weekExSel',
+   'weekExSel',
    'otherP','otherNote','otherFat','otherSat','otherSalt','otherCarb','otherFiber','otherKcal','otherPrice',
    'breakfastTime','lunchTime','dinnerTime','fixSpoons']
   .concat(FOODS.map(f => 'f_' + f.id))
@@ -4033,7 +3940,7 @@ function load(){
    前日以前のリンクなら設定だけを反映し、食事はその日の型に戻す
    （この端末の localStorage が日付をまたぐと食事を 0 に戻すのと同じ扱い）。
    ------------------------------------------------------------ */
-const SETTING_IDS = () => ['weight','height','age','baseFactor','meals','savasShare','breakfastTime','lunchTime','dinnerTime','fixSpoons','trendDays','trendKg','trendGoal','trendA','trendB']
+const SETTING_IDS = () => ['weight','height','age','baseFactor','meals','savasShare','breakfastTime','lunchTime','dinnerTime','fixSpoons']
   .concat(EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]));
 // 当日の入力（食事＋その他＋有酸素の距離）。実施種目のチェックは d.c で持ち運ぶ。
 const LINK_DAILY_IDS = () => DAILY_IDS().concat(['walk','cycle']);
@@ -4273,24 +4180,6 @@ $('meals').addEventListener('change', () => {
   });
   onInputChanged();
 });
-/* 7日平均どうしの差から「体重の変化」を入れる。
-   日数は2つの平均の「中心どうしの間隔」なので、14日ぶん記録したなら7日になる。 */
-$('trendCalc').addEventListener('click', () => {
-  const a = num('trendA'), b = num('trendB');
-  if(!(a > 0 && b > 0)){
-    $('trendCalcNote').innerHTML =
-      `<b class="warn-inline">2つの平均体重を両方とも入れてください。</b>`;
-    return;
-  }
-  const diff = r1(b - a);
-  $('trendKg').value = diff;
-  $('trendCalcNote').innerHTML =
-    `<b>${r1(a)}kg → ${r1(b)}kg（${diff > 0 ? '+' : ''}${diff}kg）</b>を「体重の変化」に入れました。` +
-    `<br><small>「記録した日数」には<b>2つの平均の中心どうしの間隔</b>を入れてください` +
-    `（14日ぶん記録して前半7日と後半7日を平均したなら <b>7日</b>、21日なら14日です）。</small>`;
-  onInputChanged();
-});
-
 /* 有酸素の距離か筋トレの欄を手で触ったときも「今日の分を入力した」とみなす。
    ③には食事の時刻も入っているので、そちらを触っただけでは入力済みにしない。 */
 ['input', 'change'].forEach(ev => {
@@ -4312,7 +4201,6 @@ $('reset').addEventListener('click', () => {
     '・「SAVASの杯数を指定」→ 8杯\n' +
     '・「SAVASを1日2回まで摂る」→ オン\n' +
     '・食事の時刻 → 朝食 7:00 / 昼食 12:00 / 夕食 18:00\n' +
-    '・「体重の推移で補正」→ 空欄（7日平均の欄も）\n' +
     '・ブラウザに保存された前回の入力内容も削除されます\n\n' +
     'よろしいですか？';
   if(!confirm(msg)) return;

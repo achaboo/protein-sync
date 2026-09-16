@@ -8,7 +8,8 @@
      ・食品マスタ表 ↔ FOODS の全項目（SAVASの行は *_PER_SPOON 定数と突合）
      ・「調整できる定数」の表 ↔ コードの実値／表に載っていない定数の洗い出し
      ・1週間の型の表 ↔ WEEKLY_PLAN（サバ缶の缶数・ドレッシングの日数・外食の曜日）
-     ・筋トレ種目と初期値 / WEEK_EX（プリセットは v.122 で廃止。復活していないかを見る）
+     ・筋トレ種目と初期値 / WEEK_EX
+     ・廃止した機能の名前が復活していないか（プリセット v.122 / 体重の推移で補正 v.124）
      ・たんぱく質10gあたりの飽和脂肪酸を sat ÷ p × 10 で再計算（並びが昇順かも見る）
      ・丼の比較表・自動候補の表・基本係数表・SAVAS上限%の表の数値を再計算
      ・マークダウン表の列数、** と括弧の対応、キリル文字の混入
@@ -43,7 +44,6 @@ const EXERCISES      = evalBlock('EXERCISES', '[', ']');
 const WEEK_EX        = evalBlock('WEEK_EX', '[', ']');
 const SAT_RATIO      = evalBlock('SAT_RATIO', '[', ']');
 const WEEKLY_PLAN    = evalBlock('WEEKLY_PLAN', '{', '}');
-const TREND_GOAL     = eval('(' + js.match(/const TREND_GOAL = (\{[\s\S]*?\}\});/)[1] + ')');
 
 /* 定数の値を取り出す。`const A = 1, B = 2;` のように1行に複数あるので、
    , か ; か 改行 か行コメントまでを値とみなす。 */
@@ -307,7 +307,8 @@ const eq = (a, b) => Math.abs(a - b) < 1e-6;
 
   /* 筋トレ・有酸素のプリセットは v.122 で廃止した（毎日手で入れるため）。
      ボタンが復活していないかだけ見ておく。 */
-  ['EX_PRESETS', 'CARDIO_PRESETS', 'cardioPreset', 'exPreset', 'exConfirm', 'exRest']
+  ['EX_PRESETS', 'CARDIO_PRESETS', 'cardioPreset', 'exPreset', 'exConfirm', 'exRest',
+   'TREND_KCAL_PER_KG', 'TREND_GOAL', 'TREND_CAP', 'needTrend', 'trendDays', 'trendCalc']
     .forEach(name => { if(js.includes(name))
       bad('廃止済み', `${name} が index.html に残っています（v.122で削除したはず）`); });
   ['ボタン'].forEach(col => {
