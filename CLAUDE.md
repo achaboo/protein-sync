@@ -10,12 +10,16 @@
 | `index.html` | ツール本体。HTML・CSS・JSをすべて内包（約3,800行） |
 | `README.md` | 計算ロジック・定数・判定基準・1週間の型の結果。**変更のたびに必ず同期する** |
 | `apple-touch-icon.png` / `favicon-192.png` | アイコン |
+| `tools/crosscheck.js` | README↔コードの機械照合。`node tools/crosscheck.js`（`-v` で照合した表の一覧）。食い違いがあれば終了コード1 |
+| `tools/browser-check.js` | ランダム検証のハーネス。ブラウザのコンソールに貼って `PSCheck.run(1000)`。終わったら `PSCheck.restore()` |
 
 ## 崩してはいけない前提
 
 - **HTML1枚で完結**。外部ライブラリ・CDN・ビルド手順なし。`file://` でも GitHub Pages でも動く
 - **オフラインで動く**。通信を前提にした機能を足さない
 - **サーバーを持たない**。保存は `localStorage`（キー `savas-calc-v3`）。端末間は「設定リンク」で運ぶ
+- **`tools/` は開発用**。`index.html` はこれに一切依存しない（1ファイル完結の前提は崩さない）。
+  GitHub Pages にも配信されるが、公開リポジトリなので問題ない
 - 利用者は iPhone Safari（ホーム画面のアイコン）と PC Chrome の両方で開く。**狭い画面での折り返しを必ず確認する**
 - 画面の文言はすべて日本語
 
@@ -66,11 +70,12 @@
 4. 構文チェック：`node -e "const s=require('fs').readFileSync('index.html','utf8');new Function(s.match(/<script>([\s\S]*)<\/script>/)[1])"`
 5. **ブラウザで実際に動かして確認する**（`file:///D:/Project/repos/protein-sync/index.html`）。
    プレビューは `data:` URL のため `localStorage` が例外になる。必要なら差し替えてテストする
-6. **ランダム検証を回す**：曜日・体重・基本係数・食事回数・有酸素・SAVASの設定・食事の数量を
-   振って数百ケース実行し、例外・`NaN`・表示の矛盾・上限超過が無いことを確認する。
-   日付は `window.Date` を差し替えて曜日を変える
+6. **ランダム検証を回す**：`tools/browser-check.js` をコンソールに貼って `PSCheck.run(1000)`。
+   曜日・体重・基本係数・食事回数・有酸素・SAVASの設定・食事の数量を振り、例外・`NaN`・
+   表示の矛盾・上限超過が無いことを確認する。終わったら `PSCheck.restore()`
 7. `README.md` を同じ内容に直す（数値も実測値に置き換える）
-8. コミットしてプッシュ。GitHub Pages の反映は `gh api repos/achaboo/protein-sync/pages --jq .status`
+8. **`README.md` か `index.html` を直したら `node tools/crosscheck.js` を通す**（0件になるまで）
+9. コミットしてプッシュ。GitHub Pages の反映は `gh api repos/achaboo/protein-sync/pages --jq .status`
 
 ## 検証でよく使う書き方
 
