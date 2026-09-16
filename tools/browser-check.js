@@ -38,6 +38,7 @@
      8  ⑤のSAVAS1回目の行に時刻が出ていないこと
      9  ⑤の時刻が昇順であること（「翌00:30」は翌日として +24時間で見る）
      10 再計算の冪等性（続けて render() しても結果が変わらない）
+     11 ①の「必要エネルギーの補正」が必要エネルギーにそのまま乗ること
    ============================================================ */
 (() => {
 'use strict';
@@ -82,15 +83,13 @@ function makeCase(rnd, i){
     two:      rnd() < 0.7,
     rest:     rnd() < 0.3,
     detail:   rnd() < 0.5,
+    kcalAdj:  pick([0, 0, 0, 200, -200, 600, -600]),   // ①の必要エネルギーの補正
     walk:     pick([0, 0, 5, 10, 12, 20, 25]),
     cycle:    pick([0, 0, 10, 20, 30, 40]),
     exOn:     EXERCISES.map(() => rnd() < 0.6),
     entered:  rnd() < 0.75,                                 // ③を今日の分として確定したか
     times:    pick([['07:00','12:00','18:00'], ['09:30','12:00','18:00'],
                     ['11:30','14:00','20:00'], ['06:00','','' ], ['', '12:00', '']]),
-    trend:    rnd() < 0.3 ? {days: pick([3, 7, 14, 21]), kg: Math.round((rnd() * 2 - 1) * 10) / 10,
-                             goal: pick(['bulk','keep','cut'])}
-                          : {days: '', kg: '', goal: 'bulk'},
     // 3割のケースは、型に加えて手入力の品目も混ぜる
     manual:   rnd() < 0.3 ? {
                 sk_gyudon:  rnd() < 0.3 ? 1 : 0,
@@ -113,9 +112,9 @@ function applyCase(c){
   setVal('baseFactor', c.factor);   setVal('meals', c.meals);
   setVal('savasShare', c.share);    setVal('fixSpoons', c.fix);
   setChk('twoDoses', c.two); setChk('restSavas', c.rest); setChk('schedDetail', c.detail);
+  setVal('kcalAdj', c.kcalAdj);
   setVal('walk', c.walk); setVal('cycle', c.cycle);
   setVal('breakfastTime', c.times[0]); setVal('lunchTime', c.times[1]); setVal('dinnerTime', c.times[2]);
-  setVal('trendDays', c.trend.days); setVal('trendKg', c.trend.kg); setVal('trendGoal', c.trend.goal);
   setVal('otherP', c.otherP);
   EXERCISES.forEach((e, i) => setChk('c_' + e.id, c.exOn[i]));
   if(c.manual) Object.keys(c.manual).forEach(id => { if($$('f_' + id)) setVal('f_' + id, c.manual[id]); });
@@ -219,6 +218,12 @@ function checkOne(c, fail){
   if(satB <= SAT_LIMIT && sat > SAT_LIMIT + 0.05)
     fail(`自動計算で飽和脂肪酸が上限を越えました：${satB}g → ${sat}g（上限 ${SAT_LIMIT}g／` +
          `${blame('sat')}${spoonNote}）`);
+
+  // 5b. ①の補正が必要エネルギーにそのまま乗っていること
+  const needNoAdj = calcNeedBase(st, ex);
+  if(calcNeed(st, ex) !== needNoAdj + c.kcalAdj)
+    fail(`必要エネルギーの補正が合いません：推定 ${needNoAdj} ＋ 補正 ${c.kcalAdj} ` +
+         `≠ ${calcNeed(st, ex)}`);
 
   // 6. 総負荷量はチェックの入っている種目だけ
   let vol = 0;
