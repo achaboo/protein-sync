@@ -29,8 +29,8 @@
      1  例外が出ないこと
      2  画面に NaN / undefined が出ないこと（④⑤と週の2表）
      3  目標たんぱく質が運動量で動かないこと（＝体重×基本係数のまま）
-     4  1日の上限：卵2個（メニューの卵込み）／SAVASの杯数（1回4杯×回数）／
-        ご飯（6杯かつ1食4杯×自宅の食事数）／オリーブオイル7さじ／候補の fillMax
+     4  1日の上限：卵2個（メニューの卵込み）／SAVASの杯数（1回 MAX_PER_SERVE 杯×回数）／
+        ご飯（autoMax かつ1食 slotLimit×自宅の食事数）／オリーブオイルの autoMax／候補の fillMax
      5  自動計算の線（自動計算ぶんを0にした状態で線の内側だった日だけを見る）
         候補と油は 食塩7.5g・飽和脂肪酸15g ／ ご飯は上限の17g ／ 上限17gは絶対に越えない
      6  総負荷量＝チェックの入っている種目だけの合計
@@ -39,6 +39,7 @@
      9  ⑤の時刻が昇順であること（「翌00:30」は翌日として +24時間で見る）
      10 再計算の冪等性（続けて render() しても結果が変わらない）
      11 ①の「必要エネルギーの補正」が必要エネルギーにそのまま乗ること
+     12 SAVASの杯数も飽和脂肪酸15gの線で止まること（最低杯数と手動指定は除く）
    ============================================================ */
 (() => {
 'use strict';
@@ -224,6 +225,16 @@ function checkOne(c, fail){
   if(calcNeed(st, ex) !== needNoAdj + c.kcalAdj)
     fail(`必要エネルギーの補正が合いません：推定 ${needNoAdj} ＋ 補正 ${c.kcalAdj} ` +
          `≠ ${calcNeed(st, ex)}`);
+
+  /* 5c. SAVASの杯数も飽和脂肪酸15gの線で止まること（v.134のガード）。
+        食品だけで線の内側だった日は、粉を足しても線を越えない。
+        例外は「筋トレ日の最低杯数」と「杯数の手動指定」で、そこは下限・指定が優先。 */
+  const satFoodOnly = calcSat(st, null).total;
+  const trained = ex.done > 0 || ex.cardio > 0;
+  const floorSpoons = trained ? MIN_SPOONS_TRAINED : 0;
+  if(!c.fix && satFoodOnly <= SAT_GOOD && sv.spoons > floorSpoons && sat > SAT_GOOD + 0.05)
+    fail(`SAVASで飽和脂肪酸が${SAT_GOOD}gの線を越えました：食品だけ ${satFoodOnly}g → ` +
+         `${sat}g（SAVAS ${sv.spoons}杯・下限 ${floorSpoons}杯）`);
 
   // 6. 総負荷量はチェックの入っている種目だけ
   let vol = 0;
