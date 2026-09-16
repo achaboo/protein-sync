@@ -99,6 +99,15 @@ const cellsOf = (t, name, n) => {
   return r ? r.cells[n] : '';
 };
 
+/* 入力欄の初期値を index.html から読む。
+   README に書いてある「73.5kgでの目標」のような値をここで決め打ちにすると、
+   体重の初期値を変えたときに照合側だけ取り残される。 */
+const htmlDefault = id => {
+  const m = html.match(new RegExp(`id="${id}"[^>]*value="([^"]*)"`))
+         || html.match(new RegExp(`value="([^"]*)"[^>]*id="${id}"`));
+  return m ? parseFloat(m[1]) : NaN;
+};
+
 const plain = s => s.replace(/\*\*/g, '').replace(/<br>/g, ' ').replace(/`/g, '').trim();
 const numOf = s => {
   const t = plain(s);
@@ -234,7 +243,7 @@ const eq = (a, b) => Math.abs(a - b) < 1e-6;
    'CARB_PER_SPOON','FIBER_PER_SPOON','KCAL_PER_SPOON','FIBER_TARGET','FAT_PER_SPOON','ACTIVITY',
    'KCAL_PER_VOLUME','WALK_KCAL','CYCLE_KCAL','TREND_KCAL_PER_KG','TREND_MIN_DAYS','TREND_MAX_DAYS',
    'TREND_CAP','ENERGY_MIN_NET','ENERGY_OVER_OK','ENERGY_OK','ENERGY_CARE','ENERGY_BAD','SALT_CARE',
-   'SALT_BAD','SAT_GOOD','SAT_PER_UNIT_MIN','SALT_PER_UNIT_MIN','HOME_B_QUOTA','WEEK_P_MIN',
+   'SALT_BAD','SAT_GOOD','SAT_PER_UNIT_MIN','SALT_PER_UNIT_MIN','HOME_B_QUOTA','WEEK_P_RATIO',
    'WEEK_COST_AIM','WEEK_EX_DAY','DEVIATION_OK','FLOOR_FACTOR','CARB_SHARE','RICE_BOWL_CARB',
    'CARB_MIN_E','CARB_MAX_E','KCAL_PER_FAT','KCAL_PER_CARB','TWO_MEAL_SPOONS','ALT_MIN_P']
     .forEach(n => {
@@ -408,10 +417,10 @@ const eq = (a, b) => Math.abs(a - b) < 1e-6;
 })();
 
 /* ============================================================
-   8. 基本係数の表（体重73.5kgでの目標）
+   8. 基本係数の表（初期値の体重での目標）
    ============================================================ */
 (() => {
-  const W = 73.5;
+  const W = htmlDefault('weight');
   const t = findTable('基本係数', '想定', `${W}kgでの目標`);
   if(!t) return;
   t.rows.forEach(({cells, line}) => {
@@ -427,7 +436,7 @@ const eq = (a, b) => Math.abs(a - b) < 1e-6;
 (() => {
   const t = findTable('上限%', '賄う量');
   if(!t) return;
-  const target = r1(73.5 * 1.65);
+  const target = r1(htmlDefault('weight') * htmlDefault('baseFactor'));
   t.rows.forEach(({cells, line}) => {
     const pct = numOf(cells[0]);
     const want = numOf(cells[1]);

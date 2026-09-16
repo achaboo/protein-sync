@@ -402,7 +402,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
     <div class="grid2">
       <div>
         <label for="weight">体重 (kg)</label>
-        <input type="number" inputmode="decimal" id="weight" value="73.5" step="0.1" min="30" max="200">
+        <input type="number" inputmode="decimal" id="weight" value="72.5" step="0.1" min="30" max="200">
       </div>
       <div>
         <label for="height">身長 (cm)</label>
@@ -452,7 +452,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
     <div class="grid2" style="margin-top:12px">
       <div>
         <label for="fixSpoons">SAVASの杯数を指定（空欄＝不足量から自動）</label>
-        <input type="number" inputmode="numeric" id="fixSpoons" value="8" min="1" max="8" step="1" placeholder="自動">
+        <input type="number" inputmode="numeric" id="fixSpoons" value="" min="1" max="8" step="1" placeholder="自動">
       </div>
     </div>
     <p class="hint" id="fixNote"></p>
@@ -634,12 +634,12 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
     </div>
     <div class="row">
       <div class="name"><b>昼食の時刻</b><small>空欄なら朝食の3時間後<br><button type="button" id="clearLunch" class="mini-btn inline-btn" hidden>自動計算にする</button></small></div>
-      <div class="qty"><input type="time" id="lunchTime" value="12:00" step="300"></div>
+      <div class="qty"><input type="time" id="lunchTime" value="" step="300"></div>
       <div class="unit">時刻</div>
     </div>
     <div class="row">
       <div class="name"><b>夕食の時刻</b><small>空欄なら基本の間隔から自動計算<br><button type="button" id="clearDinner" class="mini-btn inline-btn" hidden>自動計算にする</button></small></div>
-      <div class="qty"><input type="time" id="dinnerTime" value="18:00" step="300"></div>
+      <div class="qty"><input type="time" id="dinnerTime" value="" step="300"></div>
       <div class="unit">時刻</div>
     </div>
     <p class="hint" id="dinnerNote" style="margin-top:0"></p>
@@ -659,7 +659,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
       その日に歩いた距離・走った距離を入れてください。やらなかった種目は 0 のままにします。
     </p>
 
-    <h3>筋トレ（その日に実際にやった種目だけを残す）</h3>
+    <h3>筋トレ（その日に実際にやった種目にチェックを入れる）</h3>
     <p class="hint">
       <b>8種目を毎日すべて行う前提にはしていません。</b>その日にやった種目だけチェックを残してください。
       消費エネルギーは<b>チェックの入っている種目のセット数だけ</b>から計算します。<br>
@@ -735,7 +735,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.127';
+const APP_VERSION = '2026-09-01.128';
 
 /* SAVASの1食分は28g＝付属スプーン4杯（明治の公式値。1杯は約7g）。
    1食分28gあたり たんぱく質19.5g・108kcal・脂質2.0g・炭水化物3.7g
@@ -1214,7 +1214,7 @@ $('satRatio').innerHTML = SAT_RATIO
 $('exercises').innerHTML = EXERCISES.map(e => `
   <div class="ex" id="ex_${e.id}">
     <div class="ex-head">
-      <input type="checkbox" id="c_${e.id}" checked>
+      <input type="checkbox" id="c_${e.id}">
       <label for="c_${e.id}">${e.name}<small class="part">${e.part}</small></label>
       <span class="ex-vol" id="v_${e.id}">0 kg</span>
     </div>
@@ -2037,7 +2037,7 @@ function render(opts){
       `${sn.spoons}杯＋水${WATER_ML}ml（${r1(sn.spoons * SPOON_G)}g）`).join('　＋　');
     $('oSavasSub').innerHTML =
       `＝ ${serveText(sv.sessions.length)}　${detail}` +
-      `<br>水で溶かすため、たんぱく質は粉の ${sv.savasG}g のみです。` +
+      `<br>たんぱく質は粉の ${sv.savasG}g のみです。` +
       (reduceG >= DEVIATION_OK
         ? `<br><b>食事＋SAVASの合計は ${intake}g で、目標を ${reduceG}g 上回ります。</b>` +
           (cut.label
@@ -2049,7 +2049,7 @@ function render(opts){
                   : '') + cutWhy
             : `<br>ただし1単位が大きい品目しかないため、減らすと今度は不足します。この日は多めのままで構いません。`)
         : reduceG > 0
-          ? `<br>食事＋SAVASの合計は ${intake}g（目標を ${reduceG}g 上回りますが誤差の範囲です）。`
+          ? `<br>食事＋SAVASの合計は ${intake}g。<br>（目標を ${reduceG}g 上回りますが誤差の範囲です）`
           : `<br>不足 ${lack}g のうち <b>${sv.totalG}g</b> をこれで補います。` +
             (toFoodG >= DEVIATION_OK
               ? `<b> 残り ${toFoodG}g は食事で補ってください。</b>`
@@ -2079,7 +2079,7 @@ function render(opts){
         ? `不足 ${lack}g の全量を粉で摂ると食事からのビタミン・ミネラル・食物繊維が不足するため、上限を設けています。` +
           `上限は「① 基本設定」で変更できます（100%にすると不足の全量をSAVASで補います）。`
         : '') +
-      (sv.forced || sv.twoFixed || sv.manual ? '' : `不足 ${lack}g のうち ${sv.totalG}g を運動直後の1回にまとめています。`) +
+      (sv.forced || sv.twoFixed || sv.manual ? '' : `不足 ${lack}g のうち ${sv.totalG}g を運動直後の1回に纏めています。`) +
       (sv.packed
         ? (sv.sessions.length > 1
             ? `1回あたりは推奨の${PER_SERVE}杯より1杯多い${MAX_PER_SERVE}杯ですが、` +
@@ -3609,7 +3609,7 @@ const storageOk = (() => {
 })();
 // 入力欄の既定値を変更したら上げる。番号が違う保存データでは、
 // 下記の欄だけ復元せず新しい既定値に戻す（体重や食事回数などの他の設定は保持）。
-const DEFAULTS_VER = 13;
+const DEFAULTS_VER = 14;
 // v6：体重の初期値を 75kg → 74kg に変更。
 // 次に既定値を変えるときは、実際に変えた欄だけをこの一覧に残すこと
 // （体重を入れたままにすると、以後の更新で入力済みの体重まで戻ってしまう）。
@@ -3624,7 +3624,13 @@ const DEFAULTS_VER = 13;
 // v13：「運動を終える時刻」を廃止し、朝食の時刻を1日の起点にした。
 //      朝食の時刻の初期値が 空欄 → 07:00 に変わったので、この欄だけ初期値へ戻す
 //      （空欄のままだと、後ろの食事からさかのぼった時刻が朝食に出てしまうため）。
-const RESET_IDS = () => ['breakfastTime'];
+// v14：体重 73.5 → 72.5、SAVASの杯数の指定 8杯 → 空欄（自動）、
+//      昼食・夕食の時刻 12:00/18:00 → 空欄（基本の間隔で自動）、
+//      筋トレのチェック 全種目オン → 全部オフ（やった種目だけ入れてもらう）。
+//      チェックは RESET_IDS ではなく load() の staleEx で初期値へ戻す。
+//      次に既定値を変えるときは、この4つを RESET_IDS から必ず外すこと
+//      （残すと、入力済みの体重まで初期値へ戻ってしまう）。
+const RESET_IDS = () => ['weight','fixSpoons','lunchTime','dinnerTime'];
 const ALL_IDS = () => ['weight','height','age','baseFactor','meals','savasShare','walk','cycle',
    'kcalAdj','weekExSel',
    'otherP','otherNote','otherFat','otherSat','otherSalt','otherCarb','otherFiber','otherKcal','otherPrice',
@@ -3728,12 +3734,16 @@ function weekExState(st, sc){
 
 /* 合格条件（1週間の平均ではなく「各日」で見る）。
    平均で均すと、たんぱく質88gの日と130gの日が「平均109gなので良好」になってしまう。 */
-const WEEK_P_MIN    = 120;          // たんぱく質 g（これ以上）
+/* たんぱく質の合格線は「その日の目標の何割か」で見る。
+   固定値にすると体重を変えたときに合格線だけが取り残され、
+   目標を満たしているのに不合格と出る（v.128 まではそうなっていた）。 */
+const WEEK_P_RATIO  = 0.99;         // 目標のこの割合以上なら合格
+const weekPMin      = target => r1(target * WEEK_P_RATIO);
 const WEEK_COST_AIM = 1000;         // 食費の目安 円/日（週平均で見る）
 /* 食事だけで決まる分（運動の前提が変わっても、ご飯の杯数ぶんしか動かない） */
 const weekNgFood = d => {
   const ng = [];
-  if(d.p   <  WEEK_P_MIN)   ng.push('P');
+  if(d.p   <  weekPMin(d.target)) ng.push('P');
   if(d.salt >= SALT_LIMIT)  ng.push('食塩');
   if(d.sat  >  SAT_GOOD)    ng.push('飽和');
   return ng;
@@ -3809,7 +3819,7 @@ function renderWeekNutri(week, st, sc){
   $('weekNutriNote').innerHTML =
     `<b>この表は食事の側だけの値です。</b>たんぱく質・飽和脂肪酸・食塩・食物繊維・脂質・食費は、` +
     `運動の量が変わってもほとんど動きません（動くのはご飯の杯数と、そのぶんのエネルギーだけです）。<br>` +
-    `<b>合格条件は「週平均」ではなく「各日」で見ます</b>（P ${WEEK_P_MIN}g以上 ／ 食塩 ${SALT_LIMIT}g未満 ／ ` +
+    `<b>合格条件は「週平均」ではなく「各日」で見ます</b>（P は目標の${Math.round(WEEK_P_RATIO * 100)}%以上＝${weekPMin(r1(st.weight * st.baseFactor))}g ／ 食塩 ${SALT_LIMIT}g未満 ／ ` +
     `飽和脂肪酸 ${SAT_GOOD}g以下）。エネルギーの過不足は下の表で見てください。<br>` +
     `<small>①の設定（${r1(st.weight)}kg ／ 基本係数 ${st.baseFactor.toFixed(2)} ／ ${st.meals}食）と、` +
     `運動の前提「<b>${esc(sc.label)}</b>」で試算しています` +
@@ -3964,7 +3974,8 @@ function load(){
       // 保存後に追加した食品は保存データに無い。0 のままにせずその日の型を入れる
       if(daily.includes(id) && $(id)) $(id).value = dailyDefault(id);
     });
-    EXERCISES.forEach(e => { if($('c_' + e.id)) $('c_' + e.id).checked = !!d.c[e.id]; });
+    // 既定値を変えた版では、チェックの状態も新しい初期値（全部オフ）に合わせる
+    if(!staleEx) EXERCISES.forEach(e => { if($('c_' + e.id)) $('c_' + e.id).checked = !!d.c[e.id]; });
     if(d.exd !== undefined) exDate = d.exd;      // ③の運動を最後に確定した日
     if(d.rest !== undefined) $('restSavas').checked = !!d.rest;
     // 既定値を変えた版では、チェックの状態も新しい初期値に合わせる
@@ -4257,15 +4268,15 @@ $('copyLink').addEventListener('click', copySettingsLink);
 $('reset').addEventListener('click', () => {
   const msg =
     '入力内容をすべて初期状態に戻します。\n\n' +
-    '・体重 73.5kg / 基本係数 1.65 / 3食\n' +
+    '・体重 72.5kg / 基本係数 1.65 / 3食\n' +
     '・「今日の食事」→ その日の曜日の型に戻ります\n' +
     '・ウォーキング / サイクリングの距離 → 0\n' +
-    '・筋トレのチェック → 全種目オン（初期状態であって毎日の標準ではありません）\n' +
+    '・筋トレのチェック → 全種目オフ（その日にやった種目だけ入れてください）\n' +
     '・「運動しなかった日もSAVASを摂る」→ オフ\n' +
-    '・「SAVASの杯数を指定」→ 8杯\n' +
+    '・「SAVASの杯数を指定」→ 空欄（不足量から自動）\n' +
     '・「SAVASを1日2回まで摂る」→ オン\n' +
     '・「必要エネルギーの補正」→ 0\n' +
-    '・食事の時刻 → 朝食 7:00 / 昼食 12:00 / 夕食 18:00\n' +
+    '・食事の時刻 → 朝食 7:00 ／ 昼食・夕食は空欄（基本の間隔で自動）\n' +
     '・ブラウザに保存された前回の入力内容も削除されます\n\n' +
     'よろしいですか？';
   if(!confirm(msg)) return;
