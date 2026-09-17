@@ -29,17 +29,17 @@
      1  例外が出ないこと
      2  画面に NaN / undefined が出ないこと（④⑤と週の2表）
      3  目標たんぱく質が運動量で動かないこと（＝体重×基本係数のまま）
-     4  1日の上限：卵2個（メニューの卵込み）／SAVASの杯数（1回 MAX_PER_SERVE 杯×回数）／
+     4  1日の上限：卵2個（メニューの卵込み）／プロテインの杯数（1回 MAX_PER_SERVE 杯×回数）／
         ご飯（autoMax かつ1食 slotLimit×自宅の食事数）／オリーブオイルの autoMax／候補の fillMax
      5  自動計算の線（自動計算ぶんを0にした状態で線の内側だった日だけを見る）
         候補と油は 食塩7.5g・飽和脂肪酸15g ／ ご飯は上限の17g ／ 上限17gは絶対に越えない
      6  総負荷量＝チェックの入っている種目だけの合計
      7  ④の「③の運動は今日の分が未入力です」が、未入力のときだけ出ること
-     8  ⑤のSAVAS1回目の行に時刻が出ていないこと
+     8  ⑤のプロテイン1回目の行に時刻が出ていないこと
      9  ⑤の時刻が昇順であること（「翌00:30」は翌日として +24時間で見る）
      10 再計算の冪等性（続けて render() しても結果が変わらない）
      11 ①の「必要エネルギーの補正」が必要エネルギーにそのまま乗ること
-     12 SAVASの杯数も飽和脂肪酸15gの線で止まること（最低杯数と手動指定は除く）
+     12 プロテインの杯数も飽和脂肪酸15gの線で止まること（最低杯数と手動指定は除く）
    ============================================================ */
 (() => {
 'use strict';
@@ -80,7 +80,7 @@ function makeCase(rnd, i){
     factor:   Math.round((1.2 + rnd() * 0.6) * 100) / 100,  // 1.20〜1.80
     meals:    pick(['3', '2l', '2b']),
     share:    pick([10, 20, 30, 40, 60, 100]),
-    fix:      pick(['', '', '', 1, 4, 6, 8]),               // 空欄＝自動計算
+    fix:      pick(['', '', '', 1, 2, 3, 99]),              // 空欄＝自動計算。99は上限超えの入力
     two:      rnd() < 0.7,
     rest:     rnd() < 0.3,
     detail:   rnd() < 0.5,
@@ -171,9 +171,9 @@ function checkOne(c, fail){
          `（上限 ${eggF.max} − メニューの卵 ${menuEggs(st)}）`);
   const maxSpoons = (st.twoDoses ? 2 : SESSIONS_OFF) * MAX_PER_SERVE;
   if(sv.spoons > maxSpoons)
-    fail(`SAVASの杯数が上限超過：${sv.spoons} > ${maxSpoons}`);
+    fail(`プロテインの杯数が上限超過：${sv.spoons} > ${maxSpoons}`);
   sv.sessions.forEach((sn, i) => { if(sn.spoons > MAX_PER_SERVE)
-    fail(`SAVAS ${i + 1}回目が1回の上限超過：${sn.spoons} > ${MAX_PER_SERVE}`); });
+    fail(`プロテイン ${i + 1}回目が1回の上限超過：${sn.spoons} > ${MAX_PER_SERVE}`); });
   const riceF = foodById('rice');
   const riceCap = Math.min(riceF.autoMax, riceF.slotLimit * homeMealsOf(st).length);
   if(!autoOff('rice') && st.foods.rice > riceCap + 1e-9)
@@ -197,16 +197,16 @@ function checkOne(c, fail){
   const svBase = savasOf(base, calcFactor(base));
   const saltB  = calcSalt(base, svBase).total, satB = calcSat(base, svBase).total;
   const salt   = calcSalt(st, sv).total,       sat  = calcSat(st, sv).total;
-  // どの自動品目が押し上げたのかを添える（SAVASの杯数が動いた分は自動計算のせいではない）
+  // どの自動品目が押し上げたのかを添える（プロテインの杯数が動いた分は自動計算のせいではない）
   const blame = key => FOODS.filter(isAuto).filter(f => st.foods[f.id] > 0 && f[key])
     .map(f => `${f.short} ${r1(st.foods[f.id])}${f.unit}＝${r1(st.foods[f.id] * f[key])}g`).join('・');
   const spoonNote = svBase.spoons === sv.spoons ? ''
-    : `／SAVASも ${svBase.spoons}杯→${sv.spoons}杯 に動いています`;
+    : `／プロテインも ${svBase.spoons}杯→${sv.spoons}杯 に動いています`;
   if(saltB <= SALT_LIMIT && salt > SALT_LIMIT + 0.05)
     fail(`自動計算で食塩が線を越えました：${saltB}g → ${salt}g（線 ${SALT_LIMIT}g／` +
          `${blame('salt')}${spoonNote}）`);
   /* 候補と油は15gの線の内側であること。
-     ご飯を0にした状態を作り直して測ってはいけない（たんぱく質が変わってSAVASの杯数が動き、
+     ご飯を0にした状態を作り直して測ってはいけない（たんぱく質が変わってプロテインの杯数が動き、
      アプリが実際には作らない状態になる）。実際の最終状態から、ご飯のぶんの
      飽和脂肪酸（1杯0.1g）だけを引いて見る。 */
   const satRice = r1(FOODS.filter(f => f.autoRice || f.autoEnergy)
@@ -226,15 +226,15 @@ function checkOne(c, fail){
     fail(`必要エネルギーの補正が合いません：推定 ${needNoAdj} ＋ 補正 ${c.kcalAdj} ` +
          `≠ ${calcNeed(st, ex)}`);
 
-  /* 5c. SAVASの杯数も飽和脂肪酸15gの線で止まること（v.134のガード）。
+  /* 5c. プロテインの杯数も飽和脂肪酸15gの線で止まること（v.134のガード）。
         食品だけで線の内側だった日は、粉を足しても線を越えない。
         例外は「筋トレ日の最低杯数」と「杯数の手動指定」で、そこは下限・指定が優先。 */
   const satFoodOnly = calcSat(st, null).total;
   const trained = ex.done > 0 || ex.cardio > 0;
   const floorSpoons = trained ? MIN_SPOONS_TRAINED : 0;
   if(!c.fix && satFoodOnly <= SAT_GOOD && sv.spoons > floorSpoons && sat > SAT_GOOD + 0.05)
-    fail(`SAVASで飽和脂肪酸が${SAT_GOOD}gの線を越えました：食品だけ ${satFoodOnly}g → ` +
-         `${sat}g（SAVAS ${sv.spoons}杯・下限 ${floorSpoons}杯）`);
+    fail(`プロテインで飽和脂肪酸が${SAT_GOOD}gの線を越えました：食品だけ ${satFoodOnly}g → ` +
+         `${sat}g（${PROTEIN.name} ${sv.spoons}杯・下限 ${floorSpoons}杯）`);
 
   // 6. 総負荷量はチェックの入っている種目だけ
   let vol = 0;
@@ -253,10 +253,10 @@ function checkOne(c, fail){
   const rows = [...$$('schedule').querySelectorAll('tr')];
   if(rows.length){
     const head0 = rows[0].querySelector('td.time').textContent;
-    if(!/SAVAS|起床後/.test(head0))
-      fail(`⑤の1行目がSAVASの行ではありません：${head0.trim().slice(0, 20)}`);
+    if(head0.indexOf(PROTEIN.name) < 0 && head0.indexOf('起床後') < 0)
+      fail(`⑤の1行目がプロテインの行ではありません：${head0.trim().slice(0, 20)}`);
     if(TIME_RE.test(head0))
-      fail(`⑤のSAVAS1回目に時刻が出ています：${head0.trim().slice(0, 20)}`);
+      fail(`⑤のプロテイン1回目に時刻が出ています：${head0.trim().slice(0, 20)}`);
     let prev = -Infinity, prevTxt = '';
     rows.forEach(tr => {
       const txt = tr.querySelector('td.time').textContent;

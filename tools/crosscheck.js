@@ -5,13 +5,13 @@
    README か index.html を直したら必ず通すこと（CLAUDE.md「作業の進め方」）。
 
    照合しているもの：
-     ・食品マスタ表 ↔ FOODS の全項目（SAVASの行は *_PER_SPOON 定数と突合）
+     ・食品マスタ表 ↔ FOODS の全項目（プロテインの行は PROTEIN の公表値と突合）
      ・「調整できる定数」の表 ↔ コードの実値／表に載っていない定数の洗い出し
      ・1週間の型の表 ↔ WEEKLY_PLAN（サバ缶の缶数・ドレッシングの日数・外食の曜日）
      ・筋トレ種目と初期値 / WEEK_EX
      ・廃止した機能の名前が復活していないか（プリセット v.122 / 体重の推移で補正 v.124）
      ・たんぱく質10gあたりの飽和脂肪酸を sat ÷ p × 10 で再計算（並びが昇順かも見る）
-     ・丼の比較表・自動候補の表・基本係数表・SAVAS上限%の表の数値を再計算
+     ・丼の比較表・自動候補の表・基本係数表・プロテイン上限%の表の数値を再計算
      ・マークダウン表の列数、** と括弧の対応、キリル文字の混入
      ・README の引用（> の行）が実際の画面の文言と一致しているか
      ・CLAUDE.md の v.NNN と APP_VERSION、README の DEFAULTS_VER 記述と RESET_IDS
@@ -62,7 +62,14 @@ const scalar = name => {
   if(raw === null){ bad('定数', `${name} がコードに見つかりません`); return undefined; }
   try { return evalWith(raw); } catch(e){ return raw; }
 };
-const SPOON_G = scalar('SPOON_G');
+/* プロテインの製品情報。1杯あたりの値は index.html と同じ式で導く
+   （定数が PROTEIN からの導出になったので、リテラルとしては読めない）。 */
+const PROTEIN   = evalBlock('PROTEIN', '{', '}');
+const PER_SERVE = Math.max(1, Math.round(PROTEIN.serveG / PROTEIN.scoopG));
+const perSpoon  = k => (PROTEIN.per[k] || 0) / PER_SERVE;
+const SPOON_G   = perSpoon('p');
+const SAT_PER_SPOON = PROTEIN.per.sat !== null
+  ? perSpoon('sat') : perSpoon('fat') * PROTEIN.satRatio;
 const byId = id => FOODS.find(f => f.id === id);
 
 /* ---------- README のマークダウン表を拾う ---------- */
@@ -124,7 +131,7 @@ const eq = (a, b) => Math.abs(a - b) < 1e-6;
   const t = findTable('店', '食品', 'たんぱく質', '脂質', '飽和', '食塩', '炭水化物', '食物繊維', 'kcal', '価格', '単位');
   if(!t){ bad('食品表', '食品マスタの表が README に見つかりません'); return; }
   const seen = new Set();
-  const SKIP = ['SAVAS（1杯）', 'その他（自由入力）'];
+  const SKIP = [`${PROTEIN.name}（1杯）`, 'その他（自由入力）'];
   t.rows.forEach(({cells, line}) => {
     const [shop, name, p, fat, sat, salt, carbG, fiber, kcal, price, unit] = cells.map(plain);
     if(SKIP.includes(name)) return;
@@ -149,16 +156,16 @@ const eq = (a, b) => Math.abs(a - b) < 1e-6;
   });
   FOODS.filter(f => !f.custom && !seen.has(f.id))
        .forEach(f => bad('食品表', `${f.id}（${f.shop || ''}${f.name}）が README の食品マスタ表にありません`));
-  // SAVAS の行は定数と突き合わせる
-  const sv = t.rows.find(r => plain(r.cells[1]) === 'SAVAS（1杯）');
-  if(sv){
+  // プロテインの行は PROTEIN の公表値（÷1回分の杯数）と突き合わせる
+  const sv = t.rows.find(r => plain(r.cells[1]) === `${PROTEIN.name}（1杯）`);
+  if(!sv) bad('食品表', `README の食品マスタ表に「${PROTEIN.name}（1杯）」の行がありません`);
+  else {
     const c = sv.cells.map(plain);
-    const want = {2:SPOON_G, 3:scalar('FAT_PER_SPOON'), 4:scalar('SAT_PER_SPOON'),
-                  5:scalar('SALT_PER_SPOON'), 6:scalar('CARB_PER_SPOON'),
-                  7:scalar('FIBER_PER_SPOON'), 8:scalar('KCAL_PER_SPOON')};
+    const want = {2:SPOON_G, 3:perSpoon('fat'), 4:SAT_PER_SPOON, 5:perSpoon('salt'),
+                  6:perSpoon('carbG'), 7:perSpoon('fiber'), 8:perSpoon('kcal')};
     Object.entries(want).forEach(([i, v]) => {
-      if(!eq(numOf(c[i]), v))
-        bad('食品表', `README:${sv.line} SAVAS(1杯) の${t.head[i]}：README ${c[i]} / コード ${v}`);
+      if(Math.abs(numOf(c[i]) - v) > 0.0005)
+        bad('食品表', `README:${sv.line} ${PROTEIN.name}(1杯) の${t.head[i]}：README ${c[i]} / コード ${r1(v * 1000) / 1000}`);
     });
   }
 })();
@@ -356,7 +363,7 @@ const eq = (a, b) => Math.abs(a - b) < 1e-6;
     const name = plain(cells[0]);
     const want = numOf(cells[1]);
     let got;
-    if(name === 'SAVAS') got = r1(scalar('SAT_PER_SPOON') / SPOON_G * 10);
+    if(name === 'プロテイン' || name === PROTEIN.name) got = r1(SAT_PER_SPOON / SPOON_G * 10);
     else {
       const f = FOODS.find(x => ((x.shop ? x.shop + ' ' : '') + x.name) === name)
              || FOODS.find(x => x.name === name)
@@ -431,7 +438,7 @@ const eq = (a, b) => Math.abs(a - b) < 1e-6;
 })();
 
 /* ============================================================
-   9. SAVASで賄う上限の表（%→g）
+   9. プロテインで賄う上限の表（%→g）
    ============================================================ */
 (() => {
   const t = findTable('上限%', '賄う量');
@@ -442,7 +449,7 @@ const eq = (a, b) => Math.abs(a - b) < 1e-6;
     const want = numOf(cells[1]);
     const got = r1(target * pct / 100);
     if(!eq(want, got))
-      bad('SAVAS上限表', `README:${line} ${pct}%：README ${plain(cells[1])} / 再計算 ${got}g（目標${target}g）`);
+      bad('プロテイン上限表', `README:${line} ${pct}%：README ${plain(cells[1])} / 再計算 ${got}g（目標${target}g）`);
   });
 })();
 
