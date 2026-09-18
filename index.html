@@ -747,7 +747,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.137';
+const APP_VERSION = '2026-09-01.138';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -2018,7 +2018,10 @@ function render(opts){
   const kcal     = calcKcal(st, sv);
   const need     = calcNeed(st, ex);
   const kcalGap  = Math.round(kcal.total - need);
-  const top3     = t => t.items.slice(0, 3).map(x => `${x.name} ${x.g}g`).join('、') || '—';
+  /* 多い順に3つ出す。エネルギーだけは単位が kcal で、g のような小数も要らない。 */
+  const topN = (t, unit) => t.items.slice(0, 3).map(x =>
+    `${x.name} ${unit === 'kcal' ? Math.round(x.g).toLocaleString() : x.g}${unit}`).join('、') || '—';
+  const top3     = t => topN(t, 'g');
 
 
 /* 各行の判定を「多い／少ない／範囲内」の札で示す。
@@ -2058,7 +2061,7 @@ function render(opts){
         (fatState === 'under' ? `目標まで あと ${r1(fatMin - fat.total)}g。`
          : fatState === 'over' ? `目標を ${r1(fat.total - fatMax)}g 超えています。`
          : '') +
-        `うち飽和脂肪酸 ${sat.total}g（${satPct}%）`) +
+        `うち飽和脂肪酸 ${sat.total}g（${satPct}%）。${top3(fat)}`) +
     row('飽和脂肪酸', sat.total, 'g', `${SAT_LIMIT}g 以下`,
         satOver > 0 ? 'over' : sat.total > SAT_GOOD ? 'warn' : 'ok',
         satOver > 0
@@ -2102,7 +2105,8 @@ function render(opts){
         (Math.abs(kcalGap) > 100
           ? `このままなら週 約${r1(Math.abs(kcalGap) * 7 / 7200)}kg ${kcalGap < 0 ? '減' : '増'}`
           : '') +
-        `（基礎代謝 ${calcBMR(st).toLocaleString()} × ${ACTIVITY} ＋ 運動 ${calcEnergy(st, ex).kcal} ＝ 推定 ${calcNeedBase(st, ex).toLocaleString()}kcal${st.kcalAdj ? ' ／ 手動で ' + (st.kcalAdj > 0 ? '+' : '') + st.kcalAdj.toLocaleString() + 'kcal 補正' : ''}）${exEntered() ? '' : '<br><b class="warn-inline">⚠ ③の運動は今日の分が未入力です。</b>前回の内容で仮に計算しています。'}`, kcalTag) +
+        `<br>${topN(kcal, 'kcal')}` +
+        `<br>（基礎代謝 ${calcBMR(st).toLocaleString()} × ${ACTIVITY} ＋ 運動 ${calcEnergy(st, ex).kcal} ＝ 推定 ${calcNeedBase(st, ex).toLocaleString()}kcal${st.kcalAdj ? ' ／ 手動で ' + (st.kcalAdj > 0 ? '+' : '') + st.kcalAdj.toLocaleString() + 'kcal 補正' : ''}）${exEntered() ? '' : '<br><b class="warn-inline">⚠ ③の運動は今日の分が未入力です。</b>前回の内容で仮に計算しています。'}`, kcalTag) +
     `</tbody></table>` +
     (kcalGap <= -ENERGY_CARE ? energyAdvice(st, -kcalGap, sat.total, salt.total) : '') +
     (satOver > 0 && satAlts.length
