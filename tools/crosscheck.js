@@ -198,6 +198,16 @@ const eq = (a, b) => Math.abs(a - b) < 1e-6;
       });
       return null;
     },
+    /* 1杯あたりの値は PROTEIN から計算する式なので、evalWith では読めずに
+       黙って飛ばされていた（SAVASの値が README に残ったままだった）。ここで計算して照合する。 */
+    SPOON_G:        () => perSpoon('p'),
+    SAT_PER_SPOON:  () => SAT_PER_SPOON,
+    SALT_PER_SPOON: () => perSpoon('salt'),
+    CARB_PER_SPOON: () => perSpoon('carbG'),
+    FIBER_PER_SPOON:() => perSpoon('fiber'),
+    KCAL_PER_SPOON: () => perSpoon('kcal'),
+    FAT_PER_SPOON:  () => perSpoon('fat'),
+    PER_SERVE:      () => PER_SERVE,
     FOODS:     () => null, SAT_RATIO: () => null, EXERCISES: () => null, exDate: () => null,
     WATER:     () => null,
     'TREND_MIN_DAYS / TREND_MAX_DAYS': () => [scalar('TREND_MIN_DAYS'), scalar('TREND_MAX_DAYS')],
@@ -205,6 +215,8 @@ const eq = (a, b) => Math.abs(a - b) < 1e-6;
     'CARB_MIN_E / CARB_MAX_E': () => [scalar('CARB_MIN_E'), scalar('CARB_MAX_E')],
     'KCAL_PER_FAT / KCAL_PER_CARB': () => [scalar('KCAL_PER_FAT'), scalar('KCAL_PER_CARB')],
     'WALK_KCAL / CYCLE_KCAL': () => [scalar('WALK_KCAL'), scalar('CYCLE_KCAL')],
+    'ENERGY_W / ENERGY_FREE': () => [scalar('ENERGY_W'), scalar('ENERGY_FREE')],
+    'CLIMB_MAX / CLIMB_SEEDS': () => [scalar('CLIMB_MAX'), scalar('CLIMB_SEEDS')],
     'WATER / WATER_ML': () => null,
     TREND_GOAL: () => null,
     WEEK_EX: () => WEEK_EX.length
@@ -245,7 +257,7 @@ const eq = (a, b) => Math.abs(a - b) < 1e-6;
   // コードにあるのに定数表に無い主な定数
   const listed = new Set(t.rows.flatMap(r => plain(r.cells[0]).split(/\s*\/\s*/)));
   ['SPOON_G','PER_SERVE','MAX_PER_SERVE','SESSIONS_OFF','MIN_SPOONS_TRAINED','WATER_ML','TOLERANCE',
-   'MIN_PER_SERVE','MILK_SLACK','MEAL_P_OPT','MEAL_P_LO','MEAL_P_MUCH','FILL_STEPS','FILL_KCAL_REF','RICE_P_WEIGHT',
+   'MIN_PER_SERVE','MILK_SLACK','MEAL_P_OPT','MEAL_P_LO','MEAL_P_MUCH','BAND_W','PLOW_W','SLACK_W','BAD_BASE',
    'STRENGTH_FULL','CARDIO_FULL','SAT_LIMIT','SAT_PER_SPOON','SALT_LIMIT','SALT_PER_SPOON',
    'CARB_PER_SPOON','FIBER_PER_SPOON','KCAL_PER_SPOON','FIBER_TARGET','FAT_PER_SPOON','ACTIVITY',
    'KCAL_PER_VOLUME','WALK_KCAL','CYCLE_KCAL','TREND_KCAL_PER_KG','TREND_MIN_DAYS','TREND_MAX_DAYS',
