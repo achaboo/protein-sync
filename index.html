@@ -747,7 +747,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.136';
+const APP_VERSION = '2026-09-01.137';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -2142,7 +2142,7 @@ function render(opts){
     $('oSavas').innerHTML =
       `${PROTEIN.name} 付属スプーン ` +
       `<span style="white-space:nowrap"><span style="font-size:2.1rem">${sv.spoons}</span> 杯</span>` +
-      `<span style="font-size:1rem">　（合計 約 ${sv.totalG}g）</span>`;
+      `<br><span style="font-size:1rem">（合計 約 ${sv.totalG}g）</span>`;
     const detail = sv.sessions.map(sn =>
       `${sn.spoons}杯＋水${WATER_ML}ml（${r1(sn.spoons * SPOON_G)}g）`).join('　＋　');
     $('oSavasSub').innerHTML =
