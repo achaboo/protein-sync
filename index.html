@@ -747,7 +747,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.140';
+const APP_VERSION = '2026-09-01.141';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -923,12 +923,12 @@ const YEN_PER_SPOON = PROTEIN.pricePerKg / 1000 * PROTEIN.scoopG;   // 1回あ�
 const EXERCISES = [
   {id:'lat',      name:'ラットプルダウン',     part:'背中', w:25, r:15, s:3},
   {id:'row',      name:'シーテッドローイング', part:'背中', w:20, r:15, s:3},
-  {id:'chest',    name:'チェストプレス',       part:'胸',   w:20, r:15, s:3},
+  {id:'chest',    name:'チェストプレス',       part:'胸',   w:20, r:15, s:6},
   {id:'shoulder', name:'ショルダープレス',     part:'肩',   w:10, r:15, s:3},
   {id:'dips',     name:'ディップス',           part:'胸',   w:35, r:15, s:3},
   {id:'curl',     name:'バイセップスカール',   part:'腕',   w:10, r:15, s:3},
-  {id:'side',     name:'サイドレイズ',         part:'肩',   w:5.75, r:10, s:3},
-  {id:'rear',     name:'リアレイズ',           part:'肩',   w:5.75, r:5,  s:3}
+  {id:'side',     name:'サイドレイズ',         part:'肩',   w:8.5, r:10, s:3},
+  {id:'rear',     name:'リアレイズ',           part:'肩',   w:8.5, r:5,  s:3}
 ];
 
 const $  = id => document.getElementById(id);
@@ -1056,9 +1056,10 @@ const KCAL_ADJ_CAP = 600;
    基礎代謝 × ACTIVITY の中には運動している時間帯の安静時代謝もすでに入っているため、
    総消費（グロス）をそのまま足すと、その分を二重に数えることになる。
 
-   筋トレ：中強度のレジスタンス運動は約5METs。この型の総負荷量5,659kgを約35分とみなすと、
-   正味は (5−1)×体重×時間。体重73.5kgだった当時にこの考え方で 0.032 を置いた
-   （5,659 × 0.032 ＝ 181kcal 相当）。体重が変わっても係数は据え置きで、
+   筋トレ：中強度のレジスタンス運動は約5METs。正味は (5−1)×体重×時間。
+   体重73.5kg・総負荷5,659kgを約35分とみなして 0.032 を置いた（当時は181kcal相当）。
+   **総負荷量あたりの係数なので、種目の重量やセット数を変えれば消費も比例して動く。**
+   いまの初期値（総負荷6,682.5kg）では 214kcal になる。体重が変わっても係数は据え置きで、
    ずれは①の「必要エネルギーの補正」で手当てする。
    以前は 0.04（＝グロス226kcal相当）だったため、約45kcalを二重に数えていた。 */
 const KCAL_PER_VOLUME = 0.032; // 総負荷量 1kg あたりの消費 kcal（正味）
@@ -3757,7 +3758,7 @@ const storageOk = (() => {
 })();
 // 入力欄の既定値を変更したら上げる。番号が違う保存データでは、
 // 下記の欄だけ復元せず新しい既定値に戻す（体重や食事回数などの他の設定は保持）。
-const DEFAULTS_VER = 14;
+const DEFAULTS_VER = 15;
 // v6：体重の初期値を 75kg → 74kg に変更。
 // 次に既定値を変えるときは、実際に変えた欄だけをこの一覧に残すこと
 // （体重を入れたままにすると、以後の更新で入力済みの体重まで戻ってしまう）。
@@ -3778,7 +3779,10 @@ const DEFAULTS_VER = 14;
 //      チェックは RESET_IDS ではなく load() の staleEx で初期値へ戻す。
 //      次に既定値を変えるときは、この4つを RESET_IDS から必ず外すこと
 //      （残すと、入力済みの体重まで初期値へ戻ってしまう）。
-const RESET_IDS = () => ['weight','fixSpoons','lunchTime','dinnerTime'];
+// v15：サイドレイズ・リアレイズの初期重量 5.75 → 8.5kg、チェストプレスのセット数 3 → 6。
+//      変えたのは筋トレの3欄だけなので、v14 の4つは一覧から外している。
+//      総負荷量が 5,658.75 → 6,682.5kg に増え、筋トレの正味消費は 181 → 214kcal になる。
+const RESET_IDS = () => ['w_side','w_rear','s_chest'];
 const ALL_IDS = () => ['weight','height','age','baseFactor','meals','savasShare','walk','cycle',
    'kcalAdj','weekExSel',
    'otherP','otherNote','otherFat','otherSat','otherSalt','otherCarb','otherFiber','otherKcal','otherPrice',
