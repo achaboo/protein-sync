@@ -747,7 +747,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.138';
+const APP_VERSION = '2026-09-01.139';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -2032,6 +2032,13 @@ function render(opts){
     `<td class="num"><b>${val}</b> ${unit}</td><td class="lim">${limit}</td>` +
     `<td class="note"><b class="tag ${state}">${tag || TAG[state]}</b>${note}</td></tr>`;
   const judge = (v, min, max) => v < min ? 'under' : (max !== null && v > max) ? 'over' : 'ok';
+  /* 下限と上限がある行（脂質・炭水化物）で、範囲内のときの位置を出す。
+     遠いほうを出すと余裕があるように見えるので、**近いほうの線まで**を見せる。
+     上限ぴったりの日に「余裕 0g」と出るのが狙い（札は「ちょうどよい」のままなので、
+     文がないと張り付いていることが分からない）。 */
+  const inRange = (v, min, max) => (v - min) <= (max - v)
+    ? `目標範囲の中です（下限まで 余裕 ${r1(v - min)}g）。`
+    : `目標範囲の中です（上限まで 余裕 ${r1(max - v)}g）。`;
 
   /* 脂質は総エネルギーの20〜30%、炭水化物は50〜65%が目標範囲。
      割合は「実際に摂ったエネルギー」に対して見る。必要量を基準にすると、
@@ -2060,7 +2067,7 @@ function render(opts){
     row('脂質', fat.total, 'g', `${fatMin}〜${fatMax}g`, fatState,
         (fatState === 'under' ? `目標まで あと ${r1(fatMin - fat.total)}g。`
          : fatState === 'over' ? `目標を ${r1(fat.total - fatMax)}g 超えています。`
-         : '') +
+         : inRange(fat.total, fatMin, fatMax)) +
         `うち飽和脂肪酸 ${sat.total}g（${satPct}%）。${top3(fat)}`) +
     row('飽和脂肪酸', sat.total, 'g', `${SAT_LIMIT}g 以下`,
         satOver > 0 ? 'over' : sat.total > SAT_GOOD ? 'warn' : 'ok',
@@ -2069,7 +2076,8 @@ function render(opts){
           : sat.total > SAT_GOOD
             ? `上限（${SAT_LIMIT}g）までは あと ${r1(-satOver)}g ですが、` +
               `LDLを下げたい日は ${SAT_GOOD}g 以下に抑えたいところです。${top3(sat)}`
-            : `${SAT_GOOD}g 以下です。${SAT_LIMIT}g は上限なので、埋めにいく必要はありません。${top3(sat)}`,
+            : `${SAT_GOOD}g 以下です（余裕 ${r1(SAT_GOOD - sat.total)}g）。` +
+              `${SAT_LIMIT}g は上限なので、埋めにいく必要はありません。${top3(sat)}`,
         satOver > 0 ? '多い' : sat.total > SAT_GOOD ? '上限内' : '良好') +
     row('食塩相当量', salt.total, 'g', `${SALT_LIMIT}g 未満`,
         salt.total > SALT_BAD ? 'over' : saltOver > 0 ? 'warn' : 'ok',
@@ -2078,7 +2086,7 @@ function render(opts){
             (salt.total > SALT_BAD
               ? `<b>たんぱく質を満たすためにここまで塩を増やすのは避けたいところです。</b>`
               : '') + top3(salt)
-          : `目標まで あと ${r1(-saltOver)}g。${top3(salt)}`,
+          : `${SALT_LIMIT}g 未満です（余裕 ${r1(-saltOver)}g）。${top3(salt)}`,
         salt.total > SALT_BAD ? '多すぎる' : saltOver > 0 ? 'やや多い' : 'ちょうどよい') +
     row('食物繊維', fiber.total, 'g', `${FIBER_TARGET}g 以上`,
         fiber.total < FIBER_TARGET ? 'under' : 'ok',
@@ -2088,7 +2096,7 @@ function render(opts){
     row('炭水化物', Math.round(carb.total), 'g', `${carbMin}〜${carbMax}g`, carbState,
         (carbState === 'under' ? `目標まで あと ${carbMin - Math.round(carb.total)}g。`
          : carbState === 'over' ? `目標を ${Math.round(carb.total) - carbMax}g 超えています。`
-         : '') + top3(carb)) +
+         : inRange(Math.round(carb.total), carbMin, carbMax)) + top3(carb)) +
     row('エネルギー', kcal.total.toLocaleString(), 'kcal', `約${need.toLocaleString()}kcal`, kcalState,
         // 札が「ちょうどよい」のときに強い言い方をしないよう、判定に合わせる
         (kcalState === 'ok'
