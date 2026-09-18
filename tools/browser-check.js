@@ -34,7 +34,7 @@
      5  自動計算の線（自動計算ぶんを0にした状態で線の内側だった日だけを見る）
         候補と油は 食塩7.5g・飽和脂肪酸15g ／ ご飯は上限の17g ／ 上限17gは絶対に越えない
      6  総負荷量＝チェックの入っている種目だけの合計
-     7  ④の「③の運動は今日の分が未入力です」が、未入力のときだけ出ること
+     7  ④の「②の運動は今日の分が未入力です」が、未入力のときだけ出ること
      8  ⑤のプロテイン1回目の行に時刻が出ていないこと
      9  ⑤の時刻が昇順であること（「翌00:30」は翌日として +24時間で見る）
      10 再計算の冪等性（続けて render() しても結果が変わらない）
@@ -119,7 +119,7 @@ function applyCase(c){
   setVal('otherP', c.otherP);
   EXERCISES.forEach((e, i) => setChk('c_' + e.id, c.exOn[i]));
   if(c.manual) Object.keys(c.manual).forEach(id => { if($$('f_' + id)) setVal('f_' + id, c.manual[id]); });
-  // ③を「今日の分として確定したか」。④の未入力表示を出し分ける
+  // ②を「今日の分として確定したか」。④の未入力表示を出し分ける
   exDate = c.entered ? todayKey() : '';
 }
 
@@ -244,8 +244,9 @@ function checkOne(c, fail){
   if(Math.abs(vol - ex.volume) > 1e-6)
     fail(`総負荷量：チェックぶんの合計 ${vol} / calcFactor ${ex.volume}`);
 
-  // 7. ④の「運動が未入力」表示は、未入力のときだけ
-  const warned = /③の運動は今日の分が未入力です/.test($$('oSatBox').innerHTML);
+  /* 7. ④の「運動が未入力」表示は、未入力のときだけ。
+     丸数字はセクションの並びで変わる（v.147で運動が③→②）ので、番号は当てにしない。 */
+  const warned = /運動は今日の分が未入力です/.test($$('oSatBox').innerHTML);
   if(warned !== !exEntered())
     fail(`④の未入力表示が実態と違います（表示 ${warned} / 未入力 ${!exEntered()}）`);
 

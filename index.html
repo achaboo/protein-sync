@@ -9,11 +9,7 @@
    1. このファイル (index.html) をダブルクリックしてブラウザで開くだけで動きます。
       （サーバー不要・通信不要・スマホにコピーしても動作します）
    2. 「① 基本設定」で体重を確認します（初期値 72.5kg）。
-   3. 「② 今日の食事」は曜日ごとの型（朝食＝外食チェーン、夕食＝自宅のサバ缶）が自動で入ります。
-      ご飯・オリーブオイル・たんぱく質の候補は、その日のエネルギーと脂質の不足から自動で決まります。
-      違うものを食べた日は数量を書き換えてください。
-      リストにないものは「その他（自由入力）」にたんぱく質 g を直接入力してください。
-   4. 「③ 今日の運動・食事の時刻」で、その日に実際にやった運動を入れます。
+   3. 「② 今日の運動・食事の時刻」で、その日に実際にやった運動を入れます。
       有酸素はウォーキング / サイクリングの距離を直接入力します。
       筋トレはその日にやった種目だけチェックを残します。
       消費エネルギーはチェックの入った種目だけから計算します。
@@ -21,6 +17,10 @@
       重量 / 回数 / セット数は普段の値が既定で入っているので、変えた日だけ書き換えます。
       日付が変わると「今日の運動はまだ入力していません」と出ます
       （有酸素の距離か筋トレの欄を触るか、「計算する」を押すと入力済みになります）。
+   4. 「③ 今日の食事」は曜日ごとの型（朝食＝外食チェーン、夕食＝自宅のサバ缶）が自動で入ります。
+      ご飯・オリーブオイル・たんぱく質の候補は、その日のエネルギーと脂質の不足から自動で決まります。
+      違うものを食べた日は数量を書き換えてください。
+      リストにないものは「その他（自由入力）」にたんぱく質 g を直接入力してください。
    5. 「計算する」を押すと、
         ・今日の目標たんぱく質（体重 × 基本係数。運動量では変わりません）
         ・食事からの合計たんぱく質
@@ -33,8 +33,8 @@
       「計算する」を押し直す必要はありません。更新されると結果が一瞬ハイライトされ、
       「④ 計算結果」の右上に最終更新時刻が表示されます。
    7. 入力内容はブラウザに自動保存され、次に開いたときに復元されます。ただし
-      「② 今日の食事」はその日限りの入力なので、日付が変わると 0 に戻ります
-      （同じ日のうちに開き直した場合は復元されます）。②の見出しにある
+      「③ 今日の食事」はその日限りの入力なので、日付が変わると 0 に戻ります
+      （同じ日のうちに開き直した場合は復元されます）。③の見出しにある
       「食事をリセット」を押せば、設定はそのままで食事の入力だけを初期状態に戻せます。
       「入力をリセット」を押すと（確認ダイアログのあと）すべての入力が初期状態に戻り、
       保存内容も削除されます。
@@ -534,7 +534,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
       筋トレの量からたんぱく質の必要量を細かく算出できる根拠が無く、レジスタンストレーニング中の
       目安は <b>1.6g/kg 前後で頭打ち</b>になる（それ以上増やしても除脂肪量への上乗せが見られない）
       ためです。<br>
-      <b>運動量はエネルギー側に反映します。</b>「③ 今日の運動・食事の時刻」の内容から消費エネルギーを見積もり、
+      <b>運動量はエネルギー側に反映します。</b>「② 今日の運動・食事の時刻」の内容から消費エネルギーを見積もり、
       必要量に足します。運動した日は<b>たんぱく質ではなく主に炭水化物</b>を増やす設計です。<br>
       <b>サイクリングの距離も含みます。</b>同じ距離ならウォーキングより負荷が低いため、
       <b>0.35倍</b>してウォーキング換算距離に加算します（自転車10km ＝ 徒歩3.5km相当）。
@@ -559,80 +559,9 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
     <input type="text" id="linkBox" readonly hidden>
   </section>
 
-  <!-- ② 食事 -->
+  <!-- ② 運動 -->
   <section>
-    <h2>② 今日の食事<button type="button" id="clearFoods" class="mini-btn">食事をリセット</button></h2>
-    <div id="foods"></div>
-    <div class="row">
-      <div class="name"><b>その他（自由入力）</b>
-        <div class="other-top">
-          <input type="text" id="otherNote" class="memo" maxlength="60" placeholder="例：サラダチキン">
-          <div class="qty"><input type="number" inputmode="decimal" id="otherP" value="0" min="0" step="0.1"></div>
-          <div class="unit">g</div>
-        </div>
-        <small>上記以外で摂ったたんぱく質の合計</small>
-        <div class="other-body">
-          <div><span>エネルギー (kcal)</span><input type="number" inputmode="numeric" id="otherKcal" value="0" min="0" step="1"></div>
-          <div><span>脂質 (g)</span><input type="number" inputmode="decimal" id="otherFat" value="0" min="0" step="0.1"></div>
-          <div><span>飽和脂肪酸 (g)</span><input type="number" inputmode="decimal" id="otherSat" value="0" min="0" step="0.1"></div>
-          <div><span>炭水化物 (g)</span><input type="number" inputmode="decimal" id="otherCarb" value="0" min="0" step="0.1"></div>
-          <div><span>食物繊維 (g)</span><input type="number" inputmode="decimal" id="otherFiber" value="0" min="0" step="0.1"></div>
-          <div><span>食塩相当量 (g)</span><input type="number" inputmode="decimal" id="otherSalt" value="0" min="0" step="0.1"></div>
-          <div><span>価格 (円)</span><input type="number" inputmode="numeric" id="otherPrice" value="0" min="0" step="1"></div>
-          <div><span>単位</span><input type="text" id="otherUnit" maxlength="3" value="食"></div>
-        </div>
-        <div class="other-add">
-          <button type="button" id="otherAdd" class="mini-btn">この内容で品目を追加</button>
-          <small>上の欄を<b>1つぶんの量</b>として、②の末尾に品目として足します。個数は足した行で変えられます。<b>翌日以降も残ります</b>（消すときは行の「削除」）。</small>
-        </div>
-        <p class="hint" id="otherAddNote" style="margin:6px 0 0"></p>
-        <details class="ratio">
-          <summary>飽和脂肪酸が書かれていないときは（脂質から推定）</summary>
-          <table id="ratioTable"></table>
-          <div class="ratio-calc">
-            <select id="satRatio"></select>
-            <button type="button" id="satCalc" class="mini-btn inline-btn">脂質から計算して入れる</button>
-          </div>
-          <small>上の「脂質」に入れた値へ割合を掛けて、「飽和脂肪酸」の欄に書き込みます。</small>
-        </details></div>
-    </div>
-    <p class="hint" id="foodNote"></p>
-    <p class="hint" id="editNote" style="margin-top:0"></p>
-
-    <h3>1週間の型（初期値として自動入力）</h3>
-    <p class="hint" id="dailyNote" style="margin-top:0"></p>
-    <div class="table-wrap"><table class="mini" id="weekPlan"></table></div>
-
-    <h3>1週間の型の栄養（食事だけの値）</h3>
-    <p class="hint" id="weekNutriNote" style="margin-top:0"></p>
-    <div class="table-wrap"><table class="mini" id="weekNutri"></table></div>
-    <p class="hint" id="weekNutriSum" style="margin-top:0"></p>
-
-    <h3>運動の実績と、必要エネルギー</h3>
-    <p class="hint" style="margin-top:0">
-      <b>運動は曜日で固定していません。</b>必要エネルギーはその日に実際にやった運動（③）で決まります。
-      下の表は、いつもの運動パターンごとに<b>必要量と、この献立のエネルギーがどれだけ離れるか</b>を並べたものです。
-      上の表の「ご飯の杯数」もここで選んだ前提に合わせて動きます。
-    </p>
-    <div class="grid2" style="margin-bottom:8px">
-      <div>
-        <label for="weekExSel">上の表を計算するときの運動の前提</label>
-        <select id="weekExSel"></select>
-      </div>
-    </div>
-    <div class="table-wrap"><table class="mini" id="weekEnergy"></table></div>
-    <p class="hint" id="weekEnergyNote" style="margin-top:0"></p>
-
-    <p class="hint">
-      毎日その日の型が自動で入ります。実際に食べたものが違えば数量を書き換えてください
-      （書き換えた内容はその日のうちは保持され、翌日また型に戻ります）。
-      いま反映したい場合は上の「食事をリセット」を押してください。
-    </p>
-  </section>
-
-  <!-- ③ 運動 -->
-  <section>
-    <h2>③ 今日の運動・食事の時刻</h2>
+    <h2>② 今日の運動・食事の時刻</h2>
     <p class="hint" id="exTodayNote" style="margin-top:0"></p>
 
     <h3>食事の時刻</h3>
@@ -682,6 +611,77 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
     </p>
     <div id="exercises"></div>
     <p class="hint" id="volNote"></p>
+  </section>
+
+  <!-- ③ 食事 -->
+  <section>
+    <h2>③ 今日の食事<button type="button" id="clearFoods" class="mini-btn">食事をリセット</button></h2>
+    <div id="foods"></div>
+    <div class="row">
+      <div class="name"><b>その他（自由入力）</b>
+        <div class="other-top">
+          <input type="text" id="otherNote" class="memo" maxlength="60" placeholder="例：サラダチキン">
+          <div class="qty"><input type="number" inputmode="decimal" id="otherP" value="0" min="0" step="0.1"></div>
+          <div class="unit">g</div>
+        </div>
+        <small>上記以外で摂ったたんぱく質の合計</small>
+        <div class="other-body">
+          <div><span>エネルギー (kcal)</span><input type="number" inputmode="numeric" id="otherKcal" value="0" min="0" step="1"></div>
+          <div><span>脂質 (g)</span><input type="number" inputmode="decimal" id="otherFat" value="0" min="0" step="0.1"></div>
+          <div><span>飽和脂肪酸 (g)</span><input type="number" inputmode="decimal" id="otherSat" value="0" min="0" step="0.1"></div>
+          <div><span>炭水化物 (g)</span><input type="number" inputmode="decimal" id="otherCarb" value="0" min="0" step="0.1"></div>
+          <div><span>食物繊維 (g)</span><input type="number" inputmode="decimal" id="otherFiber" value="0" min="0" step="0.1"></div>
+          <div><span>食塩相当量 (g)</span><input type="number" inputmode="decimal" id="otherSalt" value="0" min="0" step="0.1"></div>
+          <div><span>価格 (円)</span><input type="number" inputmode="numeric" id="otherPrice" value="0" min="0" step="1"></div>
+          <div><span>単位</span><input type="text" id="otherUnit" maxlength="3" value="食"></div>
+        </div>
+        <div class="other-add">
+          <button type="button" id="otherAdd" class="mini-btn">この内容で品目を追加</button>
+          <small>上の欄を<b>1つぶんの量</b>として、③の末尾に品目として足します。個数は足した行で変えられます。<b>翌日以降も残ります</b>（消すときは行の「削除」）。</small>
+        </div>
+        <p class="hint" id="otherAddNote" style="margin:6px 0 0"></p>
+        <details class="ratio">
+          <summary>飽和脂肪酸が書かれていないときは（脂質から推定）</summary>
+          <table id="ratioTable"></table>
+          <div class="ratio-calc">
+            <select id="satRatio"></select>
+            <button type="button" id="satCalc" class="mini-btn inline-btn">脂質から計算して入れる</button>
+          </div>
+          <small>上の「脂質」に入れた値へ割合を掛けて、「飽和脂肪酸」の欄に書き込みます。</small>
+        </details></div>
+    </div>
+    <p class="hint" id="foodNote"></p>
+    <p class="hint" id="editNote" style="margin-top:0"></p>
+
+    <h3>1週間の型（初期値として自動入力）</h3>
+    <p class="hint" id="dailyNote" style="margin-top:0"></p>
+    <div class="table-wrap"><table class="mini" id="weekPlan"></table></div>
+
+    <h3>1週間の型の栄養（食事だけの値）</h3>
+    <p class="hint" id="weekNutriNote" style="margin-top:0"></p>
+    <div class="table-wrap"><table class="mini" id="weekNutri"></table></div>
+    <p class="hint" id="weekNutriSum" style="margin-top:0"></p>
+
+    <h3>運動の実績と、必要エネルギー</h3>
+    <p class="hint" style="margin-top:0">
+      <b>運動は曜日で固定していません。</b>必要エネルギーはその日に実際にやった運動（②）で決まります。
+      下の表は、いつもの運動パターンごとに<b>必要量と、この献立のエネルギーがどれだけ離れるか</b>を並べたものです。
+      上の表の「ご飯の杯数」もここで選んだ前提に合わせて動きます。
+    </p>
+    <div class="grid2" style="margin-bottom:8px">
+      <div>
+        <label for="weekExSel">上の表を計算するときの運動の前提</label>
+        <select id="weekExSel"></select>
+      </div>
+    </div>
+    <div class="table-wrap"><table class="mini" id="weekEnergy"></table></div>
+    <p class="hint" id="weekEnergyNote" style="margin-top:0"></p>
+
+    <p class="hint">
+      毎日その日の型が自動で入ります。実際に食べたものが違えば数量を書き換えてください
+      （書き換えた内容はその日のうちは保持され、翌日また型に戻ります）。
+      いま反映したい場合は上の「食事をリセット」を押してください。
+    </p>
   </section>
 
   <div class="actions">
@@ -750,7 +750,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.146';
+const APP_VERSION = '2026-09-01.147';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -1044,7 +1044,7 @@ const SAT_RATIO = [
 
      ① 身体活動レベル … 日本人の食事摂取基準の「レベルI（低い）」＝ 1.50。
         生活の大部分が座位という想定。運動の正味消費はこれとは別に足す。
-     ② ゆっくり増量のための余剰 … 週 +0.2kg ＝ 0.2 × 7,200 ÷ 7 ≒ 1日 +206kcal。
+     ③ ゆっくり増量のための余剰 … 週 +0.2kg ＝ 0.2 × 7,200 ÷ 7 ≒ 1日 +206kcal。
         基礎代謝 1,564kcal に対して 206 ÷ 1,564 ≒ +0.13。
 
    合わせて 1.50 ＋ 0.13 ＝ 1.63（v.131）。実測では +203kcal／日・週 +0.20kg 相当。
@@ -1158,7 +1158,7 @@ const foodRow = f => `
   </div>`;
 $('foods').innerHTML = FOODS.map(foodRow).join('');
 
-/* 「その他（自由入力）」を品目として②の末尾に足す。
+/* 「その他（自由入力）」を品目として③の末尾に足す。
    入力した栄養成分は「1つぶん」として持ち、個数は足した行の数量欄で変える。
    その日限りのもの（翌日は消える）なので、FOODS へ足したうえで保存データにも書き出す。 */
 let customSeq = 0;
@@ -1654,7 +1654,7 @@ function savasFor(st, ex, lack, target, lackBase){
 }
 
 /* プロテインを先に上限まで使い、それでも残る不足を納豆で埋める。
-   納豆のパック数は入力欄に書き戻すので、②の数量と④⑤の計算は必ず一致する。
+   納豆のパック数は入力欄に書き戻すので、③の数量と④⑤の計算は必ず一致する。
    手で数量を変えたい場合は、納豆の欄を直接書き換えれば次の再計算まではその値が使われる…
    のではなく毎回上書きするため、変更したいときは他の品目か「その他」で調整する。 */
 /* 自動計算する品目を手で書き換えたか（切らしている日など）。
@@ -1682,15 +1682,15 @@ function setAutoOverride(id, on){
 /* ============================================================
    自動計算（DOMに触らない純粋な計算）
 
-   ②の数量のうち、次の4つはその日の状態から自動で決める。
+   ③の数量のうち、次の4つはその日の状態から自動で決める。
      ① オリーブオイル … 脂質が総エネルギーの20%に届くまで（0〜7さじ＝0〜28g）
-     ② ご飯           … エネルギーが必要量にいちばん近づく杯数（0〜6杯＝0〜3合）
-     ③ 店のご飯       … 定食を食べる日で、まだ不足が大きいときに無料で1杯
+     ③ ご飯           … エネルギーが必要量にいちばん近づく杯数（0〜6杯＝0〜3合）
+     ② 店のご飯       … 定食を食べる日で、まだ不足が大きいときに無料で1杯
      ④ たんぱく質の候補 … 残りを 無脂肪ヨーグルト／納豆／ツナ缶／サラダチキン で埋める
 
    ご飯・オリーブオイル・候補は互いに影響し合う（ご飯を増やすと候補が減り、
-   油を増やすとご飯が減る）ので、②→④を仮に置いてから①を決め、
-   もう一度②→④を決め直す2段構えにしている。
+   油を増やすとご飯が減る）ので、③→④を仮に置いてから①を決め、
+   もう一度③→④を決め直す2段構えにしている。
    同じ関数を「1週間の型の栄養」の試算にも使うため、入力欄には触らない。
    ============================================================ */
 // st の食事の数量だけ差し替えた複製を作る
@@ -1925,8 +1925,8 @@ function balanceQuantities(st0, ex, keep, seed){
 
 /* 呼び出し口。形は以前と同じなので、④も⑤も週の表もそのまま使える。
    探索は入力のたびに走る。週の表は7日×前提7通りで1回の描画に十数回呼ばれるが、
-   週の表は `WEEKLY_PLAN` から作るので②の数量では変わらない。そこで条件を鍵にして
-   結果を使い回し、②を打っているあいだは週の表の探索が走らないようにしている。 */
+   週の表は `WEEKLY_PLAN` から作るので③の数量では変わらない。そこで条件を鍵にして
+   結果を使い回し、③を打っているあいだは週の表の探索が走らないようにしている。 */
 const balCache = new Map();
 function autoQuantities(st0, keep){
   keep = keep || {};
@@ -1958,7 +1958,7 @@ function autoFillAuto(){
   Object.keys(q).forEach(id => { const el = $('f_' + id); if(el) el.value = q[id]; });
 }
 
-/* エネルギーが足りないときに、②の品目から手早く足せるものを挙げる。
+/* エネルギーが足りないときに、③の品目から手早く足せるものを挙げる。
    たんぱく質を含む品目を足すと自動計算の納豆がそのぶん減るため、実際に増えるのは
    「その品目のkcal − 減る納豆のkcal」。この正味で並べないと、足しても増えない品目
    （卵）やかえって減る品目（サバ缶）を勧めてしまう。納豆が0パックの日は相殺が
@@ -1986,7 +1986,7 @@ function energyAdvice(st, gap, satTotal, saltTotal){
   // 候補にするのは、その店に行く日のご飯のおかわり（無料）だけ。
   const pick = f => !f.shop || (f.shopSlot && atShop(f, st));
   /* 自動で数量を決めている品目（ご飯・オリーブオイル）は、その上限までしか勧めない。
-     上限に達している日に「ご飯をあと3杯」と出すと、②に入れた数量と食い違うため。 */
+     上限に達している日に「ご飯をあと3杯」と出すと、③に入れた数量と食い違うため。 */
   const autoLeft = f => {
     const now = Math.round(st.foods[f.id] || 0);
     if(f.autoRice){
@@ -2020,7 +2020,7 @@ function energyAdvice(st, gap, satTotal, saltTotal){
                      .map(f => `${f.short} ${Math.round(st.foods[f.id])}${f.unit}`);
   const capNote = maxed.length
     ? `<small><b>${maxed.join('・')}</b>は自動計算の上限まで入っています。` +
-      `これ以上は②のほかの品目か「その他（自由入力）」で補ってください。</small>`
+      `これ以上は③のほかの品目か「その他（自由入力）」で補ってください。</small>`
     : '';
   if(!cands.length) return capNote
     ? `<div class="advice"><b>エネルギー：あと ${gap.toLocaleString()}kcal。</b>${capNote}</div>`
@@ -2216,7 +2216,7 @@ function render(opts){
           ? `このままなら週 約${r1(Math.abs(kcalGap) * 7 / 7200)}kg ${kcalGap < 0 ? '減' : '増'}`
           : '') +
         `<br>${topN(kcal, 'kcal')}` +
-        `<br>（基礎代謝 ${calcBMR(st).toLocaleString()} × ${ACTIVITY} ＋ 運動 ${calcEnergy(st, ex).kcal} ＝ 推定 ${calcNeedBase(st, ex).toLocaleString()}kcal${st.kcalAdj ? ' ／ 手動で ' + (st.kcalAdj > 0 ? '+' : '') + st.kcalAdj.toLocaleString() + 'kcal 補正' : ''}）${exEntered() ? '' : '<br><b class="warn-inline">⚠ ③の運動は今日の分が未入力です。</b>前回の内容で仮に計算しています。'}`, kcalTag) +
+        `<br>（基礎代謝 ${calcBMR(st).toLocaleString()} × ${ACTIVITY} ＋ 運動 ${calcEnergy(st, ex).kcal} ＝ 推定 ${calcNeedBase(st, ex).toLocaleString()}kcal${st.kcalAdj ? ' ／ 手動で ' + (st.kcalAdj > 0 ? '+' : '') + st.kcalAdj.toLocaleString() + 'kcal 補正' : ''}）${exEntered() ? '' : '<br><b class="warn-inline">⚠ ②の運動は今日の分が未入力です。</b>前回の内容で仮に計算しています。'}`, kcalTag) +
     `</tbody></table>` +
     (kcalGap <= -ENERGY_CARE ? energyAdvice(st, -kcalGap, sat.total, salt.total) : '') +
     (satOver > 0 && satAlts.length
@@ -2286,7 +2286,7 @@ function render(opts){
         : sv.twoFixed
           ? `<br><small><b>2食の日は不足をまず${PROTEIN.name}で埋める設定のため、上限の ${sv.spoons}杯` +
             `（${r1(sv.spoons * SPOON_G)}g・1回${MAX_PER_SERVE}杯×${sv.sessions.length}回）に固定しています。</b>` +
-            `残る不足は自動計算の候補（無脂肪ヨーグルト・納豆など）として「② 今日の食事」に自動入力されます。</small>`
+            `残る不足は自動計算の候補（無脂肪ヨーグルト・納豆など）として「③ 今日の食事」に自動入力されます。</small>`
           : sv.forced
             ? `<br><small>筋トレをした日は${PROTEIN.name}を必ず摂る設定のため、` +
               `不足の有無にかかわらず最低 ${MIN_SPOONS_TRAINED}杯（${r1(MIN_SPOONS_TRAINED * SPOON_G)}g）を確保しています。</small>`
@@ -2366,7 +2366,7 @@ function render(opts){
 }
 
 /* ------------------------------------------------------------
-   「② 今日の食事」で入力された食品を 朝食 / 昼食 / 夕食 に自動配分する。
+   「③ 今日の食事」で入力された食品を 朝食 / 昼食 / 夕食 に自動配分する。
    1単位ずつに分解し、たんぱく質の多いものから
    「その食品に適した時間帯」のうち最も不足している枠へ入れていく。
    ------------------------------------------------------------ */
@@ -2690,7 +2690,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
       : `${sn.spoons}杯<br><small>約${r1(sn.spoons * SPOON_G)}g</small>`;
   };
 
-  // 「② 今日の食事」の入力を朝・昼・晩へ自動配分
+  // 「③ 今日の食事」の入力を朝・昼・晩へ自動配分
   const bins  = distributeFoods(st, {b:mBreak, l:mLunch, d:mDinner, p:0, s:0}, plan, trained);
   const empty = !bins.b.items.length && !bins.l.items.length && !bins.d.items.length;
 
@@ -2865,7 +2865,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
 
 
   /* 牛丼チェーンの朝食メニューは11:00までしか注文できない。
-     朝食の時刻がそれを過ぎる日は、③で時刻を早めるよう促す。 */
+     朝食の時刻がそれを過ぎる日は、②で時刻を早めるよう促す。 */
   const breakfastLate = () => {
     const at = times.b;
     if(at === null || at === undefined) return false;
@@ -2877,7 +2877,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   // ⚠ の警告は簡潔表示でも出す。間に合っている日の確認だけ、くわしい説明のときに出す。
   const breakfastWarn = () => breakfastLate()
     ? `<br><span class="warnbox"><b>⚠ ${hhmm(times.b)} では朝食メニューを注文できません（11:00まで）。</b>` +
-      `「③ 今日の運動・食事の時刻」の<b>朝食の時刻を ${hhmm(BREAKFAST_END)} までに早めて</b>ください。` +
+      `「② 今日の運動・食事の時刻」の<b>朝食の時刻を ${hhmm(BREAKFAST_END)} までに早めて</b>ください。` +
       `間に合わない日は、朝食を自宅の食材に替えるか、この枠を昼食に回してください。</span>`
     : '';
   const breakfastOk = () => {
@@ -2986,7 +2986,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
       : '';
     if(empty && !bin.addTotal){
       return detail
-        ? `<b>「② 今日の食事」が未入力です。</b>食べたもの（納豆・豆腐・サバ缶など）を入力すると、ここに ${targetG}g 分の配分が自動表示されます。${always}`
+        ? `<b>「③ 今日の食事」が未入力です。</b>食べたもの（納豆・豆腐・サバ缶など）を入力すると、ここに ${targetG}g 分の配分が自動表示されます。${always}`
         : `<b>未入力</b>${always}`;
     }
     if(bin.items.length){
@@ -3024,7 +3024,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
               (postSplit.second.length
                 ? `<br><small>残りは下の「2回目の${PROTEIN.name}」に回しています。</small>`
                 : '')
-            : `<br><b>バナナ1本もあわせて</b>摂ってください（「② 今日の食事」で本数を入力すると反映されます）。`) +
+            : `<br><b>バナナ1本もあわせて</b>摂ってください（「③ 今日の食事」で本数を入力すると反映されます）。`) +
           `<br><small>この時間帯は${PROTEIN.name}とバナナのみで、他のものは摂りません。</small>`
         : dosed
           ? `<b>運動しなかった日も${PROTEIN.name}を摂る</b>設定です。不足分をここで補います。` +
@@ -3113,7 +3113,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   $('schedNote').innerHTML = un.length
     ? `<span class="warnbox"><b>⚠ ${formatPlan(un.map(u => u.key))} は配分できませんでした。</b>` +
       `ご飯は<b>1食につき${riceF ? riceF.slotLimit : 3}杯まで</b>としているため、入力した数を収める時間帯がありません。` +
-      `「② 今日の食事」の数量を見直すか、この分は別の日に回してください。` +
+      `「③ 今日の食事」の数量を見直すか、この分は別の日に回してください。` +
       `（この分も「食事から摂取」の合計には含まれています）</span>`
     : '';
 }
@@ -3530,7 +3530,7 @@ function suggestFoods(g, st){ return formatPlan(suggestPlan(g, st)); }
    プロテインの2回目か「その他（自由入力）」へ誘導する。 */
 function addAdvice(g, st){
   const plan = suggestPlan(g, st);
-  if(plan.length) return `例：<b>${formatPlan(plan)}</b> を「② 今日の食事」に追加すると、この指摘は消えます。`;
+  if(plan.length) return `例：<b>${formatPlan(plan)}</b> を「③ 今日の食事」に追加すると、この指摘は消えます。`;
   return `朝食・夕食は曜日ごとに決めたメニューなので、` +
     (st.twoDoses
       ? `固定メニュー以外に食べたものを<b>「その他（自由入力）」</b>にg数で入れてください。`
@@ -3610,15 +3610,15 @@ function renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, pl
 
   // 食物繊維が食事から足りていれば、難消化性デキストリンは要らない
   const fb = calcFiber(st, sv);
-  tips.push(['', `<b>② 食べる順番で血糖値を抑える。</b>丼ものはご飯の量が多く、血糖値が急に上がりやすい食事です。` +
+  tips.push(['', `<b>③ 食べる順番で血糖値を抑える。</b>丼ものはご飯の量が多く、血糖値が急に上がりやすい食事です。` +
     `<b>野菜 → おかず → ご飯</b>の順で食べるとインクレチンが出て、血糖値の急上昇（血糖値スパイク）と内臓脂肪の蓄積を抑えられます。` +
     `自宅の食事はミックスサラダを先に。外食では野菜を持ち込めないので、みそ汁の具・卵・肉から先に食べてご飯を最後に回してください。`]);
-  tips.push(['', `<b>③ 食物繊維は今日 ${fb.total}g（目標${FIBER_TARGET}g以上）。</b>` +
+  tips.push(['', `<b>② 食物繊維は今日 ${fb.total}g（目標${FIBER_TARGET}g以上）。</b>` +
     (fb.total >= FIBER_TARGET
       ? `食事だけで足りているので、難消化性デキストリンを足す必要はありません。摂りすぎると腹部膨満や下痢の原因になります。`
       : `${r1(FIBER_TARGET - fb.total)}g 足りません。サラダを1皿足すか、足りない日だけ難消化性デキストリン（1回5g程度・ご飯の前）で補ってください。`)]);
 
-  tips.push(['', `<b>④ カルシウムは別枠で。</b>「② 今日の食事」の品目には乳製品が含まれていないため、` +
+  tips.push(['', `<b>④ カルシウムは別枠で。</b>「③ 今日の食事」の品目には乳製品が含まれていないため、` +
     `<b>カルシウムはこのツールでは追えません</b>。牛乳・ヨーグルト・小魚・豆腐などで別途確保してください。` +
     `55歳では骨密度の維持が課題になり、納豆のビタミンK2はカルシウムを骨に定着させる働きがあるため、` +
     `納豆とカルシウム源はセットで考えると効果的です。`]);
@@ -3893,7 +3893,7 @@ const ALL_IDS = () => ['weight','height','age','baseFactor','meals','savasShare'
   .concat(FOODS.map(f => 'f_' + f.id))
   .concat(EXERCISES.flatMap(e => ['w_' + e.id, 'r_' + e.id, 's_' + e.id]));
 
-// 「② 今日の食事」はその日限りの入力。日付が変わったら復元せず 0 から始める。
+// 「③ 今日の食事」はその日限りの入力。日付が変わったら復元せず 0 から始める。
 // （同じ日のうちに開き直した場合は、入力し直さずに済むよう復元する）
 const DAILY_IDS = () => FOODS.map(f => 'f_' + f.id)
   .concat(['otherP','otherNote','otherFat','otherSat','otherSalt','otherCarb','otherFiber','otherKcal','otherPrice']);
@@ -3927,7 +3927,7 @@ const WEEKLY_PLAN = {
 const todayIdx = () => new Date().getDay();
 
 /* ------------------------------------------------------------
-   1週間の型の栄養を、①③の設定はそのままに②の数量だけ差し替えて試算する。
+   1週間の型の栄養を、①②の設定はそのままに③の数量だけ差し替えて試算する。
    ④と同じ関数（autoQuantities / savasOf / calcXxx）を通すので、
    表に出る数字と、その曜日に実際に計算される数字は一致する。
    ------------------------------------------------------------ */
@@ -3969,7 +3969,7 @@ function weekDay(idx, st0){
    そこで前提を選べるようにし、必要エネルギーの側は前提ごとに並べて見せる
    （食事テンプレートの栄養と、当日の運動実績を切り離して読めるようにするため）。 */
 const WEEK_EX = [
-  {id:'today',  label:'今日の③の入力どおり'},
+  {id:'today',  label:'今日の②の入力どおり'},
   {id:'rest',   label:'運動なし（休養日）',               walk:0,  cycle:0,  strength:false},
   {id:'walk',   label:'ウォーキング10km のみ',            walk:10, cycle:0,  strength:false},
   {id:'cycle',  label:'サイクリング20km のみ',            walk:0,  cycle:20, strength:false},
@@ -4079,7 +4079,7 @@ function renderWeekNutri(week, st, sc){
     `<small>①の設定（${r1(st.weight)}kg ／ 基本係数 ${st.baseFactor.toFixed(2)} ／ ${st.meals}食）と、` +
     `運動の前提「<b>${esc(sc.label)}</b>」で試算しています` +
     (sc.id === 'today' && !exEntered()
-      ? `<b class="warn-inline">（③の運動は今日の分が未入力です）</b>`
+      ? `<b class="warn-inline">（②の運動は今日の分が未入力です）</b>`
       : '') + `。</small>`;
   const costWk   = week.reduce((a, d) => a + d.cost, 0);
   const spoonsWk = week.reduce((a, d) => a + d.sv.spoons, 0);
@@ -4125,7 +4125,7 @@ function renderWeekEnergy(st, sc){
     `自宅の夕食の日（${WEEK_LABEL[WEEK_EX_DAY]}曜の型）で計算しています。` +
     `<b>ご飯がその日の必要量に合わせて動く</b>ので、どの前提でも差は小さく収まります` +
     `（${ENERGY_BAD}kcal 以上足りない日だけ ✕ にしています）。<br>` +
-    `<small>「筋トレ」は③でチェックの入っている種目だけを数えます` +
+    `<small>「筋トレ」は②でチェックの入っている種目だけを数えます` +
     `（いまは ${calcFactor(st).done}種目・総負荷量 ${calcFactor(st).volume.toLocaleString()}kg）。` +
     `8種目すべてを毎日行う前提にはしていません。</small>`;
 }
@@ -4157,7 +4157,7 @@ function save(){
   try{ localStorage.setItem(KEY, JSON.stringify(d)); }catch(err){}
 }
 
-/* ③の運動を「今日の分として入力したか」。
+/* ②の運動を「今日の分として入力したか」。
    運動は日によって変わるのに、入力欄の値は前回のまま残る。
    黙って前日の距離やチェックで計算すると、
    「運動していない日」と「まだ入力していない日」の区別が付かなくなるため、
@@ -4236,7 +4236,7 @@ function load(){
     });
     // 既定値を変えた版では、チェックの状態も新しい初期値（全部オフ）に合わせる
     if(!staleEx) EXERCISES.forEach(e => { if($('c_' + e.id)) $('c_' + e.id).checked = !!d.c[e.id]; });
-    if(d.exd !== undefined) exDate = d.exd;      // ③の運動を最後に確定した日
+    if(d.exd !== undefined) exDate = d.exd;      // ②の運動を最後に確定した日
     if(d.rest !== undefined) $('restSavas').checked = !!d.rest;
     // 既定値を変えた版では、チェックの状態も新しい初期値に合わせる
     if(d.two  !== undefined && !staleEx) $('twoDoses').checked = !!d.two;
@@ -4338,7 +4338,7 @@ function copySettingsLink(){
   }
 }
 
-/* 「② 今日の食事」だけを 0 に戻す（設定はそのまま） */
+/* 「③ 今日の食事」だけを 0 に戻す（設定はそのまま） */
 function clearFoods(){
   // 自由入力から足した品目は消さない（数量だけ0に戻る）。消すときは行の「削除」
   $('otherAddNote').innerHTML = '';
@@ -4420,7 +4420,7 @@ const syncAria = sec =>
 // 結果を表示する側から「④ 計算結果」を開くために使う
 const sectionOf = id => { const el = $(id); return el ? el.closest('section') : null; };
 
-/* 「計算する」を押したら、③の運動も「今日の分」として確定したとみなす。
+/* 「計算する」を押したら、②の運動も「今日の分」として確定したとみなす。
    前回とまったく同じ内容の日（連続した休養日・同じメニューを続けた日）は
    どの欄も触らないので、これが無いと⚠が消えない。
    自動再計算（onInputChanged 経由の render）では確定しない。
@@ -4502,7 +4502,7 @@ $('meals').addEventListener('change', () => {
   onInputChanged();
 });
 /* 有酸素の距離か筋トレの欄を手で触ったときも「今日の分を入力した」とみなす。
-   ③には食事の時刻も入っているので、そちらを触っただけでは入力済みにしない。 */
+   ②には食事の時刻も入っているので、そちらを触っただけでは入力済みにしない。 */
 ['input', 'change'].forEach(ev => {
   $('exercises').addEventListener(ev, markExToday);
   $('walk').addEventListener(ev, markExToday);
