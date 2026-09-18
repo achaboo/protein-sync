@@ -43,7 +43,9 @@
    ・プロテインの製品情報はスクリプト内の PROTEIN で一元管理しています。
      **製品を変えるときはそのブロックだけ直せば、画面の表示も計算もすべて追従します。**
      いまの製品：Bpro（1回分30g＝付属スプーンすりきり2杯・たんぱく質20.79g・113.79kcal）
-   ・プロテインは水240mlで溶かします（乳類は使いません）。摂る回数は「① 基本設定」の
+   ・プロテインは水で溶かします（乳類は使いません）。水の量は計算に使わないので、
+     杯数ごとの表示には出していません（商品の表示は1回分30g＝2杯に水240ml程度）。
+     摂る回数は「① 基本設定」の
      「プロテインを1日2回まで摂る」で決まります（初期値オン＝運動直後と夕方の2回まで）。
      運動していない日はプロテインを摂らず、目標分はすべて食事から確保します。
      ただし「① 基本設定」の「運動しなかった日もプロテインを摂る」をオンにすると、
@@ -748,7 +750,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.142';
+const APP_VERSION = '2026-09-01.143';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -2160,7 +2162,7 @@ function render(opts){
       `<span style="white-space:nowrap"><span style="font-size:2.1rem">${sv.spoons}</span> 杯</span>` +
       `<br><span style="font-size:1rem">（合計 約 ${sv.totalG}g）</span>`;
     const detail = sv.sessions.map(sn =>
-      `${sn.spoons}杯＋水${WATER_ML}ml（${r1(sn.spoons * SPOON_G)}g）`).join('　＋　');
+      `${sn.spoons}杯（${r1(sn.spoons * SPOON_G)}g）`).join('　＋　');
     $('oSavasSub').innerHTML =
       `＝ ${serveText(sv.sessions.length)}　${detail}` +
       `<br>たんぱく質は粉の ${sv.savasG}g のみです。` +
@@ -2224,7 +2226,7 @@ function render(opts){
   }else if(lack > 0){
     $('oSavas').innerHTML = `${PROTEIN.name}は不要です<span style="font-size:1rem">（不足 ${lack}g）</span>`;
     $('oSavasSub').innerHTML = (st.liqP > 0
-      ? `1回分（スプーン1杯＋${liqName}${st.liquidMl}ml＝約${r1(SPOON_G + st.liqP)}g）を飲むと逆に摂りすぎになります。「その他（自由入力）」に少量を足して調整してください。`
+      ? `1回分（スプーン1杯＋${liqName}＝約${r1(SPOON_G + st.liqP)}g）を飲むと逆に摂りすぎになります。「その他（自由入力）」に少量を足して調整してください。`
       : `残り ${lack}g は少量なので、「その他（自由入力）」に少量を足して調整するほうが確実です。`) +
       (liquidCutSuggestion(st, lack) ? `<br>${liquidCutSuggestion(st, lack)}` : '');
   }else{
@@ -2588,7 +2590,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   const cup = sn => {
     if(!sn || sn.spoons <= 0) return '—';
     return detail
-      ? `スプーン ${sn.spoons}杯<br><small>（水${WATER_ML}mlで溶かす<br>約${r1(sn.spoons * SPOON_G)}g）</small>`
+      ? `スプーン ${sn.spoons}杯<br><small>（水で溶かす<br>約${r1(sn.spoons * SPOON_G)}g）</small>`
       : `${sn.spoons}杯<br><small>約${r1(sn.spoons * SPOON_G)}g</small>`;
   };
 
@@ -2913,13 +2915,13 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
       cup(sMorning),
       !detail
         ? (trained || dosed
-            ? (postSplit.first.length ? `<b>あわせて ${labelOf(postSplit.first)}</b>` : `水${WATER_ML}mlで溶かす`)
+            ? (postSplit.first.length ? `<b>あわせて ${labelOf(postSplit.first)}</b>` : `水で溶かす`)
             : `<b>—</b>`)
         : trained
         ? `<b>運動したあとに摂ってください。</b>日に何回か運動する日は、そのうちの<b>1回のあと</b>で構いません。` +
           `運動後に<b>吸収が高まる状態は数時間〜翌日まで続く</b>ので、30分を過ぎても無駄にはなりません` +
           `（この行だけ時刻を出していないのはこのためです）。` +
-          `<b>水${WATER_ML}ml</b>に溶かして飲み、筋肉の修復材料を入れます。` +
+          `<b>水</b>に溶かして飲み、筋肉の修復材料を入れます。` +
           `脂質を含まないぶん胃を素早く通過し、アミノ酸が早く血中に届きます。` +
           (postSplit.first.length
             ? `<br><b>あわせて ${labelOf(postSplit.first)}</b>。糖質を補うことでたんぱく質がエネルギーに回されるのを防げます。` +
@@ -2930,7 +2932,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
           `<br><small>この時間帯は${PROTEIN.name}とバナナのみで、他のものは摂りません。</small>`
         : dosed
           ? `<b>運動しなかった日も${PROTEIN.name}を摂る</b>設定です。不足分をここで補います。` +
-            `<b>水${WATER_ML}ml</b>に溶かし、起床後から朝のうちに飲んでください。` +
+            `<b>水</b>に溶かし、起床後から朝のうちに飲んでください。` +
             `<br><small>筋線維の修復は運動後48〜72時間続くため、休養日にたんぱく質を落とさないことに意味があります。</small>`
           : st.restSavas
             ? `<b>運動しなかった日も${PROTEIN.name}を摂る</b>設定ですが、今日は食事だけで目標に届いているため0杯です。`
@@ -2988,8 +2990,8 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
         cup(sEvening),
         !detail
           // プロテインは就寝前でも負担にならないので、簡潔表示では注意も出さない
-          ? (postSplit.second.length ? `<b>あわせて ${labelOf(postSplit.second)}</b>` : `水${WATER_ML}mlで溶かす`)
-          : `夕食で摂りきれない分をここで補います。<b>水${WATER_ML}ml</b>に溶かして飲んでください。` +
+          ? (postSplit.second.length ? `<b>あわせて ${labelOf(postSplit.second)}</b>` : `水で溶かす`)
+          : `夕食で摂りきれない分をここで補います。<b>水</b>に溶かして飲んでください。` +
         (postSplit.second.length ? `<br><b>あわせて ${labelOf(postSplit.second)}</b>。` : '') +
         `<br><small>運動直後に全部まとめるより、1回 ${mealPOpt(st.weight)}g（体重×${MEAL_P_OPT}）前後に分けるほうが筋肉の材料として使われます。</small>` +
         // プロテインは吸収が速く脂質も少ないため、就寝前でも食事のような負担にならない。
@@ -3612,9 +3614,11 @@ function updateLive(){
   /* プロテインの摂り方（水のみ）。回数は「1日2回まで摂る」の設定で変わるので、
      すぐ下の twoNote と食い違わないよう、ここでも設定を見て書き分ける。 */
   $('liquidNote').innerHTML =
-    `<b>${PROTEIN.name}は水${WATER_ML}mlで溶かし、` +
+    `<b>${PROTEIN.name}は水で溶かし、` +
     (st.twoDoses ? `運動直後と夕方の2回まで摂ります。</b>` : `運動直後の1回だけ摂ります。</b>`) +
     `水にたんぱく質は含まれないため加算はありません。` +
+    `<small>水の量は好みで構いません（商品の表示は1回分${PROTEIN.serveG}g＝${PER_SERVE}杯に` +
+    `水${WATER_ML}ml程度）。杯数に合わせて加減してください。</small>` +
     (st.restSavas
       ? `運動しなかった日は<b>起床後</b>に、不足分があるときだけ摂ります。`
       : `運動していない日は${PROTEIN.name}を摂らず、目標分はすべて食事から確保します。`);
