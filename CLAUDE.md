@@ -13,6 +13,7 @@
 | `apple-touch-icon.png` / `favicon-192.png` | アイコン |
 | `tools/crosscheck.js` | README↔コードの機械照合。`node tools/crosscheck.js`（`-v` で照合した表の一覧）。食い違いがあれば終了コード1 |
 | `tools/browser-check.js` | ランダム検証のハーネス。ブラウザのコンソールに貼って `PSCheck.run(1000)`。終わったら `PSCheck.restore()` |
+| `tools/review-prompt.md` | 他のAIに科学的妥当性を見てもらうためのプロンプト。`---` から下をコピーして貼る。**設計・実測値・既知の弱点を書いてあるので、ツールを変えたらここも直す** |
 
 ## 崩してはいけない前提
 
