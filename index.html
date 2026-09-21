@@ -743,7 +743,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
         </table>
       </div>
       <p id="schedNote"></p>
-      <p class="hint">※ 目安量は今日の目標値から自動配分しています（<span class="pname">Bpro</span>と間食を引いた残りを、食事の数で等分）。<br>
+      <p class="hint">※ 目安量は今日の目標値から自動配分しています（<span class="pname">Bpro</span>と間食を引いた残りを各食事へ。<br>外食のメニューで決まる枠はその量を目安にし、余りを自宅の食材を置ける枠へ配ります）。<br>
       1食のたんぱく質は <b>体重×0.4g が目安</b>（体重×0.3〜0.6g なら問題ありません）。
       「これ以上は使えない上限」という量はないため、超えた分を後ろへ回すことはしません。</p>
     </section>
@@ -764,7 +764,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.153';
+const APP_VERSION = '2026-09-01.154';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -2492,13 +2492,14 @@ function distributeFoods(st, mealTargets, planIds, trained){
   FOODS.forEach(f => {
     const q  = Math.round(st.foods[f.id]);
     const bq = bQuota(f, st);            // 先頭のこの数だけは朝食の枠へ
-    /* 昼食も夕食も自宅の日に同じ品目が2つ以上あれば、半分ずつに分ける。
-       割り切れないぶんは夕食に寄せて、夕食にボリュームが出るようにする。
-       （1つしかない品目は今までどおり、不足の大きい枠へ自動で入る）
-       homeSlot で枠を決めている品目（オリーブオイル）は、2つ以上でも分けない。
-       昼のサラダはオリーブオイル、夕のサラダはドレッシングと決めているため。 */
-    const splitLD = hasLunch && homeDinnerDay(st) && f.home && !f.homeSlot && (q - bq) >= 2;
-    const toDinner = splitLD ? Math.ceil((q - bq) / 2) : 0;
+    /* 以前は「昼食も夕食も自宅の日に同じ品目が2つ以上あれば、半分ずつに分け、
+       端数は夕食に寄せる」という規則を置いていた（夕食にボリュームを出すため）。
+       **これをやめた**（v.154）。数で半分に割るので、たんぱく質の多い品目まで
+       機械的に夕食へ寄り、実測で 朝17.1 / 昼16.7 / 夕54.2 という偏りが出ていた。
+       夕食はサバ缶31.7gだけで1食の目安をほぼ埋めるので、そこへさらに半分を足していた。
+       いまは下の配分ループに任せる。**不足の大きい枠を選ぶ**ので、
+       サバ缶で埋まった夕食より昼食が優先される。
+       homeSlot で枠を決めている品目（オリーブオイル）は従来どおり指定の枠へ。 */
     /* ご飯のように「食事ごとに1杯ずつ」食べるものは、その日の自宅の食事へ均等に配る。
        割り切れない分は 夕食 → 昼食 → 朝食 の順に足して、夕食を厚くする。
        以前は昼と夕で半分ずつに分けていたため、朝食も自宅の日に朝だけ0杯になっていた。 */
@@ -2506,13 +2507,26 @@ function distributeFoods(st, mealTargets, planIds, trained){
     if(f.spread && q > 0){
       const ms = homeMealsOf(st);
       if(ms.length){
-        const per = Math.floor(q / ms.length);
-        let extra = q % ms.length;
-        ms.forEach(sl => plan.push({sl, n:per}));
-        ['d','l','b'].forEach(sl => {
-          const e = plan.find(x => x.sl === sl);
-          if(e && extra > 0){ e.n++; extra--; }
+        /* 以前は自宅の食事へ**均等に**配っていた（1食1杯ずつ）。
+           だが夕食はサバ缶31.7gだけで1食の目安をほぼ埋めるので、そこへ均等にご飯を足すと
+           たんぱく質が夕食に寄る（v.153で 朝17.1/昼20.6/夕50.3）。
+           いまは**たんぱく質の少ない枠から順に**配る。合計は変わらない。
+           1食に置ける杯数は slotLimit（4杯＝2合）で頭打ちにする。 */
+        const fixedP = {};
+        ms.forEach(sl => fixedP[sl] = 0);
+        FOODS.forEach(x => {
+          if(x.spread || !(st.foods[x.id] > 0)) return;
+          slotsOf(x, st).forEach(sl => { if(fixedP[sl] !== undefined && slotsOf(x, st).length === 1)
+            fixedP[sl] += st.foods[x.id] * x.p; });
         });
+        ms.forEach(sl => plan.push({sl, n:0}));
+        for(let i = 0; i < q; i++){
+          const pick = plan
+            .filter(e => e.n < (f.slotLimit || 99))
+            .sort((a, b) => (fixedP[a.sl] + a.n * f.p) - (fixedP[b.sl] + b.n * f.p))[0];
+          if(!pick) break;
+          pick.n++;
+        }
       }
     }
     for(let i = 0; i < q; i++){
@@ -2520,7 +2534,6 @@ function distributeFoods(st, mealTargets, planIds, trained){
       if(nextSpread) nextSpread.n--;
       const slot = nextSpread ? [nextSpread.sl]
                  : i < bq ? ['b']
-                 : splitLD ? ((i - bq) < toDinner ? ['d'] : ['l'])
                  : slotsOf(f, st);
       const u = {key:f.id, short:f.short, unit:f.unit, g:f.p,
                  slots:mapSlots(slot), carb:f.carb, first:f.first, lock:f.lock,
@@ -2564,12 +2577,23 @@ function distributeFoods(st, mealTargets, planIds, trained){
     return same.every(x => x.key === u.key);
   };
 
-  // 時間帯が固定された食品を先に配置する（指定枠以外へは絶対に回さない）
-  lockedUnits.forEach(u => {
-    const list = u.slots.filter(s => stapleOk(s, u));
-    if(!list.length){ unplaced.push(u); return; }
-    put(list.reduce((a, s) => gap(s) > gap(a) ? s : a, list[0]), u);
-  });
+  /* 時間帯が固定された食品を先に配置する（指定枠以外へは絶対に回さない）。
+
+     **置く順番は「枠を選べないもの → たんぱく質の多い順」**（v.154）。
+     以前は FOODS に書いた順に置いていた。この配分は「いちばん不足している枠へ入れる」
+     という貪欲法なので、**大きい塊を後に回すと必ず行き過ぎる**。
+     サバ缶（31.7g・夕食固定）は FOODS のなかでアーモンドやヨーグルトより後ろにあるため、
+     小さい品目で埋めた夕食へ最後に31.7gが乗り、実測で 朝17.1/昼29.6/夕41.3 になっていた。
+     枠が1つしかないもの（サバ缶・メニュー・ご飯の割り当て済み分）は選択の余地が無いので
+     先に確定させ、残りを大きい順に不足の大きい枠へ入れる。 */
+  lockedUnits
+    .map((u, i) => ({u, i}))
+    .sort((a, b) => (a.u.slots.length - b.u.slots.length) || (b.u.g - a.u.g) || (a.i - b.i))
+    .forEach(({u}) => {
+      const list = u.slots.filter(s => stapleOk(s, u));
+      if(!list.length){ unplaced.push(u); return; }
+      put(list.reduce((a, s) => gap(s) > gap(a) ? s : a, list[0]), u);
+    });
 
   // 「毎食1個」の品目がその枠にまだ入っていないか
   const roomOk = (s, u) =>
@@ -2776,15 +2800,33 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   // その分は食事の枠から差し引いてから 朝／昼／晩 に配分する。
   // 自宅で夕食をとる日のサバ缶とご飯は夕食の枠に入るので、ここでは差し引かない。
   const snackG  = r1(FOODS.reduce((a, f) => a + snackQty(f, st) * f.p, 0));
-  /* 食事で摂るべき量 = 目標 − プロテイン − 間食。これを食事の数で等分する。
+  /* 食事で摂るべき量 = 目標 − プロテイン − 間食。これを各食事へ割り振る。
      以前は 朝30%/昼35%/晩35% の割合で分け、1食40gで頭打ちにしていたが、
      たんぱく質は割合ではなくgで見るほうが実態に合う（1食 体重×0.4g が目安）。 */
+  /* 1食の目安。単純に「残り ÷ 食事の数」で等分すると、外食の枠が目安に届かない日に
+     そのぶんが行き場を失い、届かなかった差が**自宅の食事の片方へ丸ごと寄る**。
+     平日は朝食が外食（まぜのっけ朝食17.1g）で目安29.5gに12.4g届かないため、
+     実測で 朝17.1 / 昼20.6 / 夕50.3 になっていた（v.153）。
+     そこで**自宅の食材を置けない枠は、その枠に実際に入る量を目安とし、
+     余った目安を残りの枠へ配り直す**。合計は変わらない。 */
   const byMeal  = Math.max(0, target - sv.totalG - snackG);
-  const nMeals  = ['b','l','d'].filter(k => k !== st.skip).length || 1;
-  const per     = Math.round(byMeal / nMeals);
-  const mBreak  = st.skip === 'b' ? 0 : per;
-  const mLunch  = st.skip === 'l' ? 0 : per;
-  const mDinner = per;
+  const mealKeys = ['b', 'l', 'd'].filter(k => k !== st.skip);
+  const nMeals  = mealKeys.length || 1;
+  // その枠に自宅の食材を置けるか（置けない枠＝外食のメニューだけで決まる枠）
+  const homeOk = {b:homeBreakfastDay(st), l:true, d:homeDinnerDay(st)};
+  // 固定メニューだけで決まる枠の、実際のたんぱく質量
+  const fixedG = k => FOODS.reduce((a, f) =>
+    a + ((st.foods[f.id] > 0 && f.lock && f.slot === k) ? st.foods[f.id] * f.p : 0), 0);
+  const fixedKeys = mealKeys.filter(k => !homeOk[k]);
+  const freeKeys  = mealKeys.filter(k =>  homeOk[k]);
+  let rest = byMeal, fixedT = {};
+  fixedKeys.forEach(k => { fixedT[k] = r1(Math.min(fixedG(k), byMeal / nMeals)); rest -= fixedT[k]; });
+  const perFree = freeKeys.length ? Math.round(rest / freeKeys.length) : 0;
+  const tOf = k => mealKeys.indexOf(k) < 0 ? 0
+                 : (homeOk[k] ? perFree : Math.round(fixedT[k]));
+  const mBreak  = tOf('b');
+  const mLunch  = tOf('l');
+  const mDinner = tOf('d');
 
   const sMorning = sv.sessions[0];   // 1回目（運動直後、休養日は起床後）
   const sEvening = sv.sessions[1];   // 2回目（「1日2回まで」を選んだ場合のみ）
