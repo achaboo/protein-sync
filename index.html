@@ -167,6 +167,13 @@ input[type=checkbox]:focus-visible{outline:2px solid #bfd7ff;outline-offset:2px}
 .row:last-child{border-bottom:none}
 .row .name{flex:1 1 auto;min-width:0}
 .row .name > b{display:block;font-size:.93rem;font-weight:600}   /* 直接の子だけ。小文字注記の中の <b> は行を分けない */
+/* 「今日は使う／使わない」。店名は見出しなので上の行に置き、チェックは品目名の左に並べる */
+.row .name .shop{display:block;font-size:.93rem;font-weight:600}
+.row .name .use{display:flex;align-items:center;gap:6px;cursor:pointer}
+.row .name .use input{flex:0 0 auto;margin:0}
+.row .name .use > b{font-size:.93rem;font-weight:600}
+.row.off{opacity:.45}
+.row.off .qty input{text-decoration:line-through}
 .row .name small{color:var(--sub);font-size:.76rem}
 .qty{flex:0 0 92px;display:flex;align-items:center;gap:6px}
 .qty input{text-align:center}
@@ -616,6 +623,13 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
   <!-- ③ 食事 -->
   <section>
     <h2>③ 今日の食事<button type="button" id="clearFoods" class="mini-btn">食事をリセット</button></h2>
+    <p class="hint" style="margin-top:0">
+      <b>品目名の左のチェックは「今日はこれを使う」</b>という意味です。初期値は全部オンで、
+      そのときはこれまでどおりに自動計算します。<b>在庫が無い日や気が進まない日は外してください。</b>
+      外した品目は数量を0として扱い、自動計算の組み立てからも除きます。
+      <b>その日限り</b>の設定なので、翌日と「食事をリセット」で全部オンに戻ります。
+    </p>
+    <p class="hint" id="useNote" style="margin-top:0"></p>
     <div id="foods"></div>
     <div class="row">
       <div class="name"><b>その他（自由入力）</b>
@@ -750,7 +764,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.149';
+const APP_VERSION = '2026-09-01.150';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -1148,7 +1162,12 @@ FOODS.filter(f => f.autoBal).forEach(f => {
 
 const foodRow = f => `
   <div class="row" id="row_${f.id}">
-    <div class="name"><b>${f.shop ? f.shop + '<br>' : ''}${esc(f.name)}</b>` +
+    <div class="name">` +
+      /* 使う／使わない。店のメニューは店名の左ではなく**品目名の左**に置く
+         （店名は見出しなので、そこに付けると店ごと外すように見える）。 */
+      `${f.shop ? `<span class="shop">${esc(f.shop)}</span>` : ''}` +
+      `<label class="use"><input type="checkbox" id="use_${f.id}" checked>` +
+      `<b>${esc(f.name)}</b></label>` +
       // 全角の「）」で終わる注記は、そのあとに半角スペースを足すと空きすぎて見える
       `<small><span id="info_${f.id}">${infoHtml(f)}</span>` +
       `${f.ruleNote ? `<br>${f.ruleNote}` : ''}${f.limitNote ? `<br><b>${f.limitNote}</b>` : ''}` +
@@ -1370,7 +1389,8 @@ function readState(){
     const v = parseInt($('fixSpoons').value, 10);
     return (v >= 1 && v <= st.maxSpoons) ? v : 0;
   })();
-  FOODS.forEach(f => st.foods[f.id] = num('f_' + f.id));
+  // 「今日は使わない」に外した品目は、数量を0として扱う
+  FOODS.forEach(f => st.foods[f.id] = foodUse(f.id) ? num('f_' + f.id) : 0);
   EXERCISES.forEach(e => st.ex[e.id] = {
     on: $('c_' + e.id).checked, w: num('w_' + e.id), r: num('r_' + e.id), s: num('s_' + e.id)
   });
@@ -1669,6 +1689,31 @@ function savasFor(st, ex, lack, target, lackBase){
    のではなく毎回上書きするため、変更したいときは他の品目か「その他」で調整する。 */
 /* 自動計算する品目を手で書き換えたか（切らしている日など）。
    その日のうちは手入力を優先し、「自動計算に戻す」で解除する。 */
+/* 「今日は使わない」と外した品目 {id:true}。③の各行の先頭のチェックを外すと入る。
+   外した品目は数量を0として扱い、自動計算の対象からも外す（探索の変数から消える）。
+   在庫切れやその日の気分で品目を抜くための仕組みなので、**その日限り**にしてある。
+   翌日と「食事をリセット」で全部オンに戻る（食事の数量と同じ扱い）。 */
+let foodOff = {};
+const foodUse = id => !foodOff[id];
+function readFoodUse(){
+  foodOff = {};
+  FOODS.forEach(f => { const el = $('use_' + f.id); if(el && !el.checked) foodOff[f.id] = true; });
+}
+function applyFoodUse(){
+  FOODS.forEach(f => { const el = $('use_' + f.id); if(el) el.checked = !foodOff[f.id]; });
+  refreshUseNotes();
+}
+function refreshUseNotes(){
+  FOODS.forEach(f => { const row = $('row_' + f.id); if(row) row.classList.toggle('off', !!foodOff[f.id]); });
+  const off = FOODS.filter(f => foodOff[f.id]);
+  const el = $('useNote');
+  if(el) el.innerHTML = off.length
+    ? `<b class="warn-inline">${off.length}品目を今日は使わない設定にしています</b>` +
+      `（${off.map(f => esc(f.short || f.name)).join('・')}）。` +
+      `自動計算はこれらを外して組み立てます。チェックを戻すか「食事をリセット」で元に戻ります。`
+    : '';
+}
+
 let autoOverride = {};                 // 自動入力を止めている品目 {id:true}
 const AUTO_IDS = () => FOODS.filter(isAuto).map(f => f.id);
 const autoOff  = id => !!autoOverride[id];
@@ -1770,9 +1815,14 @@ const CLIMB_KICKS = 40;  // 見つかった最良点を揺さぶって登り直�
    ご飯は「1食 slotLimit 杯 × 自宅で食べる食事の数」、店の無料ご飯はその店に行く日だけ、
    卵はメニューに含まれる分を引いた残り、バナナは運動した日は1本以上
    （運動直後の枠から糖質を切らさないため）。 */
-function autoRanges(st, ex){
+function autoRanges(st, ex, keepOff){
   const r = {};
-  FOODS.filter(isAuto).forEach(f => { r[f.id] = {lo:0, hi:Math.max(0, f.autoMax || f.fillMax || 0)}; });
+  FOODS.filter(isAuto).forEach(f => {
+    // 「今日は使わない」に外した品目は、上限も下限も0にして探索から外す。
+    // 「1週間の型の栄養」は今日の在庫とは無関係の基準なので、そこでは見ない（keepOff）
+    const use = keepOff || foodUse(f.id);
+    r[f.id] = {lo:0, hi: use ? Math.max(0, f.autoMax || f.fillMax || 0) : 0};
+  });
   const home = FOODS.find(f => f.autoRice);
   if(home && r[home.id]){
     const meals = homeMealsOf(st).length;
@@ -1785,7 +1835,7 @@ function autoRanges(st, ex){
       a + (f.id === 'egg' ? 0 : (f.eggs || 0) * (st.foods[f.id] || 0)), 0);
     r.egg.hi = Math.max(0, Math.min(r.egg.hi, (eggF.max === undefined ? 2 : eggF.max) - used));
   }
-  if(r.banana && (ex.done > 0 || ex.cardio > 0)) r.banana.lo = Math.min(1, r.banana.hi);
+  if(r.banana && r.banana.hi > 0 && (ex.done > 0 || ex.cardio > 0)) r.banana.lo = Math.min(1, r.banana.hi);
   return r;
 }
 
@@ -1887,8 +1937,8 @@ function climbFrom(score, range, ids, start){
 
 /* その日の自動計算を1回ぶん解く。keep に入れた品目（手入力に切り替えたもの）は触らない。
    同じ関数を「1週間の型の栄養」の試算にも使うため、入力欄には触らない。 */
-function balanceQuantities(st0, ex, keep, seed){
-  const range = autoRanges(st0, ex);
+function balanceQuantities(st0, ex, keep, seed, keepOff){
+  const range = autoRanges(st0, ex, keepOff);
   const all = FOODS.filter(isAuto).map(f => f.id).filter(id => range[id] && !keep[id]);
   const out = {};
   all.forEach(id => out[id] = range[id].lo);
@@ -1964,7 +2014,7 @@ function balanceQuantities(st0, ex, keep, seed){
    週の表は `WEEKLY_PLAN` から作るので③の数量では変わらない。そこで条件を鍵にして
    結果を使い回し、③を打っているあいだは週の表の探索が走らないようにしている。 */
 const balCache = new Map();
-function autoQuantities(st0, keep){
+function autoQuantities(st0, keep, keepOff){
   keep = keep || {};
   const zero = {};
   FOODS.filter(isAuto).forEach(f => { if(!keep[f.id]) zero[f.id] = 0; });
@@ -1976,10 +2026,11 @@ function autoQuantities(st0, keep){
                FOODS.map(f => st.foods[f.id] || 0).join(','),
                st.otherP, st.otherKcal, st.otherFat, st.otherSat, st.otherSalt,
                st.otherCarb, st.otherFiber,
-               Object.keys(keep).sort().join(',')].join('|');
+               Object.keys(keep).sort().join(','),
+               keepOff ? 'week' : Object.keys(foodOff).sort().join(',')].join('|');
   let got = balCache.get(key);
   if(!got){
-    got = balanceQuantities(st, ex, keep, st0.foods);
+    got = balanceQuantities(st, ex, keep, st0.foods, keepOff);
     if(balCache.size > 200) balCache.clear();
     balCache.set(key, got);
   }
@@ -2020,7 +2071,7 @@ function energyAdvice(st, gap, satTotal, saltTotal){
   const netOf  = f => Math.round(f.kcal - f.p * offset);
   // 店のメニュー（朝食・夕食）は曜日で決まっているので候補にしない。
   // 候補にするのは、その店に行く日のご飯のおかわり（無料）だけ。
-  const pick = f => !f.shop || (f.shopSlot && atShop(f, st));
+  const pick = f => foodUse(f.id) && (!f.shop || (f.shopSlot && atShop(f, st)));
   /* 自動で数量を決めている品目（ご飯・オリーブオイル）は、その上限までしか勧めない。
      上限に達している日に「ご飯をあと3杯」と出すと、③に入れた数量と食い違うため。 */
   const autoLeft = f => {
@@ -3983,7 +4034,7 @@ function weekDay(idx, st0){
     foods.egg = Math.max(0, Math.min(foods.egg || 0, eggF.max - used));
   }
   let st = withFoods(weekBase(st0), foods);
-  st = withFoods(st, autoQuantities(st, {}));      // ご飯・油・候補を自動で決める
+  st = withFoods(st, autoQuantities(st, {}, true));   // ご飯・油・候補を自動で決める（型なので「今日は使わない」は見ない）
   const ex     = calcFactor(st);
   const food   = calcFood(st);
   const sv     = savasOf(st, ex);
@@ -4187,7 +4238,7 @@ const applyDailyDefaults = () => DAILY_IDS().forEach(id => { if($(id)) $(id).val
 const todayKey  = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
 
 function save(){
-  const d = {v:{}, c:{}, date:todayKey(), dv:DEFAULTS_VER, exd:exDate, rest:$('restSavas').checked, two:$('twoDoses').checked, sd:$('schedDetail').checked, ao:autoOverride, calc:calculated, cf:customData(), ov:foodOverride};
+  const d = {v:{}, c:{}, date:todayKey(), dv:DEFAULTS_VER, exd:exDate, rest:$('restSavas').checked, two:$('twoDoses').checked, sd:$('schedDetail').checked, ao:autoOverride, calc:calculated, cf:customData(), ov:foodOverride, off:foodOff};
   ALL_IDS().forEach(id => d.v[id] = $(id).value);
   EXERCISES.forEach(e => d.c[e.id] = $('c_' + e.id).checked);
   try{ localStorage.setItem(KEY, JSON.stringify(d)); }catch(err){}
@@ -4283,6 +4334,9 @@ function load(){
                  : typeof d.ao === 'object' ? {...d.ao}
                  : {natto:true};
     refreshAutoNotes();
+    // 「今日は使わない」もその日限り。日付が変われば全部オンに戻す
+    foodOff = (!sameDay || !d.off) ? {} : {...d.off};
+    applyFoodUse();
     wasCalculated = !!d.calc;
   }catch(err){}
 }
@@ -4345,10 +4399,13 @@ function applySettingsFromHash(hash){
     restoreCustomFoods(d.cf, sameDay ? d.v : null);
     if(!sameDay){
       applyDailyDefaults();        // 食事は受け取った端末の「その日の型」に戻す
+      foodOff = {}; applyFoodUse();
       return 'settings';
     }
     LINK_DAILY_IDS().forEach(put);
     EXERCISES.forEach(e => { if(d.c && d.c[e.id] !== undefined && $('c_' + e.id)) $('c_' + e.id).checked = !!d.c[e.id]; });
+    foodOff = d.off ? {...d.off} : {};      // 「今日は使わない」も当日のリンクなら運ぶ
+    applyFoodUse();
     return 'all';
   }catch(err){ return false; }
 }
@@ -4379,12 +4436,15 @@ function clearFoods(){
   // 自由入力から足した品目は消さない（数量だけ0に戻る）。消すときは行の「削除」
   $('otherAddNote').innerHTML = '';
   setAutoOverride(null, false);  // 自動計算も元に戻す
+  foodOff = {}; applyFoodUse();  // 「今日は使わない」も全部オンに戻す
   applyDailyDefaults();          // その日の型に戻す
   onInputChanged();
 }
 
 // 入力が変わったら即座に保存し、計算済みならその場で再計算する
 function onInputChanged(){
+  readFoodUse();                 // ③の「使う／使わない」を先に読む
+  refreshUseNotes();
   updateLive();
   save();
   if(calculated) render();          // scroll しない＝編集中に画面が飛ばない
