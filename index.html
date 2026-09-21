@@ -764,7 +764,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.152';
+const APP_VERSION = '2026-09-01.153';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -2065,6 +2065,10 @@ const ENERGY_OVER_OK    = 150;  // この量までの超過は書き添えない
 const ENERGY_OK    = 200;   // 必要量とのズレがこの範囲なら「ちょうどよい」kcal
 const ENERGY_CARE  = 300;   // ここを超える不足は注意
 const ENERGY_BAD   = 500;   // ここを超える不足は筋肥大に不利（強い警告）
+/* 食塩の段階。7.5g（目標）を超えたあとを SALT_CARE(8.0) と SALT_BAD(9.0) で2つに割る。
+   以前は SALT_CARE が定義されているだけでどこからも使われておらず、
+   7.5〜9.0 が一律「やや多い」だった（7.6 も 8.9 も同じ表示）。v.153で4段階にした。
+   **合否の線は 7.5g のまま**なので、週の表の判定は変わらない（表示だけの変更）。 */
 const SALT_CARE    = 8.0;   // 食塩：目標7.5gを超えたあと、ここまでは「やや多い」
 const SALT_BAD     = 9.0;   // ここを超えたら「多すぎる」
 /* 飽和脂肪酸の2本の線。**公的基準そのものではなく、このツールの独自目標**である点に注意。
@@ -2282,14 +2286,16 @@ function render(opts){
               `${SAT_LIMIT}g は上限なので、埋めにいく必要はありません。${top3(sat)}`,
         satOver > 0 ? '多い' : sat.total > SAT_GOOD ? '上限内' : '良好') +
     row('食塩相当量', salt.total, 'g', `${SALT_LIMIT}g 未満`,
-        salt.total > SALT_BAD ? 'over' : saltOver > 0 ? 'warn' : 'ok',
+        salt.total > SALT_CARE ? 'over' : saltOver > 0 ? 'warn' : 'ok',
         saltOver > 0
           ? `目標（${SALT_LIMIT}g未満）を ${saltOver}g 超えています。` +
-            (salt.total > SALT_BAD
+            (salt.total > SALT_CARE
               ? `<b>たんぱく質を満たすためにここまで塩を増やすのは避けたいところです。</b>`
               : '') + top3(salt)
           : `${SALT_LIMIT}g 未満です（余裕 ${r1(-saltOver)}g）。${top3(salt)}`,
-        salt.total > SALT_BAD ? '多すぎる' : saltOver > 0 ? 'やや多い' : 'ちょうどよい') +
+        salt.total > SALT_BAD  ? '多すぎる'
+        : salt.total > SALT_CARE ? '多い'
+        : saltOver > 0 ? 'やや多い' : 'ちょうどよい') +
     row('食物繊維', fiber.total, 'g', `${FIBER_TARGET}g 以上`,
         fiber.total < FIBER_TARGET ? 'under' : 'ok',
         (fiber.total < FIBER_TARGET
