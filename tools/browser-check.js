@@ -35,7 +35,7 @@
         候補と油は 食塩7.5g・飽和脂肪酸15g ／ ご飯は上限の17g ／ 上限17gは絶対に越えない
      6  総負荷量＝チェックの入っている種目だけの合計
      7  ④の「②の運動は今日の分が未入力です」が、未入力のときだけ出ること
-     8  ⑤のプロテイン1回目の行に時刻が出ていないこと
+     8  ⑤のプロテイン1回目の行に時刻が出ていないこと（粉を摂らない日は行そのものが出ない）
      9  ⑤の時刻が昇順であること（「翌00:30」は翌日として +24時間で見る）
      10 再計算の冪等性（続けて render() しても結果が変わらない）
      11 ①の「必要エネルギーの補正」が必要エネルギーにそのまま乗ること
@@ -254,9 +254,14 @@ function checkOne(c, fail){
   const rows = [...$$('schedule').querySelectorAll('tr')];
   if(rows.length){
     const head0 = rows[0].querySelector('td.time').textContent;
-    if(head0.indexOf(PROTEIN.name) < 0 && head0.indexOf('起床後') < 0)
+    /* 運動もしておらず「休養日も摂る」もオフの日は、粉を1杯も摂らないので
+       プロテインの行そのものが出ない（v.151）。そういう日は1行目が朝食になる。 */
+    const ex0      = calcFactor(readState());
+    const noPowder = !(ex0.done > 0 || ex0.cardio > 0) && !$$('restSavas').checked;
+    const isPowder = head0.indexOf(PROTEIN.name) >= 0 || head0.indexOf('起床後') >= 0;
+    if(!isPowder && !noPowder)
       fail(`⑤の1行目がプロテインの行ではありません：${head0.trim().slice(0, 20)}`);
-    if(TIME_RE.test(head0))
+    if(isPowder && TIME_RE.test(head0))
       fail(`⑤のプロテイン1回目に時刻が出ています：${head0.trim().slice(0, 20)}`);
     let prev = -Infinity, prevTxt = '';
     rows.forEach(tr => {
