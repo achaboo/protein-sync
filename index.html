@@ -750,7 +750,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.148';
+const APP_VERSION = '2026-09-01.149';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -864,6 +864,16 @@ const FOODS = [
   {id:'banana',  name:'バナナ',              short:'バナナ',       note:'1本 約1g',
    price:34, ruleNote:'運動直後（運動した日は1本以上）', p:1, unit:'本', sat:0.1, salt:0, carbG:20.3, fiber:1.0, kcal:77, fat:0.2,
    slots:['b','l','d'], post:true, autoDaily:2, autoBal:true, autoMax:3},
+  /* アーモンド。1粒＝1.0g として、100gあたりの値を1/100にしてある。
+     100gあたり：629kcal／たんぱく質20.9g／脂質54.1g／炭水化物19.7g／食塩0g（利用者の提示値）。
+     **飽和脂肪酸4.0gと食物繊維10.1gは日本食品標準成分表の「アーモンド（乾）」からの推定値**
+     （提示値に無かったため）。飽和は15gの制約に、食物繊維は21g以上の判定に効くので、
+     0のままにすると制約をすり抜ける。鉄3.4mg・ビタミンE19.3mgはこのツールが追っていない。
+     1日10粒まで（autoMax）。1粒きざみなので、エネルギーの細かい調整にも使える。 */
+  {id:'almond',  name:'アーモンド',            short:'アーモンド',   weekShort:'アーモンド', note:'1粒 約0.21g',
+   ruleNote:'1日10粒まで<br>飽和脂肪酸と食物繊維は推定値<br>鉄・ビタミンEは計算に入れていません',
+   price:3.8, p:0.209, unit:'粒', sat:0.04, salt:0, carbG:0.197, fiber:0.101, kcal:6.29, fat:0.541,
+   slots:['s'], lock:true, home:true, autoBal:true, autoMax:10},
 
   // --- 自宅の食材（外食には持ち込めないので「間食」の枠にまとめる） ---
   {id:'tomato',  name:'トマトジュース',        short:'トマトジュース', weekShort:'トマトJ', note:'200ml 約1.8g（食塩無添加）',
@@ -1737,6 +1747,12 @@ const BAND_W    = 1e4;   // 帯から外れたときの重み（帯に入るこ�
    食塩・飽和の線（BAD_BASE）よりは軽くして、順番を
    「食塩・飽和 ＞ たんぱく質の下限 ＞ ほかの帯」にしてある。 */
 const PLOW_W    = 1e7;
+/* 合格線を「わずかに」割った答えが、帯のズレと相殺されて選ばれてしまうのを防ぐ下駄。
+   0.1g 足りないだけでも週の表は✕になるので、**割ったかどうか**で段差を付ける
+   （割ったときの点数は、どの帯のズレよりも必ず大きくなる）。
+   これが無いと、木曜の休養日で「118.3g・エネルギー+318kcal」が
+   「118.4g・+386kcal」に勝ってしまった（v.149）。 */
+const PLOW_FIX  = 1e6;
 const BAND_FIB  = 0.3;   // 食物繊維は合否に入れていないので軽い
 /* エネルギーだけは帯（±200kcal）の中でも「必要量に近いほどよい」。
    ACTIVITY に増量の余剰（+203kcal／日）を入れてあるので、帯の中でも
@@ -1747,7 +1763,8 @@ const SLACK_W   = 10;    // 食塩・飽和の余裕を残すことの重み（�
 const COST_W    = 1 / 5000;   // 最後の同点崩し。余裕より軽く効かせる
 const BAD_BASE  = 1e8;   // 食塩・飽和の線を越えた点の下駄（帯の外れよりさらに重い）
 const CLIMB_MAX = 200;   // 山登りの打ち切り（通常は10回ほどで止まる）
-const CLIMB_SEEDS = 12;  // 決まった6点に加えて散らす初期点の数（少ないと浅い谷で止まる）
+const CLIMB_SEEDS = 8;   // 決まった6点に加えて散らす初期点の数
+const CLIMB_KICKS = 40;  // 見つかった最良点を揺さぶって登り直す回数（乱数の初期点より効率がよい）
 
 /* 自動で数量を決める品目と、その日の上限。
    ご飯は「1食 slotLimit 杯 × 自宅で食べる食事の数」、店の無料ご飯はその店に行く日だけ、
@@ -1822,8 +1839,8 @@ function makeScore(st0, ex, ids, satCap){
             + BAND_FIB * Math.pow(outOf(fib,  FIBER_TARGET, Infinity, FIBER_TARGET), 2);
     const near  = Math.pow(Math.max(0, Math.abs(kcal - need) - ENERGY_FREE) / ENERGY_OK, 2);
     const under = Math.pow(Math.max(0, pLo - P) / DEVIATION_OK, 2);
-    return {ok:true,
-            score: PLOW_W * under + BAND_W * d + ENERGY_W * near
+    return {ok:true, pShort: under > 0,
+            score: (under > 0 ? PLOW_FIX : 0) + PLOW_W * under + BAND_W * d + ENERGY_W * near
                  + SLACK_W * (salt / SALT_LIMIT + sat / SAT_GOOD) + COST_W * food.cost};
   };
   return q => {
@@ -1879,9 +1896,9 @@ function balanceQuantities(st0, ex, keep, seed){
   const ids = all.filter(id => range[id].hi > range[id].lo);
   if(!ids.length) return out;
 
-  const run = (range, satCap) => {
+  const run = (range, satCap, seeds, kicks) => {
     const score = makeScore(st0, ex, ids, satCap);
-    const mid = {}, hi = {}, fill = {}, carbs = {};
+    const mid = {}, hi = {}, fill = {}, carbs = {}, prot = {};
     ids.forEach(id => {
       const f = foodById(id);
       mid[id]   = Math.round((range[id].lo + range[id].hi) / 2);
@@ -1890,22 +1907,39 @@ function balanceQuantities(st0, ex, keep, seed){
       // 「サラダチキンで食塩を使い切って身動きが取れない」ような谷から抜けるため
       fill[id]  = (f && f.autoFill && f.salt <= 1) ? range[id].hi : range[id].lo;
       carbs[id] = (f && (f.autoRice || f.autoEnergy)) ? range[id].hi : range[id].lo;
+      // たんぱく質を持つ品目だけを上限まで。合格線ぎりぎりの日はここが効く
+      prot[id]  = (f && f.p > 0) ? range[id].hi : range[id].lo;
     });
     /* 山登りは初期点しだいで浅い谷に落ちる（食塩を使い切った組み合わせから
        抜けられない、など）。決まった6点に加えて、散らした点からも始める。
        乱数は日替わりにせず固定の種から作るので、同じ条件なら毎回同じ答えになる。 */
     const rnd = (() => { let x = 123456789; return () => (x = (x * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff; })();
     const spread = [];
-    for(let i = 0; i < CLIMB_SEEDS; i++){
+    for(let i = 0; i < seeds; i++){
       const s0 = {};
       ids.forEach(id => s0[id] = range[id].lo + Math.floor(rnd() * (range[id].hi - range[id].lo + 1)));
       spread.push(s0);
     }
     let best = null;
-    [{}, seed || {}, mid, hi, fill, carbs].concat(spread).forEach(start => {
+    [{}, seed || {}, mid, hi, fill, carbs, prot].concat(spread).forEach(start => {
       const got = climbFrom(score, range, ids, start);
       if(got.res.ok && (!best || got.res.score < best.res.score)) best = got;
     });
+    /* 見つかった最良点を少し揺さぶって登り直す（反復局所探索）。
+       まっさらな乱数の初期点をいくつも試すより、良い点の近くを探すほうが
+       同じ手数でよく当たる。品目が増えて初期点を増やしたら①の再計算が1秒を超えたため、
+       初期点を減らしてこちらに振り替えた（v.149）。 */
+    for(let k = 0; best && k < kicks; k++){
+      const s0 = Object.assign({}, best.q);
+      const n = 2 + Math.floor(rnd() * 2);              // 2〜3品目を動かす
+      for(let j = 0; j < n; j++){
+        const id = ids[Math.floor(rnd() * ids.length)];
+        const d  = (Math.floor(rnd() * 5) - 2);         // −2〜+2
+        s0[id] = Math.max(range[id].lo, Math.min(range[id].hi, s0[id] + d));
+      }
+      const got = climbFrom(score, range, ids, s0);
+      if(got.res.ok && got.res.score < best.res.score) best = got;
+    }
     return best;
   };
   /* 置ける組み合わせが1つも無い日は、下限（運動した日のバナナ1本）も外して探し直す。
@@ -1913,7 +1947,14 @@ function balanceQuantities(st0, ex, keep, seed){
      「バナナ1本ぶんで上限を越える」組み合わせを返してしまう。 */
   const bare = {};
   ids.forEach(id => bare[id] = {lo:0, hi:range[id].hi});
-  const best = run(range, SAT_GOOD) || run(range, SAT_LIMIT) || run(bare, SAT_LIMIT);
+  /* たんぱく質の合格線を割った答えしか出せなかったときだけ、探索を重くしてやり直す。
+     ここを割ると週の表が✕になるので、そのときだけ時間をかける価値がある。
+     ふだんは軽いほうで足りるので、①の設定を変えたときの再計算も遅くならない（v.149）。 */
+  let best = run(range, SAT_GOOD, CLIMB_SEEDS, CLIMB_KICKS);
+  if(best && best.res.pShort)
+    best = run(range, SAT_GOOD, CLIMB_SEEDS * 6, CLIMB_KICKS * 3) || best;
+  if(!best) best = run(range, SAT_LIMIT, CLIMB_SEEDS * 2, CLIMB_KICKS)
+                || run(bare,  SAT_LIMIT, CLIMB_SEEDS * 2, CLIMB_KICKS);
   ids.forEach(id => out[id] = best ? best.q[id] : 0);
   return out;
 }
