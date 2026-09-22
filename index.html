@@ -764,7 +764,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.156';
+const APP_VERSION = '2026-09-01.157';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -2358,7 +2358,10 @@ function render(opts){
           ? `このままなら週 約${r1(Math.abs(kcalGap) * 7 / 7200)}kg ${kcalGap < 0 ? '減' : '増'}`
           : '') +
         `<br>${topN(kcal, 'kcal')}` +
-        `<br>（基礎代謝 ${calcBMR(st).toLocaleString()} × ${ACTIVITY} ＋ 運動 ${calcEnergy(st, ex).kcal} ＝ 推定 ${calcNeedBase(st, ex).toLocaleString()}kcal${st.kcalAdj ? ' ／ 手動で ' + (st.kcalAdj > 0 ? '+' : '') + st.kcalAdj.toLocaleString() + 'kcal 補正' : ''}）${exEntered() ? '' : '<br><b class="warn-inline">⚠ ②の運動は今日の分が未入力です。</b>前回の内容で仮に計算しています。'}`, kcalTag) +
+        /* 「推定」が合計にしか付いておらず、**運動の数字そのものには付いていなかった**（v.157で直した）。
+           すぐ横の②には「総負荷量 6,682.5kg」という正確な実測値が出るので、
+           その値から出した214kcalも確かな消費量に読めてしまう、という外部レビューの指摘。 */
+        `<br>（基礎代謝 ${calcBMR(st).toLocaleString()} × ${ACTIVITY} ＋ 運動 ${calcEnergy(st, ex).kcal > 0 ? `<b>約${calcEnergy(st, ex).kcal}kcal（推定）</b>` : `0kcal`} ＝ 推定 ${calcNeedBase(st, ex).toLocaleString()}kcal${st.kcalAdj ? ' ／ 手動で ' + (st.kcalAdj > 0 ? '+' : '') + st.kcalAdj.toLocaleString() + 'kcal 補正' : ''}）${exEntered() ? '' : '<br><b class="warn-inline">⚠ ②の運動は今日の分が未入力です。</b>前回の内容で仮に計算しています。'}`, kcalTag) +
     `</tbody></table>` +
     (kcalGap <= -ENERGY_CARE ? energyAdvice(st, -kcalGap, sat.total, salt.total) : '') +
     (satOver > 0 && satAlts.length
@@ -2374,6 +2377,19 @@ function render(opts){
           ? `納豆のたれを使わないと1パックあたり0.7g（今日は ${r1(Math.round(st.foods.natto) * 0.7)}g）減ります。`
           : '') +
         `外食が2食入る日は、店のメニューだけで5g前後になります。</div>`
+      : '') +
+    /* 何が推定値なのかを1か所にまとめる。運動の消費は v.157 で足した。
+       筋トレは「総負荷量 × 0.032」という**このツール独自のモデル**で、
+       実際の消費は種目・セット間の休憩・密度で変わる（研究でも3〜8METsの幅がある）。
+       値そのものは残し、**性格の表示だけ**を直してある。 */
+    (calcEnergy(st, ex).kcal > 0
+      ? `<div class="advice"><b>運動の消費エネルギー（約${calcEnergy(st, ex).kcal}kcal）は推定値です。</b>` +
+        (ex.done > 0
+          ? `筋トレのぶんは<b>総負荷量に比例させたこのツール独自のモデル</b>で出しています` +
+            `（総負荷量1kgあたり ${KCAL_PER_VOLUME}kcal）。実際の消費は種目・セット間の休憩・` +
+            `トレーニングの密度で変わり、研究でも 3〜8 METs と幅があります。`
+          : `有酸素のぶんは「体重1kg・1kmあたり」の近似です。`) +
+        `実測とずれるようなら、①の「必要エネルギーの補正」で合わせてください。</div>`
       : '') +
     `<small>飽和脂肪酸と外食の食物繊維は推定値、ほかは公表値です` +
     (SAT_IS_ESTIMATE
@@ -4300,13 +4316,26 @@ function renderWeekNutri(week, st, sc){
       : '') + `。</small>`;
   const costWk   = week.reduce((a, d) => a + d.cost, 0);
   const spoonsWk = week.reduce((a, d) => a + d.sv.spoons, 0);
+  /* **栄養の合否と食費の合否を分けて出す**（v.157）。
+     それまでは「◎ 食事の条件は7日すべて満たしています。週の食費 8,510円（…目安1,000円）」と
+     1行に並べていた。◎ のすぐ横に目標を超えた金額が出るので、**全体として合格に見える**
+     という外部レビューの指摘。判定そのものは変えていない（`weekNgFood` は
+     たんぱく質・食塩・飽和脂肪酸の3つだけを見る）。
+     食費の合否は **`WEEK_COST_AIM` が食事だけの金額に対する目安**なので、粉代を含めない。 */
+  const costDay = Math.round(costWk / 7);
+  const costNg  = costDay > WEEK_COST_AIM;
   $('weekNutriSum').innerHTML =
     (bad.length
-      ? `<b class="warn-inline">✕ ${bad.map(d => WEEK_LABEL[d.idx] + '（' + weekNgFood(d).join('・') + '）').join('・')}` +
-        ` が条件を外れています。</b>`
-      : `<b>◎ 食事の条件は7日すべて満たしています。</b>`) +
-    `　週の食費 <b>${costWk.toLocaleString()}円</b>` +
-    `（1日平均 ${Math.round(costWk / 7).toLocaleString()}円／目安 ${WEEK_COST_AIM.toLocaleString()}円）。` +
+      ? `<b>栄養条件：</b><b class="warn-inline">✕ ${bad.map(d => WEEK_LABEL[d.idx] + '（' + weekNgFood(d).join('・') + '）').join('・')} が条件を外れています。</b>`
+      : `<b>栄養条件：◎ 7日すべて満たしています</b>（たんぱく質・食塩・飽和脂肪酸）。`) +
+    (costNg
+      ? `<br><b>食費条件：</b><b class="warn-inline">✕ 1日平均 ${costDay.toLocaleString()}円</b>（目安 ${WEEK_COST_AIM.toLocaleString()}円／<b>+${(costDay - WEEK_COST_AIM).toLocaleString()}円</b>）。`
+      : `<br><b>食費条件：◎ 1日平均 ${costDay.toLocaleString()}円</b>（目安 ${WEEK_COST_AIM.toLocaleString()}円以内）。`) +
+    `　週の合計 ${costWk.toLocaleString()}円。` +
+    (costNg
+      ? `<br><small>食費は<b>合否を分けて出しているだけで、献立の組み立てには制約として効かせていません</b>。` +
+        `自動計算のなかでは「同じ点数なら安いほう」という最後の判断材料です。</small>`
+      : '') +
     `<br><small>${PROTEIN.name}の粉代は上の食費に含めていません` +
     `（${PROTEIN.pricePerKg.toLocaleString()}円/kg ＝ 1杯 約${Math.round(YEN_PER_SPOON)}円）。` +
     `この前提では平均 ${r1(spoonsWk / 7)}杯/日 ＝ 約${Math.round(spoonsWk * YEN_PER_SPOON / 7).toLocaleString()}円なので、` +
