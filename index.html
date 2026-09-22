@@ -764,7 +764,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.155';
+const APP_VERSION = '2026-09-01.156';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -936,6 +936,42 @@ const FOODS = [
   {id:'tuna',    name:'ツナ缶',                short:'ツナ缶',       note:'1缶 約12.7g',
    price:133, p:12.7, unit:'缶', sat:3.8, salt:0.6, carbG:0.1, fiber:0, kcal:184, fat:14.8,
    slots:['s'], lock:true, home:true, autoFill:true, fillMax:2},
+
+  /* ここから3品目は v.156 で追加。外部レビューの「高エネルギー・低飽和・低食塩・
+     低調理の候補を増やす」という指摘に対して、利用者が商品を決めて公表値を出したもの。
+     **たんぱく質10gあたりの飽和脂肪酸**は 牛乳1.6g・パン1.7g・シリアル1.3g で、
+     ツナ缶（3.0g）より軽く、ヨーグルト（0.4g）・納豆（1.0g）より重い。
+     **カルシウムと鉄は追っていない**（外食メニューの公表値が無いので、このツールは
+     そもそも微量栄養素を合計していない）。 */
+
+  /* 西友 みなさまのお墨付き 低脂肪牛乳 1000ml 236円。200ml（1杯）あたりの公表値。
+     **飽和脂肪酸1.1gは推定値**（公表値に無い）。日本食品標準成分表「加工乳・低脂肪」の
+     脂質1.0g に対する飽和0.67g から、脂質1.7g × 0.67 で出した。
+     0のまま入れると、乳脂肪の品目が飽和15gの制約をすり抜ける。
+     公表のカルシウム240mgはこのツールに項目が無いので追っていない。 */
+  {id:'milk',    name:'低脂肪牛乳',            short:'低脂肪牛乳',   weekShort:'低脂肪乳', note:'1杯200ml 約6.8g',
+   ruleNote:'1日3杯（600ml）まで<br>飽和脂肪酸は推定値<br>カルシウムは計算に入れていません',
+   price:48, p:6.8, unit:'杯', sat:1.1, salt:0.22, carbG:10.2, fiber:0, kcal:83, fat:1.7,
+   slots:['s'], lock:true, home:true, autoFill:true, fillMax:3},
+
+  /* 敷島製パン 麦のめぐみ 全粒粉入り食パン 6枚 279円。1枚あたりの公表値。
+     **飽和脂肪酸1.0gも公表値**なので推定を使っていない。
+     炭水化物28.1g＝糖質24.0g＋食物繊維4.1g。食塩0.7gは候補のなかでは納豆と同じ重さ。 */
+  {id:'bread',   name:'全粒パン',              short:'全粒パン',     weekShort:'全粒パン', note:'1枚 約5.8g',
+   ruleNote:'全粒粉入り食パン（6枚切り）<br>1日3枚まで',
+   price:47, p:5.8, unit:'枚', sat:1.0, salt:0.7, carbG:28.1, fiber:4.1, kcal:154, fat:3.0,
+   slots:['s'], lock:true, home:true, autoFill:true, fillMax:3},
+
+  /* 西友 みなさまのお墨付き オートミール 340g 398円。1食30gあたりの公表値。
+     **飽和脂肪酸0.5gは推定値**（公表値に無い）。日本食品標準成分表「オートミール」の
+     脂質5.7g に対する飽和1.25g から、脂質2.2g × 0.219 で出した。
+     **食塩0g・飽和0.5gで食物繊維3.0g**と、この型のなかでは軽い候補。
+     公表の水溶性1.3g・β-グルカン0.9gはこのツールに項目が無いので追っていない
+     （食物繊維は総量3.0gだけを数える）。 */
+  {id:'cereal',  name:'シリアル',              short:'シリアル',     weekShort:'シリアル', note:'1食30g 約3.9g',
+   ruleNote:'オートミール（1食30g）<br>1日2食まで<br>飽和脂肪酸は推定値',
+   price:36, p:3.9, unit:'食', sat:0.5, salt:0, carbG:20.3, fiber:3.0, kcal:110, fat:2.2,
+   slots:['s'], lock:true, home:true, autoFill:true, fillMax:2},
   {id:'rice',    name:'ご飯（0.5合）',        short:'ご飯',         note:'0.5合 約4.5g',
    weekName:'ご飯', ruleNote:'エネルギーの不足から自動計算<br>（0〜6杯＝0〜3合）',
    price:33, p:4.5, unit:'杯', sat:0.1, salt:0, carbG:58.0, fiber:2.5, kcal:257, fat:0.7,
@@ -1015,12 +1051,12 @@ const FIBER_TARGET = 22;
 /* ⑤の1食の中で品目を並べる順。関連するものを隣どうしに置くための順番で、
    栄養計算には影響しない。
    サラダ→ドレッシング→油（サラダ一式）、トマトジュース→乳製品、主菜、主食の順。 */
-const SCHED_ORDER = ['salad','dressing','olive','tomato','yogurt','egg','natto',
+const SCHED_ORDER = ['salad','dressing','olive','tomato','yogurt','milk','egg','natto',
                      'chicken','tuna','saba','saba_aji','saba_miso','katsuju'];
 const SCHED_RANK = (() => {
   const r = {};
   SCHED_ORDER.forEach((id, i) => r[id] = i);
-  r.rice = 30; r.banana = 40;            // 主食と果物は最後
+  r.rice = 30; r.bread = 31; r.cereal = 32; r.banana = 40;   // 主食と果物は最後
   return key => (r[key] !== undefined ? r[key] : 20);   // 指定のないもの（店のメニュー）は主菜のあと
 })();
 
@@ -2815,8 +2851,15 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   // その枠に自宅の食材を置けるか（置けない枠＝外食のメニューだけで決まる枠）
   const homeOk = {b:homeBreakfastDay(st), l:true, d:homeDinnerDay(st)};
   // 固定メニューだけで決まる枠の、実際のたんぱく質量
-  const fixedG = k => FOODS.reduce((a, f) =>
-    a + ((st.foods[f.id] > 0 && f.lock && f.slot === k) ? st.foods[f.id] * f.p : 0), 0);
+  /* `f.slot` だけを見ていると、**店の無料ご飯が数えられない**（`shopSlot` で
+     その日の定食の枠に付くため、`slot` を持っていない）。木曜に無料ご飯が入ると
+     朝食の目安が24gのまま実際は29.6gになった（v.156で踏んだ）。
+     枠が1つに決まっている品目は `slotsOf` で引く。 */
+  const fixedG = k => FOODS.reduce((a, f) => {
+    if(!(st.foods[f.id] > 0) || !f.lock) return a;
+    const sl = slotsOf(f, st);
+    return a + (sl.length === 1 && sl[0] === k ? st.foods[f.id] * f.p : 0);
+  }, 0);
   const fixedKeys = mealKeys.filter(k => !homeOk[k]);
   const freeKeys  = mealKeys.filter(k =>  homeOk[k]);
   let rest = byMeal, fixedT = {};
