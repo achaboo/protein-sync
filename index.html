@@ -786,7 +786,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.162';
+const APP_VERSION = '2026-09-01.163';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -2258,6 +2258,128 @@ function energyAdvice(st, gap, satTotal, saltTotal){
 }
 
 
+/* ============================================================
+   減らす候補（v.163）
+   ------------------------------------------------------------
+   ④の「食べる量」の下に置く。**どれを1単位減らすといちばん軽くなるか**を出す。
+   「エネルギーが足りないときの追加候補」の逆向きで、考え方は同じ。
+
+   なぜ人には決められないか：自動計算の品目を1つ減らすと、
+   **残りが組み直されて別の品目が増える**。実測（平日・筋トレ8種目・2,828g）では
+
+     ご飯     4→3杯 … 重さは **6g しか減らない**。食塩 +0.7g・飽和 +0.6g・食費 +46円
+     アーモンド 7→6粒 … 総量は **64g 増える**
+     ヨーグルト 1→0杯 … −151g・−39円で、食塩と飽和はほぼ動かない
+
+   **いちばん減らしたくなるご飯が、いちばん割に合わない。**
+   実際に組み直して測らないと分からないので、ツールが出す。
+
+   重い（1品目あたり約140ms・7品目で約1秒）ので**ボタンを押したときだけ**走らせる。
+   ④を描き直すと消える（前提の変わった提案を残さないため）。
+   ここで見るのは**重さだけ**で、食塩・飽和・たんぱく質・エネルギーは
+   「その手で線を割らないか」の足切りにしか使わない。 */
+
+const CUT_MIN_G = 50;   // これ未満しか軽くならない手は「効果がない」に回す
+/* **線の内側であっても、余裕を使い切る手は勧めない。**
+   実測で「ミックスサラダ1皿を抜く」が −301g といちばん軽くなるが、
+   減ったぶんを飽和の重い品目が埋めて **飽和脂肪酸が 13.1g → 15.0g（余裕0）** になった。
+   15g ちょうどは `SAT_GOOD` を超えていないので、越えたかどうかだけで見ると素通りする。
+   健診でLDLを指摘されている以上、**余裕を差し出して軽くするのは勧める側に置かない**。 */
+const CUT_SALT_KEEP = 0.3;   // 食塩：この余裕を割る手は「避けたほうがよい」に回す
+const CUT_SAT_KEEP  = 0.5;   // 飽和脂肪酸：同じ
+
+/* 「この品目をこの数にしたら」を実際に組み直して測る。
+   pin を手入力と同じ扱い（keep）にして、残りは balanceQuantities に決め直させる。
+   手入力に切り替え済みの品目は動かさない（画面と食い違わせないため）。 */
+function simulateFoods(st0, pin){
+  const keep = {};
+  FOODS.filter(isAuto).forEach(f => { if(autoOff(f.id)) keep[f.id] = true; });
+  if(pin) Object.keys(pin).forEach(k => keep[k] = true);
+  const stIn = pin ? withFoods(st0, pin) : st0;
+  const st   = withFoods(stIn, autoQuantities(stIn, keep));
+  const ex   = calcFactor(st);
+  const food = calcFood(st);
+  const target = r1(st.weight * ex.factor);
+  const sv = savasFor(st, ex, r1(Math.max(0, target - food.total)), target,
+                      lackBeforeAuto(st, food, target));
+  return {target, need:calcNeed(st, ex), cost:food.cost, spoons:sv.spoons,
+          gram:calcGram(st, sv).total, kcal:calcKcal(st, sv).total,
+          salt:calcSalt(st, sv).total, sat:calcSat(st, sv).total,
+          p:r1(food.total + sv.totalG)};
+}
+
+function cutAdvice(st0){
+  const base = simulateFoods(st0, null);
+  const cands = FOODS.filter(isAuto)
+    .filter(f => foodUse(f.id) && $('f_' + f.id) && Math.round(st0.foods[f.id] || 0) >= 1)
+    .map(f => {
+      const now = Math.round(st0.foods[f.id]);
+      const r   = simulateFoods(st0, {[f.id]: now - 1});
+      /* 足切り。**線の内側から外へ出す手も、外にあるのをさらに悪くする手も勧めない。**
+         見るのは「その手のあとの値が安全圏より上か」と「いまより悪くなるか」の2つ。
+         2つ目が要る：2食の日は素の状態で飽和14.7gあり、線の内側かどうかだけで見ると
+         14.7→15.0g にする手が素通りした（v.163で踏んだ）。
+         逆に、すでに外に出ている日に**同じか下げる**手は通す（改善を潰さないため）。 */
+      const ng = [];
+      const saltKeep = SALT_LIMIT - CUT_SALT_KEEP, satKeep = SAT_GOOD - CUT_SAT_KEEP;
+      // 余裕が0のときに「余裕が 0g しか残りません」と書かないよう、言い方を分ける
+      const slack = (left, v) => left <= 0 ? `${v}g まで上がり、余裕が無くなります`
+                                           : `${v}g まで上がり、余裕が ${left}g しか残りません`;
+      if(r.salt > saltKeep && r.salt > base.salt)
+        ng.push(r.salt >= SALT_LIMIT
+          ? `食塩が ${r.salt}g と目標（${SALT_LIMIT}g未満）を超えます`
+          : `食塩が ` + slack(r1(SALT_LIMIT - r.salt), r.salt));
+      if(r.sat > satKeep && r.sat > base.sat)
+        ng.push(r.sat > SAT_GOOD
+          ? `飽和脂肪酸が ${r.sat}g と ${SAT_GOOD}g を超えます`
+          : `飽和脂肪酸が ` + slack(r1(SAT_GOOD - r.sat), r.sat));
+      if(r.p < r1(r.target * WEEK_P_OK) && base.p >= r1(base.target * WEEK_P_OK))
+        ng.push(`たんぱく質が ${r.p}g（合格線 ${r1(r.target * WEEK_P_OK)}g）まで下がります`);
+      if((r.need - r.kcal) > ENERGY_CARE && (base.need - base.kcal) <= ENERGY_CARE)
+        ng.push(`エネルギーが ${Math.round(r.need - r.kcal)}kcal 足りなくなります`);
+      return {f, now, r, cut: base.gram - r.gram, ng};
+    });
+  const good  = cands.filter(c => !c.ng.length && c.cut >= CUT_MIN_G)
+                     .sort((a, b) => (b.cut - a.cut) || (a.r.cost - b.r.cost)).slice(0, 3);
+  const flat  = cands.filter(c => !c.ng.length && c.cut >= 0 && c.cut < CUT_MIN_G);
+  const worse = cands.filter(c => !c.ng.length && c.cut < 0);
+  const bad   = cands.filter(c => c.ng.length);
+
+  const money = d => d === 0 ? '' : `／${d < 0 ? '−' : '+'}${Math.abs(d).toLocaleString()}円`;
+  const rows = good.map(c => {
+    const d = c.r.cost - base.cost;
+    return `<li><b>${c.f.short} ${c.now}${c.f.unit} → ${c.now - 1}${c.f.unit}</b>` +
+           `（<b>−${c.cut.toLocaleString()}g</b>${money(d)}／` +
+           `${c.r.kcal < base.kcal ? '−' : '+'}${Math.abs(c.r.kcal - base.kcal).toLocaleString()}kcal）` +
+           `<br><small>食塩 ${base.salt}→${c.r.salt}g・飽和 ${base.sat}→${c.r.sat}g・` +
+           `たんぱく質 ${base.p}→${c.r.p}g` +
+           (c.r.spoons !== base.spoons ? `・${PROTEIN.name} ${base.spoons}→${c.r.spoons}杯` : '') +
+           `</small> ` +
+           `<button type="button" class="mini-btn inline-btn" ` +
+           `data-cut-apply="${c.f.id}:${c.now - 1}">この案にする</button></li>`;
+  }).join('');
+
+  const listOf = a => a.map(c => `${c.f.short}（${c.cut >= 0 ? '−' : '+'}${Math.abs(c.cut)}g）`).join('・');
+  return `<div class="advice"><b>食べる量：いま ${base.gram.toLocaleString()}g。</b>` +
+    (good.length
+      ? `1単位ずつ減らして<b>実際に組み直した</b>結果です（減らしたぶんは他の品目が埋め直します）。` +
+        `<ul class="engy">${rows}</ul>`
+      : `<b>いまの品目では、軽くする手が見つかりませんでした。</b>` +
+        `どれを減らしても${CUT_MIN_G}g以上は軽くならないか、食塩・飽和脂肪酸・たんぱく質の線を割ります。` +
+        `③の「今日は使わない」で品目ごと外すか、量を残す前提で組み直してください。`) +
+    (flat.length  ? `<br><small><b>減らしてもほとんど軽くならない：</b>${listOf(flat)}</small>` : '') +
+    (worse.length ? `<br><small><b>減らすとかえって重くなる：</b>${listOf(worse)}` +
+                    `（減ったぶんを別の品目が埋めるためです）</small>` : '') +
+    /* 避ける手の重さは**正負の両方がありうる**（軽くならないうえに線も割る手がある）。
+       `−${cut}` と決め打ちすると「−-156g」と二重マイナスになる（v.163で踏んだ）。 */
+    (bad.length
+      ? `<br><small><b>避けたほうがよい：</b>` +
+        bad.map(c => `${c.f.short}（` +
+          (c.cut > 0 ? `−${c.cut.toLocaleString()}g 軽くなりますが、`
+                     : `軽くならないうえ、`) + `${c.ng[0]}）`).join('・') + `</small>`
+      : '') +
+    `<br><small>重さはすべて見積りです。この計算は押すたびにやり直します。</small></div>`;
+}
 
 /* ============================================================
    結果描画
@@ -2440,6 +2562,16 @@ function render(opts){
            その値から出した214kcalも確かな消費量に読めてしまう、という外部レビューの指摘。 */
         `<br>（基礎代謝 ${calcBMR(st).toLocaleString()} × ${ACTIVITY} ＋ 運動 ${calcEnergy(st, ex).kcal > 0 ? `<b>約${calcEnergy(st, ex).kcal}kcal（推定）</b>` : `0kcal`} ＝ 推定 ${calcNeedBase(st, ex).toLocaleString()}kcal${st.kcalAdj ? ' ／ 手動で ' + (st.kcalAdj > 0 ? '+' : '') + st.kcalAdj.toLocaleString() + 'kcal 補正' : ''}）${exEntered() ? '' : '<br><b class="warn-inline">⚠ ②の運動は今日の分が未入力です。</b>前回の内容で仮に計算しています。'}`, kcalTag) +
     `</tbody></table>` +
+    /* 「多すぎて食べきれない」ときの1手（v.163）。1秒ほどかかるので、
+       毎回の再計算には入れずボタンにしてある。
+       **表のセルの中には置かない** — 375px では4列目が130pxしかなく、
+       候補の行とボタンが崩れる（v.163で実際に踏んだ）。
+       「エネルギーが足りないときの追加候補」と同じ、表の外の `.advice` に出す。 */
+    `<div class="advice"><b>食べる量が多くて食べきれないときは、` +
+    `どれを減らすと実際に軽くなるかを計算できます。</b>` +
+    `<br><small>1品目ずつ減らして献立を組み直すので、5秒ほどかかることがあります。</small>` +
+    `<br><button type="button" class="mini-btn inline-btn" data-cut="go">減らす候補を出す</button>` +
+    `<div id="cutOut"></div></div>` +
     (kcalGap <= -ENERGY_CARE ? energyAdvice(st, -kcalGap, sat.total, salt.total) : '') +
     (satOver > 0 && satAlts.length
       ? `<div class="advice">飽和脂肪酸：${satTop.short}（${satTop.sat}g）を${satAlts.join('／')}に替えると下がります。</div>`
@@ -4896,6 +5028,33 @@ $('foods').addEventListener('click', e => {
     closeEditor();
     applyFoodOverrides();
     onInputChanged();
+  }
+});
+
+/* ④の中のボタン（減らす候補を出す／この案にする）。
+   `oSatBox` は再描画のたびに innerHTML を作り直すので、要素ではなく親で受ける。 */
+$('oSatBox').addEventListener('click', e => {
+  const go = e.target.closest('[data-cut]');
+  if(go){
+    go.disabled = true;
+    go.textContent = '計算しています…';
+    // 同期で1秒ほど止まるので、先に「計算しています」を描かせてから走らせる
+    setTimeout(() => {
+      const out = $('cutOut');
+      if(out) out.innerHTML = cutAdvice(readState());
+      if(go.isConnected){ go.disabled = false; go.textContent = '計算し直す'; }
+    }, 0);
+    return;
+  }
+  const ap = e.target.closest('[data-cut-apply]');
+  if(ap){
+    const [id, v] = ap.getAttribute('data-cut-apply').split(':');
+    const el = $('f_' + id);
+    if(el){
+      setAutoOverride(id, true);   // その品目だけ手入力に切り替える（残りは組み直す）
+      el.value = v;
+      onInputChanged();
+    }
   }
 });
 
