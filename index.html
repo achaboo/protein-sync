@@ -808,7 +808,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.169';
+const APP_VERSION = '2026-09-01.170';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -2297,6 +2297,70 @@ function energyAdvice(st, gap, satTotal, saltTotal){
 
 
 /* ============================================================
+   休養日に粉を0杯にしている日の提案（v.170）
+   ------------------------------------------------------------
+   運動していない日は既定で粉0杯なので、**目標の全量を食事だけで背負う**。
+   実測（体重72.5kg・月曜の型）では、ヨーグルト3杯＋納舆2P＋卵が昼食に積み上がり、
+   **昼食1,086g・1食51.1g（体重×0.70）**となって、ツール自身が出す目安帯
+   （21.8〜43.5g）を超えていた。
+   ①の「運動しなかった日も摂る」をオンにすると
+   飽和13.3→12.1g・食塩7.0→6.3gで、追加費用は1日11円。
+   **設定を知らなければ気づけない**ので、④から知らせる。
+
+   計算は探索を1回余分に回す（約300ms）ので、**ボタンを押したときだけ**。
+   毎回の再計算に入れると、休養日は①を打つたびに2倍かかる。
+   ============================================================ */
+function restDoseAdvice(st, sv){
+  // 手で杯数を指定した日と、すでにオンの日は出さない
+  if(sv.spoons > 0 || sv.manual || st.restSavas) return '';
+  return `<div class="advice"><b>今日は${PROTEIN.name}が0杯です。</b>` +
+    `目標のたんぱく質を<b>食事だけで背負う</b>ことになるので、` +
+    `1食の量とたんぱく質が増えやすくなります。` +
+    `①の「運動しなかった日も${PROTEIN.name}を摂る」をオンにすると何が変わるかを、` +
+    `この日の数字で出せます。` +
+    `<br><button type="button" class="mini-btn inline-btn" data-rest="go">この日で試算する</button>` +
+    `<div id="restOut"></div></div>`;
+}
+
+/* 粉を摂った場合と比べる。**両方とも同じ関数を通す**ので、
+   ④に出ている数字と食い違わない。 */
+function restDoseCompare(st0){
+  const keep = {};
+  FOODS.filter(isAuto).forEach(f => { if(autoOff(f.id) || !$('f_' + f.id)) keep[f.id] = true; });
+  const measure = st => {
+    const ex = calcFactor(st), sv = savasOf(st, ex), food = calcFood(st);
+    return {spoons: sv.spoons, foodP: food.total, cost: food.cost,
+            sat: calcSat(st, sv).total, salt: calcSalt(st, sv).total,
+            kcal: calcKcal(st, sv).total, gram: calcGram(st, sv).total,
+            need: calcNeed(st, ex), yen: Math.round(food.cost + sv.spoons * YEN_PER_SPOON)};
+  };
+  const now = measure(st0);
+  const st1 = {...st0, restSavas: true};
+  const alt = measure(withFoods(st1, autoQuantities(st1, keep)));
+  const g  = (a, b, unit, lowerBetter) => {
+    const d = r1(b - a);
+    const good = lowerBetter ? d < 0 : d > 0;
+    return `<td class="num">${a.toLocaleString()}${unit}</td>` +
+           `<td class="num"><b class="${d === 0 ? '' : good ? 'ok' : 'warn'}">` +
+           `${b.toLocaleString()}${unit}</b></td>`;
+  };
+  return `<table class="nutri"><tbody>` +
+    `<tr><th>&nbsp;</th><td class="num">いま（0杯）</td><td class="num"><b>オンにすると</b></td></tr>` +
+    `<tr><th>${PROTEIN.name}</th>${g(now.spoons, alt.spoons, '杯', false)}</tr>` +
+    `<tr><th>食事が背負うP</th>${g(now.foodP, alt.foodP, 'g', true)}</tr>` +
+    `<tr><th>飽和脂肪酸</th>${g(now.sat, alt.sat, 'g', true)}</tr>` +
+    `<tr><th>食塩</th>${g(now.salt, alt.salt, 'g', true)}</tr>` +
+    `<tr><th>エネルギー</th>${g(now.kcal, alt.kcal, 'kcal', false)}</tr>` +
+    `<tr><th>食べる量</th>${g(now.gram, alt.gram, 'g', true)}</tr>` +
+    `<tr><th>食費＋粉代</th>${g(now.yen, alt.yen, '円', true)}</tr>` +
+    `</tbody></table>` +
+    `<small>必要エネルギーは ${now.need.toLocaleString()}kcal で、どちらも変わりません。` +
+    `<b>1日の総量はほぼ同じ</b>ですが、食事が背負うたんぱく質が減るので、` +
+    `1食に積み上がる量とたんぱく質は小さくなります。` +
+    `切り替えるなら①のチェックをオンにしてください（この表は試算だけで、設定は変えません）。</small>`;
+}
+
+/* ============================================================
    減らす候補（v.163）
    ------------------------------------------------------------
    ④の「食べる量」の下に置く。**どれを1単位減らすといちばん軽くなるか**を出す。
@@ -2500,6 +2564,32 @@ function render(opts){
   const top3     = t => topN(t, 'g');
 
 
+  /* 手で入れた品目が、食塩・飽和の線を大きく使っているときに名指す。
+     **自動計算はこの品目を減らせない**ので、名前を出さないと手の打ちようがない。
+     利用者が登録した菓子が **1個で飽和4.5g**（栗サブレ）だったことから足した（v.170）。
+
+     対象は**自動計算が選んでいない品目**だけ。
+     週の型に入っているもの（サバ缶4.2g・まぜのっけ2.8gなど）を毎日名指しても
+     打つ手が無く、ただの雑音になる。 */
+  const HAND_SAT  = r1(SAT_GOOD   * 0.20);   // 飽和：線の2割を超えたら名指す
+  const HAND_SALT = r1(SALT_LIMIT * 0.20);   // 食塩：同じ
+  const handNote = (key, line, unitName) => {
+    const rows = FOODS.filter(f => {
+      if(!((st.foods[f.id] || 0) > 0) || !(f[key] > 0)) return false;
+      if(isAuto(f)) return false;                                  // 自動計算が減らせる品目は見ない
+      if((WEEKLY_PLAN[todayIdx()] || {})[f.id]) return false;      // 今日の型に入っているものも見ない
+      return true;
+    }).map(f => ({f, g: r1(st.foods[f.id] * f[key])}))
+      .filter(x => x.g >= (key === 'sat' ? HAND_SAT : HAND_SALT))
+      .sort((a, b) => b.g - a.g).slice(0, 2);
+    if(!rows.length) return '';
+    return `<br><b class="warn-inline">` + rows.map(({f, g}) =>
+      `${esc(f.short || f.name)} ${r1(st.foods[f.id])}${esc(f.unit)}で ${g}${unitName}` +
+      `（${line}${unitName}の線の ${Math.round(g / line * 100)}%）`).join('・') +
+      `</b>。<small>手で入れた品目なので、自動計算では減らせません。` +
+      `数量を見直すか、その日はほかを軽くしてください。</small>`;
+  };
+
 /* 各行の判定を「多い／少ない／範囲内」の札で示す。
      赤いだけでは多いのか少ないのか分からないため、色も分けている。 */
   const TAG = {over:'多い', under:'少ない', ok:'ちょうどよい', warn:'注意'};
@@ -2547,22 +2637,24 @@ function render(opts){
         `うち飽和脂肪酸 ${sat.total}g（${satPct}%）。${top3(fat)}`) +
     row('飽和脂肪酸', sat.total, 'g', `${SAT_LIMIT}g 以下`,
         satOver > 0 ? 'over' : sat.total > SAT_GOOD ? 'warn' : 'ok',
-        satOver > 0
+        (satOver > 0
           ? `上限を ${satOver}g 超えています。${top3(sat)}`
           : sat.total > SAT_GOOD
             ? `上限（${SAT_LIMIT}g）までは あと ${r1(-satOver)}g ですが、` +
               `LDLを下げたい日は ${SAT_GOOD}g 以下に抑えたいところです。${top3(sat)}`
             : `${SAT_GOOD}g 以下です（余裕 ${r1(SAT_GOOD - sat.total)}g）。` +
-              `${SAT_LIMIT}g は上限なので、埋めにいく必要はありません。${top3(sat)}`,
+              `${SAT_LIMIT}g は上限なので、埋めにいく必要はありません。${top3(sat)}`)
+          + handNote('sat', SAT_GOOD, 'g'),
         satOver > 0 ? '多い' : sat.total > SAT_GOOD ? '上限内' : '良好') +
     row('食塩相当量', salt.total, 'g', `${SALT_LIMIT}g 未満`,
         salt.total > SALT_CARE ? 'over' : saltOver > 0 ? 'warn' : 'ok',
-        saltOver > 0
+        (saltOver > 0
           ? `目標（${SALT_LIMIT}g未満）を ${saltOver}g 超えています。` +
             (salt.total > SALT_CARE
               ? `<b>たんぱく質を満たすためにここまで塩を増やすのは避けたいところです。</b>`
               : '') + top3(salt)
-          : `${SALT_LIMIT}g 未満です（余裕 ${r1(-saltOver)}g）。${top3(salt)}`,
+          : `${SALT_LIMIT}g 未満です（余裕 ${r1(-saltOver)}g）。${top3(salt)}`)
+          + handNote('salt', SALT_LIMIT, 'g'),
         salt.total > SALT_BAD  ? '多すぎる'
         : salt.total > SALT_CARE ? '多い'
         : saltOver > 0 ? 'やや多い' : 'ちょうどよい') +
@@ -2614,6 +2706,7 @@ function render(opts){
        **表のセルの中には置かない** — 375px では4列目が130pxしかなく、
        候補の行とボタンが崩れる（v.163で実際に踏んだ）。
        「エネルギーが足りないときの追加候補」と同じ、表の外の `.advice` に出す。 */
+    restDoseAdvice(st, sv) +
     `<div class="advice"><b>食べる量が多くて食べきれないときは、` +
     `どれを減らすと実際に軽くなるかを計算できます。</b>` +
     `<br><small>1品目ずつ減らして献立を組み直すので、5秒ほどかかることがあります。</small>` +
@@ -5180,6 +5273,17 @@ $('oSatBox').addEventListener('click', e => {
       const out = $('cutOut');
       if(out) out.innerHTML = cutAdvice(readState());
       if(go.isConnected){ go.disabled = false; go.textContent = '計算し直す'; }
+    }, 0);
+    return;
+  }
+  const rs = e.target.closest('[data-rest]');
+  if(rs){
+    rs.disabled = true;
+    rs.textContent = '計算しています…';
+    setTimeout(() => {
+      const out = $('restOut');
+      if(out) out.innerHTML = restDoseCompare(readState());
+      if(rs.isConnected){ rs.disabled = false; rs.textContent = '計算し直す'; }
     }, 0);
     return;
   }
