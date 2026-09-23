@@ -808,7 +808,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.165';
+const APP_VERSION = '2026-09-01.166';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -3064,6 +3064,18 @@ function orderNote(bin, home){
 }
 
 /* 各食事の過不足に応じた一言（詳しい理由は README.md にまとめている） */
+/* **くわしい説明を出していない日でも、目安に大きく足りない枠は黙らない**（v.166）。
+   ⑤は「目安 約33g」の横に 10.2g の中身を並べて何も言わない画面になっていた
+   （利用者から「こんな献立あり得ますか」と指摘された）。
+   ④は「不足103.5g・エネルギーが1,793kcal足りない」と出していたが、
+   **⑤だけを見ると整った献立に見える**のが問題だった。
+   1日の合計が足りている日は配分の問題でしかないので出さない（`dayCovered`）。 */
+const shortNote = (bin, target, dayCovered) => {
+  const d = r1(target - r1(bin.total + bin.addTotal));
+  return (!dayCovered && d >= 5)
+    ? ` <b class="warn-inline">目安に あと約${d}g</b>` : '';
+};
+
 function mealAdvice(bin, target, st, dayCovered){
   // ④で決めた品目がこの食事に割り当てられていれば、それを提示する
   const after = r1(bin.total + bin.addTotal);
@@ -3462,7 +3474,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
     if(bin.items.length){
       return detail
         ? `${head}<b>${bin.label}</b> ＝ 合計 <b>${bin.total}g</b>${pairNote(bin)}<br>${mealAdvice(bin, targetG, st, dayCovered)}${tail}${always}`
-        : `<b>${bin.label}</b>${pairNote(bin)}${always}`;
+        : `<b>${bin.label}</b>${shortNote(bin, targetG, dayCovered)}${pairNote(bin)}${always}`;
     }
     if(bin.addTotal){
       return detail
@@ -3618,12 +3630,24 @@ function renderAltFoods(toFoodG, sv, st, plan, capBinds){
   const shown = FOODS.filter(f => !f.first && !f.fixedMenu && !f.autoFill && f.p >= ALT_MIN_P)
                      .filter(f => roomFor(f, st) > 0)
                      .slice().sort((a, b) => pricePer10g(a) - pricePer10g(b));
-  const hidden = FOODS.filter(f => !f.first && !f.fixedMenu && !f.autoFill && f.p < ALT_MIN_P);
+  // 「少なすぎて除いた」の列挙にも、使わない品目は出さない（v.166）
+  const hidden = FOODS.filter(f => !f.first && !f.fixedMenu && !f.autoFill &&
+                                   f.p < ALT_MIN_P && foodUse(f.id));
   if(!shown.length){
+    /* 候補が1つも無い理由は2つある。**「使わない」にしたせいなら、そう言う**（v.166）。
+       以前は理由を「曜日ごとのメニューだから」と決め打ちしていたので、
+       チェックを外して候補が消えた人に、当たっていない説明を返していた。 */
+    const offAlts = FOODS.filter(f => !f.first && !f.fixedMenu && !f.autoFill &&
+                                      f.p >= ALT_MIN_P && !foodUse(f.id));
     box.innerHTML =
       `<div class="alt"><h4>残り ${toFoodG}g をどうするか` +
       `<small>（上の${PROTEIN.name} ${sv.spoons}杯・${sv.totalG}g を摂った前提）</small></h4>` +
-      `<p class="hint" style="margin:0">朝食・夕食は曜日ごとに決めたメニュー（外食・サバ缶）なので、この表では増減させません。` +
+      `<p class="hint" style="margin:0">` +
+      (offAlts.length
+        ? `<b class="warn-inline">候補になる品目をすべて「使わない」にしています</b>` +
+          `（${offAlts.map(f => esc(f.short || f.name)).join('・')}）。` +
+          `③でチェックを戻すと、ここに補う候補が出ます。<br>`
+        : `朝食・夕食は曜日ごとに決めたメニュー（外食・サバ缶）なので、この表では増減させません。`) +
       `残りは` + (st.twoDoses ? '' : `<b>「${PROTEIN.name}を1日2回まで摂る」をオンにする</b>か、`) +
       `固定メニュー以外に食べたものを<b>「その他（自由入力）」</b>にg数で入れて調整してください。` +
       savasCapNote(sv, st, capBinds) + `</p></div>`;
@@ -3785,7 +3809,15 @@ const menuEggsOfDay = () => {
   }, 0);
 };
 /* その品目をあと何個足せるか。卵はメニューに含まれる分も上限に数える */
+/* その品目を「あと何単位すすめてよいか」。④の早見表・補う組み合わせ・追加候補が使う。
+   **「使わない」にした品目は 0 を返す**（v.166）。
+   READMEには以前から「④の追加候補や早見表にも出さない」と書いてあったのに、
+   実装していたのは追加候補（`energyAdvice` の `pick`）だけで、
+   **早見表と `suggestPlan` は素通りしていた** — チェックを外した卵・納豆（たれなし）・
+   サバ缶（味付）が「残りを補うなら」に並んでいた。
+   ここで止めれば、`roomFor` を通る4か所すべてに効く。 */
 const roomFor = (f, st) => {
+  if(!foodUse(f.id)) return 0;
   if(f.max === undefined) return 99;
   const now  = Math.round((st && st.foods && st.foods[f.id]) || 0);
   const used = f.id === 'egg' ? menuEggs(st) : 0;
