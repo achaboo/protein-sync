@@ -764,7 +764,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.157';
+const APP_VERSION = '2026-09-01.158';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -820,7 +820,11 @@ const perSpoon  = key => (PROTEIN.per[key] || 0) / PER_SERVE;
 //   first : 食事の最初に食べる食品（ベジファースト用。糖質メニューのある食事へ優先配分）
 //   lock  : true なら slots に挙げた時間帯「以外」には絶対に配分しない
 //   group : 同じグループの「別の品目」は同じ時間帯に配分しない
-//   slotLimit : 同じグループの品目を1つの時間帯に置ける上限（例：ご飯は1食0.5合＝1杯）
+//   slotLimit : 同じグループの品目を1つの時間帯に置ける上限（例：ご飯は1食1合＝2杯）。
+//               **人が1食で食べられる量で決める。エネルギーが足りないからと上げない**
+//   even  : 自宅の食事が2つ以上ある日は、その食事へ**均等に**割る（v.158）。
+//           これが無いと「いちばん不足している枠へ詰める」置き方になり、
+//           ヨーグルト4杯が全部昼食、サラダ3皿が全部夕食、という寄り方をする
 //   perMealQty: 1食あたりに入れる数（既定1）
 //   post  : 運動した日は「運動直後」の枠にだけ配分する（例：バナナ）
 //   autoPerMeal: 食事回数と同じ数を毎日の初期値にする（例：昼食と夕食で毎回ご飯0.5合）
@@ -896,25 +900,29 @@ const FOODS = [
 
   // --- 自宅の食材（外食には持ち込めないので「間食」の枠にまとめる） ---
   {id:'tomato',  name:'トマトジュース',        short:'トマトジュース', weekShort:'トマトJ', note:'200ml 約1.8g（食塩無添加）',
-   price:40, ruleNote:'毎日2杯（カリウム補給）', p:1.8, unit:'杯', sat:0, salt:0.06, carbG:6.6, fiber:1.4, kcal:34, fat:0.2,
-   slots:['s'], lock:true, home:true, autoDaily:2},
+   price:40, ruleNote:'毎日2杯（カリウム補給）<br>3食の日は食事ごとに分けます', p:1.8, unit:'杯', sat:0, salt:0.06, carbG:6.6, fiber:1.4, kcal:34, fat:0.2,
+   slots:['s'], lock:true, home:true, autoDaily:2, even:true},
   {id:'dressing',name:'ノンオイルドレッシング', short:'ノンオイルドレッシング', weekShort:'ドレッシング', note:'1ふり 約0.5g',
-   ruleNote:'青じそ（大さじ1＝15g）<br>夕食のサラダに',
+   ruleNote:'青じそ（大さじ1＝15g）<br>サラダのある食事に<br>3食の日は食事ごとに分けます',
    price:15, p:0.5, unit:'ふり', sat:0, salt:0.8, carbG:1.4, fiber:0, kcal:8, fat:0,
-   slots:['s'], lock:true, home:true, homeMeal:true, homeBreakfast:true},
+   slots:['s'], lock:true, home:true, homeMeal:true, homeBreakfast:true, even:true},
+  /* `homeSlot:'l'`（昼食に固定）を v.158 で外した。固定されていると
+     「均等に分ける」ができず、7さじが1食にまとまっていた。 */
   {id:'olive',   name:'オリーブオイル',        short:'オリーブオイル', weekShort:'オリーブ油', note:'1さじ 約0g',
-   ruleNote:'エクストラバージン（小さじ1＝4g）<br>脂質の不足から自動計算（0〜7さじ）',
+   ruleNote:'エクストラバージン（小さじ1＝4g）<br>脂質の不足から自動計算（0〜7さじ）<br>3食の日は食事ごとに分けます',
    price:13, p:0, unit:'さじ', fat:4, sat:0.5, salt:0, carbG:0, fiber:0, kcal:36,
-   slots:['s'], lock:true, home:true, homeMeal:true, homeBreakfast:true, homeSlot:'l',
-   autoFat:true, autoMax:7},
+   slots:['s'], lock:true, home:true, homeMeal:true, homeBreakfast:true,
+   autoFat:true, autoMax:7, even:true},
   {id:'salad',   name:'ミックスサラダ',        short:'ミックスサラダ', weekShort:'サラダ', note:'0.5袋 約0.65g',
+   ruleNote:'3食の日は食事ごとに分けます',
    price:53, p:0.65, unit:'皿', sat:0, salt:0, carbG:1.9, fiber:0.8, kcal:12, fat:0.1,
    slots:['s'], lock:true, home:true, homeMeal:true, homeBreakfast:true, first:true,
-   autoBal:true, autoMax:3},
+   autoBal:true, autoMax:3, even:true},
   // 1杯＝100g として数える（表示値が100gあたりのため）
   {id:'yogurt',  name:'無脂肪ヨーグルト',      short:'無脂肪ヨーグルト', weekShort:'ヨーグルト', note:'1杯100g 約4.6g',
+   ruleNote:'1日4杯（1カップ400g）まで<br>3食の日は食事ごとに分けます',
    price:35, p:4.6, unit:'杯', sat:0.2, salt:0.1, carbG:4.9, fiber:0, kcal:40, fat:0.3,
-   slots:['s'], lock:true, home:true, autoFill:true, fillMax:4},
+   slots:['s'], lock:true, home:true, autoFill:true, fillMax:4, even:true},
   {id:'chicken', name:'サラダチキン',          short:'サラダチキン',   note:'1P 約20.9g',
    price:278, p:20.9, unit:'P', sat:0.5, salt:2.2, carbG:1.4, fiber:1.4, kcal:103, fat:1.8,
    slots:['s'], lock:true, home:true, autoFill:true, fillMax:2},
@@ -976,7 +984,17 @@ const FOODS = [
    weekName:'ご飯', ruleNote:'エネルギーの不足から自動計算<br>（0〜6杯＝0〜3合）',
    price:33, p:4.5, unit:'杯', sat:0.1, salt:0, carbG:58.0, fiber:2.5, kcal:257, fat:0.7,
    slots:['d'], lock:true, slot:'d', home:true, homeMeal:true, homeBreakfast:true, fixedMenu:true,
-   carb:true, group:'staple', slotLimit:4, spread:true,    // spread: 自宅の食事へ均等に配る
+   /* **slotLimit は「人が1食で食べられる量」で決める。エネルギーの都合で上げない。**
+      この値は 1杯（0.5合）から 2杯 → 3杯 → 4杯 と3回引き上げられている。
+      理由はどれも「自宅の夕食が700〜900kcal足りない」「−594→−436kcalに改善」で、
+      **食べられる量かどうかを基準にした回が1度も無かった**（v.158で気づいた）。
+      その結果 ⑤ に「昼食：ご飯4杯」＝1食で2合、と出ていた。
+      2杯（1合＝茶碗2杯）に戻す。**栄養は1gも変わらない** — 合計の杯数は同じで、
+      1食に寄っていたものが2食に分かれるだけ（実測：昼4杯 → 昼2杯＋夕2杯）。
+      **エネルギーが届かない日は、ご飯を積むのではなく「届かない」と出すのが正しい。**
+      歩18km＋筋トレの日は、これで献立が3,267→3,131kcalになり
+      エネルギーが「足りない」と出るようになるが、それが型の実際の限界である。 */
+   carb:true, group:'staple', slotLimit:2, spread:true,    // spread: 自宅の食事へ配る
    autoRice:true, autoMax:6},
   {id:'natto',   name:'納豆',                short:'納豆',         note:'1パック 約8.3g',
    price:32, p:8.3, unit:'P', sat:0.8, salt:0.7, carbG:7.3, fiber:3.6, kcal:99, fat:4.9,
@@ -2556,6 +2574,19 @@ function distributeFoods(st, mealTargets, planIds, trained){
        割り切れない分は 夕食 → 昼食 → 朝食 の順に足して、夕食を厚くする。
        以前は昼と夕で半分ずつに分けていたため、朝食も自宅の日に朝だけ0杯になっていた。 */
     const plan = [];
+    /* **均等に分ける**（`even`・v.158）。
+       これが無いと、1単位ずつ「いちばん不足している枠」へ入れる貪欲法になるので、
+       ヨーグルト4杯が全部昼食、サラダ3皿が全部夕食、という寄り方をする。
+       自宅の食事が2つ以上ある日だけ効かせる（木曜は昼食しか置けない、
+       2食の日は「間食」にまとめる、という既存の扱いをそのまま残すため）。
+       割り切れない分は**後ろの食事**へ寄せる（サラダ一式は夕食に置く慣習に合わせる）。 */
+    if(f.even && q > 0 && atMeal(f, st)){
+      const ms = homeMealsOf(st);
+      if(ms.length > 1){
+        const per = Math.floor(q / ms.length), extra = q % ms.length;
+        ms.forEach((sl, i) => plan.push({sl, n: per + (i >= ms.length - extra ? 1 : 0)}));
+      }
+    }
     if(f.spread && q > 0){
       const ms = homeMealsOf(st);
       if(ms.length){
@@ -2563,7 +2594,7 @@ function distributeFoods(st, mealTargets, planIds, trained){
            だが夕食はサバ缶31.7gだけで1食の目安をほぼ埋めるので、そこへ均等にご飯を足すと
            たんぱく質が夕食に寄る（v.153で 朝17.1/昼20.6/夕50.3）。
            いまは**たんぱく質の少ない枠から順に**配る。合計は変わらない。
-           1食に置ける杯数は slotLimit（4杯＝2合）で頭打ちにする。 */
+           1食に置ける杯数は slotLimit（2杯＝1合）で頭打ちにする。 */
         const fixedP = {};
         ms.forEach(sl => fixedP[sl] = 0);
         FOODS.forEach(x => {
@@ -2625,7 +2656,7 @@ function distributeFoods(st, mealTargets, planIds, trained){
     if(!u.group) return true;
     const same = bins[s].items.filter(x => x.group === u.group);
     if(!same.length) return true;
-    if(u.slotLimit) return same.length < u.slotLimit;   // 枠あたりの上限（ご飯は1食0.5合＝1杯まで）
+    if(u.slotLimit) return same.length < u.slotLimit;   // 枠あたりの上限（ご飯は1食1合＝2杯まで）
     return same.every(x => x.key === u.key);
   };
 
