@@ -808,7 +808,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.166';
+const APP_VERSION = '2026-09-01.167';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -2447,6 +2447,11 @@ function render(opts){
   const planTotal  = r1(plan.reduce((a, id) => a + pOf(id), 0));
   const dayCovered = toFoodG < DEVIATION_OK ||
                      r1(food.total + sv.totalG + planTotal) >= target - 0.05;
+  /* **いま入力されている内容だけで目標に届いているか。**`dayCovered` とは別物。
+     `dayCovered` は「④が提案する品目を足せば届く」なので、提案できる品目が残っていれば
+     ほぼ常に true になる。しかも**その提案は簡易表示の⑤には出ない**（`label` に入らない）。
+     v.166でこれを混同し、⑤の「目安に あと約○g」がほとんど出なかった（v.167で修正）。 */
+  const dayMet = toFoodG < DEVIATION_OK;
 
   // ---- サマリー ----
   const floor   = r1(st.weight * FLOOR_FACTOR);       // ここを超えていればその日は十分
@@ -2744,7 +2749,7 @@ function render(opts){
       : '');
 
   renderAltFoods(toFoodG, sv, st, plan, capBinds);
-  renderSchedule(st, ex, target, sv, plan, dayCovered);
+  renderSchedule(st, ex, target, sv, plan, dayCovered, dayMet);
   renderTips(st, ex, target, lack, food, sv, toFoodG, capBinds, floor, intake, reduceG, cut);
 
   // 更新されたことが必ず分かるように、時刻を刻んでハイライトする
@@ -3069,10 +3074,14 @@ function orderNote(bin, home){
    （利用者から「こんな献立あり得ますか」と指摘された）。
    ④は「不足103.5g・エネルギーが1,793kcal足りない」と出していたが、
    **⑤だけを見ると整った献立に見える**のが問題だった。
-   1日の合計が足りている日は配分の問題でしかないので出さない（`dayCovered`）。 */
-const shortNote = (bin, target, dayCovered) => {
+   **見るのは `dayMet`（入力済みの内容だけで足りているか）であって `dayCovered` ではない。**
+   `dayCovered` は「④の提案を足せば届く」なので、提案できる品目が残っていればほぼ常に true。
+   v.166でそちらを渡してしまい、注記がほとんど出なかった。
+   1日の合計が入力済みで足りている日は、枠ごとのズレは配分の問題なので出さない
+   （木曜の昼食＝目安26g・実際14.7g がこれにあたる）。 */
+const shortNote = (bin, target, dayMet) => {
   const d = r1(target - r1(bin.total + bin.addTotal));
-  return (!dayCovered && d >= 5)
+  return (!dayMet && d >= 5)
     ? ` <b class="warn-inline">目安に あと約${d}g</b>` : '';
 };
 
@@ -3111,7 +3120,7 @@ function mealAdvice(bin, target, st, dayCovered){
 }
 
 /* 時間帯別スケジュール */
-function renderSchedule(st, ex, target, sv, plan, dayCovered){
+function renderSchedule(st, ex, target, sv, plan, dayCovered, dayMet){
   const trained = ex.done > 0 || ex.cardio > 0;
 
   /* 「くわしい説明を表示する」がオフのときは、食べるものだけを出す。
@@ -3458,6 +3467,19 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
         : '')];
   };
 
+  /* ④が「残りを補うなら」で出した組み合わせは、ここで各食事に割り当ててある（`bin.adds`）。
+     **くわしい説明がオフのときに、これを出していなかった**（v.167で修正）。
+     そのため⑤は「バタどら2個＋栗サブレ1個」だけを見せながら、
+     内部では提案分を足して目安に届いた扱いにしており、**注記も出ず**、
+     しかも「食べる量 約190g」にはその見えない分が入っていた。
+     利用者からは「こんな献立あり得ますか」→（v.166後も）「何も変化がない」として報告された。 */
+  const addNote = bin => {
+    if(!(bin.addTotal > 0)) return '';
+    // `addLabel` は品目ごとにgを持つので、1品目だけのときに合計を添えると同じ数字が2回出る
+    const many = new Set(bin.adds.map(u => u.key)).size > 1;
+    return ` ＋ <b>④の提案：${bin.addLabel}</b>${many ? `（合計 +${bin.addTotal}g）` : ''}`;
+  };
+
   // 各食事行の「内容・ポイント」：回し分を差し引いた、その時間帯で実際に食べるもの
   const meal = (raw, targetG, tail, k, always) => {
     always = always || '';
@@ -3474,12 +3496,12 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
     if(bin.items.length){
       return detail
         ? `${head}<b>${bin.label}</b> ＝ 合計 <b>${bin.total}g</b>${pairNote(bin)}<br>${mealAdvice(bin, targetG, st, dayCovered)}${tail}${always}`
-        : `<b>${bin.label}</b>${shortNote(bin, targetG, dayCovered)}${pairNote(bin)}${always}`;
+        : `<b>${bin.label}</b>${addNote(bin)}${shortNote(bin, targetG, dayMet)}${pairNote(bin)}${always}`;
     }
     if(bin.addTotal){
       return detail
         ? `${head}入力済みの食事はこの時間帯に配分されていません。<br>${mealAdvice(bin, targetG, st, dayCovered)}${tail}${always}`
-        : `<b>この時間帯の配分はありません</b>${always}`;
+        : `入力済みの食事はこの時間帯にありません。${addNote(bin)}${shortNote(bin, targetG, dayMet)}${always}`;
     }
     return detail
       ? `今日の入力分はすべて他の時間帯に配分されました。ここで摂るなら ${targetG}g 前後を目安に。${tail}${always}`
