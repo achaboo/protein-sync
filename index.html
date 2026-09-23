@@ -412,7 +412,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
     <h2>① 基本設定</h2>
     <div class="grid2">
       <div>
-        <label for="weight">体重 (kg)</label>
+        <label for="weight">体重の7日平均 (kg)</label>
         <input type="number" inputmode="decimal" id="weight" value="72.5" step="0.1" min="30" max="200">
       </div>
       <div>
@@ -436,6 +436,18 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
         <input type="number" inputmode="decimal" id="baseFactor" value="1.65" step="0.05" min="1" max="2.5">
       </div>
     </div>
+    <!-- 体重は「その日の値」ではなく7日平均を入れてもらう（v.160）。
+         1日の上下1〜2kgは水分・グリコーゲン・消化管の中身で、脂肪の増減ではない。
+         日ごとの値を入れると目標が毎朝揺れるうえ、**揺れの向きが逆になる** —
+         指示どおり食べた翌朝は重いので「もっと食べろ」、食べきれなかった翌朝は
+         軽いので「減らせ」と出る。大きさは小さい（1kgで16kcal）が、
+         守るべき数字が毎日動くこと自体が続けにくさになる。 -->
+    <p class="hint">※ 体重は<b>7日平均</b>を入れてください。更新は<b>週に1回</b>で十分です
+      （日付が変わっても保持されるので、毎日入れ直す必要はありません）。<br>
+      <b>体重計には毎日乗って構いません</b> — 7日平均を作るにはそのほうが確かです。ただし
+      <b>1日の上下1〜2kgは水分とその日食べた量</b>で、脂肪の増減ではありません。
+      その日の値を入れると、目標が毎朝揺れます
+      （体重1kgで たんぱく質 ±1.65g・必要エネルギー ±16kcal）。</p>
     <p class="hint" id="baseNote"></p>
 
     <div class="grid2" style="margin-top:12px">
@@ -764,7 +776,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.159';
+const APP_VERSION = '2026-09-01.160';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
