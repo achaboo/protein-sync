@@ -7,7 +7,9 @@
      2. DevTools のコンソールを開き、このファイルの中身を全部貼って Enter
      3. コンソールで実行する
 
-          PSCheck.run(1000)            1,000ケース（既定）
+          PSCheck.runAsync(1000)       1,000ケース（画面を止めずに回す。**こちらを推奨**）
+          PSCheck.progress             途中経過（done / n / fails）
+          PSCheck.run(1000)            同じ検証を同期で回す（1,000ケースで20分以上固まる）
           PSCheck.run(200)             件数を指定
           PSCheck.run(1000, 12345)     乱数の種を指定（失敗を再現するとき）
           PSCheck.only(12345, 37)      種12345の37番目のケースだけを流して画面に残す
@@ -40,6 +42,16 @@
      10 再計算の冪等性（続けて render() しても結果が変わらない）
      11 ①の「必要エネルギーの補正」が必要エネルギーにそのまま乗ること
      12 プロテインの杯数も飽和脂肪酸15gの線で止まること（最低杯数と手動指定は除く）
+     13 ④の「残りを補う提案」も 食塩7.5g・飽和15g の線を越えないこと
+     14 ⑤が中身を隠していないこと（③の数量>0の品目と、④の提案の品目が全部出ている）
+     15 エネルギーが必要量を ENERGY_BAD 以上下回る日は、④が「足りない」と出していること
+
+   振っている状態（v.168で追加）
+     ・品目の「使う／使わない」を無作為に外す（3割。5%は「すべて外す」に近い状態）
+     ・自由入力の品目を無作為に足す（2割。栄養が偏った品目も作る）
+     ここを振っていなかったため、**標準の型から外れた日の不具合を取りこぼしていた**。
+     実際に、⑤が④の提案を隠す不具合（v.167で修正）と、
+     提案が食塩・飽和を見ていない不具合（v.168で修正）は、利用者が食べて見つけている。
    ============================================================ */
 (() => {
 'use strict';
@@ -100,7 +112,32 @@ function makeCase(rnd, i){
                 saba_miso:  rnd() < 0.2 ? 1 : 0,
                 katsuju:    rnd() < 0.15 ? 1 : 0
               } : null,
-    otherP:   rnd() < 0.15 ? Math.round(rnd() * 40) : 0
+    otherP:   rnd() < 0.15 ? Math.round(rnd() * 40) : 0,
+    /* 品目の「使う／使わない」。在庫が無い日・食べない品目がある日を作る。
+       5%は「ほぼ全部外す」にして、提案も候補も作れない状態を通す。 */
+    offAll:   rnd() < 0.05,
+    off:      rnd() < 0.30 ? (() => {
+                const ids = FOODS.filter(f => !f.custom).map(f => f.id);
+                const k = 1 + Math.floor(rnd() * 12);
+                const o = {};
+                for(let j = 0; j < k; j++) o[ids[Math.floor(rnd() * ids.length)]] = true;
+                return o;
+              })() : null,
+    /* 自由入力の品目。**栄養成分は利用者が手で書き写すので、偏った値もありうる**
+       （実際に「1個で飽和脂肪酸4.5g」の菓子が登録された）。そこを振る。 */
+    custom:   rnd() < 0.20 ? Array.from({length: 1 + Math.floor(rnd() * 2)}, (_, k) => ({
+                name:  'テスト品目' + (k + 1),
+                unit:  '個',
+                p:     Math.round(rnd() * 25 * 10) / 10,
+                kcal:  Math.round(rnd() * 400),
+                fat:   Math.round(rnd() * 20 * 10) / 10,
+                sat:   Math.round(rnd() * 10 * 10) / 10,
+                carbG: Math.round(rnd() * 60 * 10) / 10,
+                fiber: Math.round(rnd() * 5 * 10) / 10,
+                salt:  Math.round(rnd() * 3 * 10) / 10,
+                price: Math.round(rnd() * 500),
+                qty:   1 + Math.floor(rnd() * 3)
+              })) : null
   };
   return c;
 }
@@ -121,6 +158,25 @@ function applyCase(c){
   if(c.manual) Object.keys(c.manual).forEach(id => { if($$('f_' + id)) setVal('f_' + id, c.manual[id]); });
   // ②を「今日の分として確定したか」。④の未入力表示を出し分ける
   exDate = c.entered ? todayKey() : '';
+
+  /* 自由入力の品目を足す。**ケースごとに必ず消す**（消さないと FOODS と DOM が
+     ケース数ぶん膨らんで、検証そのものが遅くなる）。 */
+  c._customIds = [];
+  if(c.custom) c.custom.forEach(o => { c._customIds.push(addCustomFood(o, o.qty).id); });
+
+  // 品目の「使う／使わない」
+  foodOff = {};
+  if(c.offAll)   FOODS.forEach(f => { if($$('use_' + f.id)) foodOff[f.id] = true; });
+  else if(c.off) Object.keys(c.off).forEach(id => { if($$('use_' + id)) foodOff[id] = true; });
+  applyFoodUse();
+}
+
+/* ケースの後始末。足した品目を消し、チェックを全部オンに戻す。 */
+function cleanupCase(c){
+  (c._customIds || []).forEach(id => removeCustomFood(id));
+  c._customIds = [];
+  foodOff = {};
+  applyFoodUse();
 }
 
 /* ---------- 判定 ---------- */
@@ -273,6 +329,62 @@ function checkOne(c, fail){
     });
   }
 
+  /* 13. ④の「残りを補う提案」も線を越えないこと（v.168のガード）。
+         `energyAdvice` には以前から `capOfFood` があったのに、**ここだけ素通り**で、
+         実測でサバ缶（みそ煮）2缶を提案し、その日の飽和が23.1g（上限17g）になっていた。
+         契約は「提案前が線の内側なら、提案後も内側」「提案前が外なら1gも足さない」。 */
+  const target  = r1(st.weight * ex.factor);
+  const foodNow = calcFood(st);
+  const toFoodG = r1(Math.max(0, target - r1(foodNow.total + sv.totalG)));
+  const satNow  = calcSat(st, sv).total;
+  const saltNow = calcSalt(st, sv).total;
+  const plan    = toFoodG >= DEVIATION_OK ? suggestPlan(toFoodG, st, satNow, saltNow) : [];
+  const addOf   = key => r1(plan.reduce((a, id) => {
+    const f = foodById(id); return a + ((f && f[key]) || 0);
+  }, 0));
+  const satAdd = addOf('sat'), saltAdd = addOf('salt');
+  const planLabel = () => formatPlan(plan);
+  if(satNow <= SAT_GOOD && r1(satNow + satAdd) > SAT_GOOD + 0.05)
+    fail(`④の提案で飽和脂肪酸が${SAT_GOOD}gの線を越えました：${satNow}g → ` +
+         `${r1(satNow + satAdd)}g（提案 ${planLabel()}）`);
+  if(satNow > SAT_GOOD && satAdd > 0.05)
+    fail(`すでに飽和脂肪酸が線の外（${satNow}g）なのに、④が +${satAdd}g の提案をしています` +
+         `（${planLabel()}）`);
+  if(saltNow < SALT_LIMIT && r1(saltNow + saltAdd) >= SALT_LIMIT)
+    fail(`④の提案で食塩が${SALT_LIMIT}gの線に達しました：${saltNow}g → ` +
+         `${r1(saltNow + saltAdd)}g（提案 ${planLabel()}）`);
+  if(saltNow >= SALT_LIMIT && saltAdd > 0.05)
+    fail(`すでに食塩が線の外（${saltNow}g）なのに、④が +${saltAdd}g の提案をしています` +
+         `（${planLabel()}）`);
+
+  /* 14. ⑤が中身を隠していないこと。
+         ③に数量が入っている品目と、④が提案した品目は、⑤のどこかに名前が出ているはず。
+         v.166まで、**くわしい説明がオフだと④の提案が⑤から消えていた**
+         （利用者が「こんな献立あり得ますか」と報告するまで分からなかった）。 */
+  const schedTxt = $$('schedule').textContent;
+  FOODS.forEach(f => {
+    if(!((st.foods[f.id] || 0) > 0)) return;
+    const nm = f.short || f.name;
+    if(schedTxt.indexOf(nm) < 0)
+      fail(`⑤に「${nm}」が出ていません（③の数量 ${r1(st.foods[f.id])}${f.unit}）`);
+  });
+  [...new Set(plan)].forEach(id => {
+    const f = foodById(id); if(!f) return;
+    const nm = f.short || f.name;
+    if(schedTxt.indexOf(nm) < 0)
+      fail(`⑤に④の提案「${nm}」が出ていません（提案 ${planLabel()}）`);
+  });
+
+  /* 15. エネルギーが必要量を大きく下回る日は、④がそう出していること。
+         ⑤だけを見て食べると気づけないので、④の札は必ず立てる。 */
+  const kcalTotal = calcKcal(st, sv).total;
+  const needNow   = calcNeed(st, ex);
+  const kcalRow   = [...$$('oSatBox').querySelectorAll('tr')]
+    .find(tr => tr.querySelector('th') && tr.querySelector('th').textContent.trim() === 'エネルギー');
+  if(kcalRow && kcalTotal - needNow <= -ENERGY_BAD && kcalRow.className !== 'under')
+    fail(`エネルギーが必要量を ${Math.round(needNow - kcalTotal)}kcal 下回るのに、` +
+         `④の札が「足りない」になっていません（class=${kcalRow.className}）`);
+
   // 10. 再計算の冪等性
   const a = snapshot();
   render();
@@ -281,6 +393,28 @@ function checkOne(c, fail){
 }
 
 /* ---------- 実行 ---------- */
+/* 失敗のまとめ方は run と runAsync で同じにする */
+function report(n, seed, fails, sec){
+  console.log(`\n${n}ケース / 種 ${seed} / ${sec}秒`);
+  if(!fails.length){
+    console.log('%c✅ すべて通りました', 'color:#0a0;font-weight:bold');
+  }else{
+    console.log(`%c✕ ${fails.length}件`, 'color:#c00;font-weight:bold');
+    // 同じ内容の失敗はまとめて、代表の再現手順を出す
+    const byMsg = new Map();
+    fails.forEach(f => {
+      const key = f.msg.replace(/[0-9.]+/g, '#');
+      if(!byMsg.has(key)) byMsg.set(key, {count: 0, first: f});
+      byMsg.get(key).count++;
+    });
+    [...byMsg.values()].sort((x, y) => y.count - x.count).forEach(({count, first}) => {
+      console.log(`  ${count}件  ${first.msg}`);
+      console.log(`        再現: PSCheck.only(${seed}, ${first.n})`, first.c);
+    });
+  }
+  console.log('終わったら PSCheck.restore() を実行して、ページを再読み込みしてください。');
+}
+
 const PSCheck = {
   run(n, seed){
     n = n || 1000;
@@ -297,29 +431,48 @@ const PSCheck = {
       } catch(err){
         push('例外: ' + (err && err.message ? err.message : String(err)));
         console.error(err);
+      } finally {
+        try { cleanupCase(c); } catch(e){}
       }
       if((i + 1) % 100 === 0) console.log(`  ${i + 1}/${n} … 失敗 ${fails.length}件`);
     }
     const sec = ((RealDate.now() - t0) / 1000).toFixed(1);
-    console.log(`\n${n}ケース / 種 ${seed} / ${sec}秒`);
-    if(!fails.length){
-      console.log('%c✅ すべて通りました', 'color:#0a0;font-weight:bold');
-    }else{
-      console.log(`%c✕ ${fails.length}件`, 'color:#c00;font-weight:bold');
-      // 同じ内容の失敗はまとめて、代表の再現手順を出す
-      const byMsg = new Map();
-      fails.forEach(f => {
-        const key = f.msg.replace(/[0-9.]+/g, '#');
-        if(!byMsg.has(key)) byMsg.set(key, {count: 0, first: f});
-        byMsg.get(key).count++;
-      });
-      [...byMsg.values()].sort((x, y) => y.count - x.count).forEach(({count, first}) => {
-        console.log(`  ${count}件  ${first.msg}`);
-        console.log(`        再現: PSCheck.only(${seed}, ${first.n})`, first.c);
-      });
-    }
-    console.log('終わったら PSCheck.restore() を実行して、ページを再読み込みしてください。');
-    return {seed, n, fails};
+    report(n, seed, fails, sec);
+    return {seed, n, fails, sec};
+  },
+
+  /* 同じ検証を**画面を止めずに**回す。
+     1ケース約1.3秒かかるので、1,000ケースを同期で回すとタブが20分以上固まる。
+     `PSCheck.progress` で途中経過を見られる。 */
+  runAsync(n, seed, chunk){
+    n = n || 1000;
+    chunk = chunk || 5;
+    seed = seed === undefined ? (Math.random() * 1e9) | 0 : seed;
+    const rnd = mulberry32(seed);
+    const fails = [];
+    const t0 = RealDate.now();
+    let i = 0;
+    PSCheck.progress = {done: 0, n, seed, fails, running: true, sec: null};
+    return new Promise(resolve => {
+      const step = () => {
+        const end = Math.min(i + chunk, n);
+        for(; i < end; i++){
+          const c = makeCase(rnd, i);
+          const push = msg => fails.push({n: i, msg, c});
+          try { applyCase(c); checkOne(c, push); }
+          catch(err){ push('例外: ' + (err && err.message ? err.message : String(err))); }
+          finally { try { cleanupCase(c); } catch(e){} }
+        }
+        PSCheck.progress.done = i;
+        if(i < n){ setTimeout(step, 0); return; }
+        const sec = ((RealDate.now() - t0) / 1000).toFixed(1);
+        PSCheck.progress.running = false;
+        PSCheck.progress.sec = sec;
+        report(n, seed, fails, sec);
+        resolve({seed, n, fails, sec});
+      };
+      setTimeout(step, 0);
+    });
   },
 
   // 失敗したケースだけを流して、そのまま画面に残す（目で確かめるため）
