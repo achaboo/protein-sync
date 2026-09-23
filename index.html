@@ -233,6 +233,7 @@ button{font:inherit;border:none;border-radius:11px;padding:13px 18px;cursor:poin
 }
 .mini-btn:active{background:#dce9fb}
 .inline-btn{margin:6px 0 0}   /* 注記の中に置くとき用。見出し用の右寄せを打ち消す */
+.inline-btn + .inline-btn{margin-left:8px}
 .sub-btn{background:#eef3fa;color:var(--brand-d);border:1px solid #cddffb;padding:10px 16px;font-size:.86rem}
 .sub-btn:active{background:#dce9fb}
 #linkBox{margin-top:6px;font-size:.75rem;color:var(--sub)}
@@ -658,10 +659,19 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
       （その品目だけ手入力に切り替わり、残りはその値に合わせて組み直します）。
     </p>
     <p class="hint" style="margin-top:0">
-      <b>品目名の左のチェックは「今日はこれを使う」</b>という意味です。初期値は全部オンで、
-      そのときはこれまでどおりに自動計算します。<b>在庫が無い日や気が進まない日は外してください。</b>
+      <b>品目名の左のチェックは「この品目を使ってよい」</b>という意味です
+      （「今日これを食べる」ではありません）。初期値は全部オンです。
+      <b>買わない品目・食べない品目は外してください。</b>
       外した品目は数量を0として扱い、自動計算の組み立てからも除きます。
-      <b>その日限り</b>の設定なので、翌日と「食事をリセット」で全部オンに戻ります。
+      <b>この設定は翌日も続きます</b>（v.165で変更）。一度整えれば毎朝やり直す必要はありません。
+      全部オンに戻すのは「すべて戻す」と「食事をリセット」です。
+    </p>
+    <p class="hint" style="margin-top:0">
+      <!-- 外す品目のほうが多い人向け。1つずつ外すより「全部外してから要るものを入れる」ほうが速い -->
+      <button type="button" id="useNone" class="mini-btn inline-btn">すべて外す</button>
+      <button type="button" id="useAll" class="mini-btn inline-btn">すべて戻す</button>
+      <br><small>使う品目のほうが少ないときは、<b>いちど「すべて外す」を押してから</b>
+      使うものにチェックを入れると速く済みます。</small>
     </p>
     <p class="hint" id="useNote" style="margin-top:0"></p>
     <div id="foods"></div>
@@ -798,7 +808,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.164';
+const APP_VERSION = '2026-09-01.165';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -1793,8 +1803,15 @@ function savasFor(st, ex, lack, target, lackBase){
    その日のうちは手入力を優先し、「自動計算に戻す」で解除する。 */
 /* 「今日は使わない」と外した品目 {id:true}。③の各行の先頭のチェックを外すと入る。
    外した品目は数量を0として扱い、自動計算の対象からも外す（探索の変数から消える）。
-   在庫切れやその日の気分で品目を抜くための仕組みなので、**その日限り**にしてある。
-   翌日と「食事をリセット」で全部オンに戻る（食事の数量と同じ扱い）。 */
+   **v.164まで「その日限り」にしていた**（翌日は全部オンに戻していた）。
+   在庫切れやその日の気分で抜くもの、という想定だったが、実際には
+   **同じ品目を毎日外していた**ので、外す手間が毎朝かかっていた。
+   利用者から「毎回チェックを外す工数のほうが多い」と指摘されたので、
+   **価格の変更（`foodOverride`）と同じ『設定』の扱いに変えた**（v.165）。
+   日付が変わっても保持し、設定リンクでも日付に関係なく運ぶ。
+   全部オンに戻すのは「すべて戻す」と「食事をリセット」。
+   **黙って持ち越すと「なぜこの品目が入らないのか」が分からなくなる**ので、
+   外している品目は `useNote` に必ず一覧で出す。 */
 let foodOff = {};
 const foodUse = id => !foodOff[id];
 function readFoodUse(){
@@ -1810,9 +1827,10 @@ function refreshUseNotes(){
   const off = FOODS.filter(f => foodOff[f.id]);
   const el = $('useNote');
   if(el) el.innerHTML = off.length
-    ? `<b class="warn-inline">${off.length}品目を今日は使わない設定にしています</b>` +
+    ? `<b class="warn-inline">${off.length}品目を「使わない」にしています</b>` +
       `（${off.map(f => esc(f.short || f.name)).join('・')}）。` +
-      `自動計算はこれらを外して組み立てます。チェックを戻すか「食事をリセット」で元に戻ります。`
+      `自動計算はこれらを外して組み立てます。<b>この設定は翌日も続きます。</b>` +
+      `チェックを戻すか「すべて戻す」「食事をリセット」で元に戻ります。`
     : '';
 }
 
@@ -4787,8 +4805,8 @@ function load(){
                  : typeof d.ao === 'object' ? {...d.ao}
                  : {natto:true};
     refreshAutoNotes();
-    // 「今日は使わない」もその日限り。日付が変われば全部オンに戻す
-    foodOff = (!sameDay || !d.off) ? {} : {...d.off};
+    // 「使わない」は設定なので、日付が変わっても持ち越す（v.165）
+    foodOff = d.off ? {...d.off} : {};
     applyFoodUse();
     wasCalculated = !!d.calc;
     if(d.lk) appliedLink = d.lk;      // 適用済みのリンク（二度目は読まない）
@@ -4825,6 +4843,11 @@ function buildSettingsLink(){
   const d = {v:{}, c:{}, date:todayKey(), rest:$('restSavas').checked, two:$('twoDoses').checked, sd:$('schedDetail').checked};
   d.cf = customData();
   d.ov = foodOverride;
+  /* 「使う／使わない」も設定として運ぶ（v.165）。
+     **v.164まで、ここで入れ忘れていた** — 受け取る側には
+     「当日のリンクなら運ぶ」というコードがあったのに、送る側が `off` を入れていなかったので
+     一度も運べていなかった（READMEとCLAUDE.mdは運ぶと書いていた）。 */
+  d.off = foodOff;
   SETTING_IDS().concat(LINK_DAILY_IDS()).forEach(id => { if($(id)) d.v[id] = $(id).value; });
   EXERCISES.forEach(e => d.c[e.id] = $('c_' + e.id).checked);
   // クエリ（キャッシュ回避用の ?v= など）は引き継がず、素のURLに設定だけを付ける
@@ -4846,8 +4869,10 @@ function applySettingsFromHash(hash){
     if(!d.v) return false;
     const put = id => { if(d.v[id] !== undefined && $(id)) $(id).value = d.v[id]; };
     SETTING_IDS().forEach(put);
-    // 品目の値の変更は設定と同じ扱い（日付に関係なく反映する）
+    // 品目の値の変更と「使う／使わない」は設定と同じ扱い（日付に関係なく反映する）
     if(d.ov){ foodOverride = {...d.ov}; applyFoodOverrides(); }
+    foodOff = d.off ? {...d.off} : {};
+    applyFoodUse();
     if(d.rest !== undefined) $('restSavas').checked = !!d.rest;   // 設定なので日付に関係なく反映
     if(d.two  !== undefined) $('twoDoses').checked  = !!d.two;
     if(d.sd   !== undefined) $('schedDetail').checked = !!d.sd;
@@ -4858,14 +4883,11 @@ function applySettingsFromHash(hash){
     restoreCustomFoods(d.cf, sameDay ? d.v : null);
     if(!sameDay){
       applyDailyDefaults();        // 食事は受け取った端末の「その日の型」に戻す
-      foodOff = {}; applyFoodUse();
       appliedLink = m[1];
       return 'settings';
     }
     LINK_DAILY_IDS().forEach(put);
     EXERCISES.forEach(e => { if(d.c && d.c[e.id] !== undefined && $('c_' + e.id)) $('c_' + e.id).checked = !!d.c[e.id]; });
-    foodOff = d.off ? {...d.off} : {};      // 「今日は使わない」も当日のリンクなら運ぶ
-    applyFoodUse();
     appliedLink = m[1];
     return 'all';
   }catch(err){ return false; }
@@ -4897,7 +4919,7 @@ function clearFoods(){
   // 自由入力から足した品目は消さない（数量だけ0に戻る）。消すときは行の「削除」
   $('otherAddNote').innerHTML = '';
   setAutoOverride(null, false);  // 自動計算も元に戻す
-  foodOff = {}; applyFoodUse();  // 「今日は使わない」も全部オンに戻す
+  foodOff = {}; applyFoodUse();  // 「使う／使わない」も全部オンに戻す（設定だが、ここでは戻す）
   applyDailyDefaults();          // その日の型に戻す
   onInputChanged();
 }
@@ -4984,6 +5006,13 @@ const sectionOf = id => { const el = $(id); return el ? el.closest('section') : 
    画面を見て自分でボタンを押したときだけにする。 */
 $('calc').addEventListener('click', () => { markExToday(); render({scroll:true}); });
 $('clearFoods').addEventListener('click', clearFoods);
+/* 「すべて外す」「すべて戻す」。先に DOM のチェックを書き替えてから onInputChanged を呼ぶ
+   （onInputChanged は `readFoodUse` で画面から読み直すため、順番を逆にすると効かない）。 */
+$('useNone').addEventListener('click', () => {
+  foodOff = {}; FOODS.forEach(f => { if($('use_' + f.id)) foodOff[f.id] = true; });
+  applyFoodUse(); onInputChanged();
+});
+$('useAll').addEventListener('click', () => { foodOff = {}; applyFoodUse(); onInputChanged(); });
 [['clearLunch','lunchTime'], ['clearDinner','dinnerTime']]
   .forEach(([btn, input]) => {
     $(btn).addEventListener('click', () => { $(input).value = ''; onInputChanged(); });
