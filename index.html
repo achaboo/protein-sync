@@ -764,7 +764,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.158';
+const APP_VERSION = '2026-09-01.159';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -920,9 +920,15 @@ const FOODS = [
    autoBal:true, autoMax:3, even:true},
   // 1杯＝100g として数える（表示値が100gあたりのため）
   {id:'yogurt',  name:'無脂肪ヨーグルト',      short:'無脂肪ヨーグルト', weekShort:'ヨーグルト', note:'1杯100g 約4.6g',
-   ruleNote:'1日4杯（1カップ400g）まで<br>3食の日は食事ごとに分けます',
+   /* **ヨーグルトだけは `even` を付けない**（v.159）。
+      1杯4.6gとたんぱく質を持つので、均等に割るとたんぱく質が夕食に寄る
+      （サバ缶31.7gが夕食固定のため）。実測：均等にすると 17.1/20.5/48.3、
+      外すと 17.1/25.1/43.7 で、**1食の目安（体重×0.3〜0.6g）に収まる**。
+      外すと貪欲法が「たんぱく質の少ない枠」へ置くので、balancer として働く。
+      代わりに1食へ寄る（最大4杯＝400g）ので、そこは「食べる量」の表示で見る。 */
+   ruleNote:'1日4杯（1カップ400g）まで',
    price:35, p:4.6, unit:'杯', sat:0.2, salt:0.1, carbG:4.9, fiber:0, kcal:40, fat:0.3,
-   slots:['s'], lock:true, home:true, autoFill:true, fillMax:4, even:true},
+   slots:['s'], lock:true, home:true, autoFill:true, fillMax:4},
   {id:'chicken', name:'サラダチキン',          short:'サラダチキン',   note:'1P 約20.9g',
    price:278, p:20.9, unit:'P', sat:0.5, salt:2.2, carbG:1.4, fiber:1.4, kcal:103, fat:1.8,
    slots:['s'], lock:true, home:true, autoFill:true, fillMax:2},
@@ -1508,6 +1514,9 @@ const calcFiber = (st, sv) => totalOf(st, sv, 'fiber', FIBER_PER_SPOON);
 /* エネルギーだけは整数に丸める。1杯あたりが割り切れない製品（Bproは56.895kcal）だと
    合計が小数になり、「2,805.6kcal」のような表示になってしまうため。
    丸めるのは合計の段階なので、1杯あたりの精度は落とさない。 */
+/* その日の飲食物の総重量。栄養ではないので帯も上限も持たず、**出すだけ**。
+   `GRAM` が見積りなので、合計も見積りである（画面にもそう書く）。 */
+const calcGram  = (st, sv) => totalOf(st, sv, 'gram',  GRAM_PER_SPOON);
 const calcKcal  = (st, sv) => {
   const t = totalOf(st, sv, 'kcal', KCAL_PER_SPOON);
   t.food = Math.round(t.food); t.savas = Math.round(t.savas); t.total = Math.round(t.total);
@@ -1865,6 +1874,14 @@ const BAND_FIB  = 0.3;   // 食物繊維は合否に入れていないので軽�
 const ENERGY_W  = 5;
 const ENERGY_FREE = 0;   // 帯の中でもズレは点数に効かせる（増量の余剰を守るため）
 const SLACK_W   = 10;    // 食塩・飽和の余裕を残すことの重み（帯の次に効く）
+/* **嵩（食べる量）の重み**（v.159）。食費のすぐ上に置く。
+   それまで探索は7つの栄養の帯と食費しか見ておらず、**重さという概念が無かった**ので、
+   帯さえ満たせば嵩がいくら増えても平気で選んだ（実測で1日3.0kg・昼食1.37kg）。
+   ハードな上限にはしない — `BULK_AIM` を割れない日が普通にあるため
+   （7項目すべてを満たす最軽量を探しても2,552gだった）。
+   **目安を超えたぶんだけ**を点数に足し、同じ点数なら軽いほうを選ばせる。
+   食費より重く、食塩・飽和の余裕（`SLACK_W`）より軽い。 */
+const BULK_W    = 1 / 200;
 const COST_W    = 1 / 5000;   // 最後の同点崩し。余裕より軽く効かせる
 const BAD_BASE  = 1e8;   // 食塩・飽和の線を越えた点の下駄（帯の外れよりさらに重い）
 const CLIMB_MAX = 200;   // 山登りの打ち切り（通常は10回ほどで止まる）
@@ -1951,7 +1968,9 @@ function makeScore(st0, ex, ids, satCap){
     const under = Math.pow(Math.max(0, pLo - P) / DEVIATION_OK, 2);
     return {ok:true, pShort: under > 0,
             score: (under > 0 ? PLOW_FIX : 0) + PLOW_W * under + BAND_W * d + ENERGY_W * near
-                 + SLACK_W * (salt / SALT_LIMIT + sat / SAT_GOOD) + COST_W * food.cost};
+                 + SLACK_W * (salt / SALT_LIMIT + sat / SAT_GOOD)
+                 + BULK_W * Math.max(0, calcGram(st, sv).total - BULK_AIM)
+                 + COST_W * food.cost};
   };
   return q => {
     let key = '';
@@ -2110,6 +2129,11 @@ function autoFillAuto(){
    「その品目のkcal − 減る納豆のkcal」。この正味で並べないと、足しても増えない品目
    （卵）やかえって減る品目（サバ缶）を勧めてしまう。納豆が0パックの日は相殺が
    起きないので、そのままのkcalで見る。 */
+/* 1日に食べる飲食物の重さの目安（g）。**栄養ではないので合否には入れない。**
+   越えても✕にはせず、④に「多め」と出し、自動計算では同じ点数なら軽いほうを選ぶ。
+   2,500g は、7項目すべてを満たす組み合わせのうち最軽量を探して得た実測値
+   （2,552g）を丸めたもの。**これより下は、いまの食材では組めない。** */
+const BULK_AIM = 2500;
 const ENERGY_MIN_NET = 20;   // これ未満しか増えない品目は挙げない
 const SAT_PER_UNIT_MIN  = 0.4;  // 飽和脂肪酸の残り枠で数を絞る対象（1単位あたり）
 const SALT_PER_UNIT_MIN = 0.2;  // 食塩の残り枠で数を絞る対象（1単位あたり）
@@ -2276,6 +2300,7 @@ function render(opts){
   const carb     = calcCarb(st, sv);
   const fiber    = calcFiber(st, sv);
   const kcal     = calcKcal(st, sv);
+  const gram     = calcGram(st, sv);
   const need     = calcNeed(st, ex);
   const kcalGap  = Math.round(kcal.total - need);
   /* 多い順に3つ出す。エネルギーだけは単位が kcal で、g のような小数も要らない。 */
@@ -2359,6 +2384,18 @@ function render(opts){
         (carbState === 'under' ? `目標まで あと ${carbMin - Math.round(carb.total)}g。`
          : carbState === 'over' ? `目標を ${Math.round(carb.total) - carbMax}g 超えています。`
          : inRange(Math.round(carb.total), carbMin, carbMax)) + top3(carb)) +
+    /* **食べる量**（v.159）。栄養の帯ではないので `warn`/`ok` の2段階だけ。
+       それまでツールは重さを持っておらず、1日3.0kg・昼食1.37kgという献立を
+       平気で出していた（利用者の「食べきれない」で気づいた）。 */
+    row('食べる量', gram.total.toLocaleString(), 'g', `${BULK_AIM.toLocaleString()}g 前後`,
+        gram.total > BULK_AIM ? 'warn' : 'ok',
+        (gram.total > BULK_AIM
+          ? `目安より ${(gram.total - BULK_AIM).toLocaleString()}g 多めです。`
+          : `目安の中です（余裕 ${(BULK_AIM - gram.total).toLocaleString()}g）。`) +
+        `飲みものと、水で溶いた${PROTEIN.name}も含みます。<br>${topN(gram, 'g')}` +
+        `<br><small><b>重さはすべて見積り</b>です（公表の内容量・成分表・器の見当から出した概算）。` +
+        `栄養の計算には使っていません。「その他（自由入力）」と自分で足した品目は0として扱います。</small>`,
+        gram.total > BULK_AIM ? '多め' : 'ちょうどよい') +
     row('エネルギー', kcal.total.toLocaleString(), 'kcal', `約${need.toLocaleString()}kcal`, kcalState,
         // 札が「ちょうどよい」のときに強い言い方をしないよう、判定に合わせる
         (kcalState === 'ok'
@@ -2642,6 +2679,9 @@ function distributeFoods(st, mealTargets, planIds, trained){
 
   units.sort((a, b) => b.g - a.g);
 
+  /* その食事の重さ（g）。⑤に出して「1食にどれだけ盛るのか」を見えるようにする。 */
+  const binGram = bin => Math.round(
+    bin.items.concat(bin.adds || []).reduce((a, u) => a + (GRAM[u.key] || 0), 0));
   const mk   = () => ({items:[], total:0, adds:[], addTotal:0});
   const bins = {b:mk(), l:mk(), d:mk(), p:mk(), s:mk()};   // p = 運動直後、s = 間食（自宅の食材）
   const gap  = s => (mealTargets[s] || 0) - bins[s].total - bins[s].addTotal;
@@ -2786,6 +2826,9 @@ function distributeFoods(st, mealTargets, planIds, trained){
     });
   })();
 
+  // すべての移動が終わってから、各食事の重さを確定する（⑤に出す）
+  Object.values(bins).forEach(bin => { bin.gram = binGram(bin); });
+
   // 同じ食品をまとめて「納豆 1P（8g）」の形に整形（最初に食べるものを先頭に並べる）
   Object.values(bins).forEach(bin => {
     const map = new Map();
@@ -2914,6 +2957,11 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
   const perFree = freeKeys.length ? Math.round(rest / freeKeys.length) : 0;
   const tOf = k => mealKeys.indexOf(k) < 0 ? 0
                  : (homeOk[k] ? perFree : Math.round(fixedT[k]));
+  /* 目安量（たんぱく質のg）の下に、その食事の**重さ**を添える（v.159）。
+     たんぱく質のgだけでは「1食にどれだけ盛るのか」が分からず、
+     1食1.37kg という配分を出していても画面からは読み取れなかった。 */
+  const gramLabel = bin => (bin && bin.gram > 0)
+    ? `<br><small>食べる量 約${bin.gram.toLocaleString()}g</small>` : '';
   const mBreak  = tOf('b');
   const mLunch  = tOf('l');
   const mDinner = tOf('d');
@@ -3199,7 +3247,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
     const late = at !== null && at !== undefined && at >= LATE_HHMM;
     return [
       `間食<br><small>（${(at !== null && at !== undefined ? hhmm(at) + '・' : '')}自宅）</small>`,
-      `約&nbsp;${snack.bin.total}&nbsp;g`,
+      `約&nbsp;${snack.bin.total}&nbsp;g` + gramLabel(snack.bin),
       `<b>${snack.bin.label}</b>` +
       (detail
         ? `<br><small>${FOODS.filter(f => inSnack(f, st)).map(f => f.short).join('・')}は外食に持ち込めないため、この時間にまとめて摂ります。` +
@@ -3289,7 +3337,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
         ]
       : [
           '朝食' + timeLabel('b'),
-          `約&nbsp;${mBreak}&nbsp;g`,
+          `約&nbsp;${mBreak}&nbsp;g` + gramLabel(bins.b),
           meal(bins.b, mBreak, breakfastOk(), 'b', breakfastWarn())
         ],
     splitRow('b'),
@@ -3306,14 +3354,14 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered){
         ]
       : [
           '昼食' + timeLabel('l'),
-          `約&nbsp;${mLunch}&nbsp;g`,
+          `約&nbsp;${mLunch}&nbsp;g` + gramLabel(bins.l),
           meal(bins.l, mLunch, '', 'l')
         ],
     splitRow('l'),
     snackRow('l'),
     [
       '夕食' + timeLabel('d'),
-      `約&nbsp;${mDinner}&nbsp;g`,
+      `約&nbsp;${mDinner}&nbsp;g` + gramLabel(bins.d),
       meal(bins.d, mDinner, '<br>就寝の3時間前までに済ませると消化と睡眠の質の面で有利です。', 'd')
     ],
     splitRow('d'),
@@ -4175,6 +4223,49 @@ const WEEKLY_PLAN = {
   5: {sk_mazenokke:1, saba:1, salad:1, dressing:1},   // 金（自宅の夕食）
   6: {sk_mazenokke:1, saba:1, salad:1, dressing:1}    // 土（自宅の夕食）
 };
+/* ============================================================
+   1単位あたりの実重量（g）。**すべて見積り**で、公表の内容量・
+   日本食品標準成分表・器の見当から出した概算である。
+   **栄養の計算には一切使わない。**「その日いくつ食べることになるか」を
+   出すためだけの値なので、多少ずれても判断を誤らせない。
+
+   なぜ要るか（v.159）：それまでツールは**重さという概念を持っていなかった**。
+   7つの栄養の帯と食費しか見ていないので、帯さえ満たせば嵩がいくら増えても
+   平気で選ぶ。実測で **1日 約3.0kg**、**昼食だけで1.37kg** という献立を出していた。
+   何かを絞っても別の嵩で埋め直すだけだった（ご飯を半分にしたら
+   ヨーグルト・パン・バナナが増えて総量はむしろ増えた）。
+
+   **調理後の重さで数える**（オートミールは乾燥30g→約100g）。
+   口に運ぶ量を見たいので、吸った水も数える。
+   プロテインは粉と水を別に数える（`GRAM_PER_SPOON`）。
+   「その他（自由入力）」と、利用者が足した品目には重量が無いので0として扱う。
+   ============================================================ */
+const GRAM = {
+  // --- 外食（器の中身の総量。みそ汁・つゆ込みの見当） ---
+  sk_mazenokke:550, sk_gyudon:430, mt_teishoku:500, mt_rice:250, mt_gyumeshi:400, mt_miso:180,
+  ys_hamegg:520, ys_shiosaba:560, ys_rice:250, ys_butadon:400, nk_oyako:430, katsuju:450,
+  // --- 自宅の食材 ---
+  banana:100,        // 1本の可食部
+  almond:1,          // 1粒
+  tomato:206,        // 200ml
+  dressing:15,       // 大さじ1
+  olive:4,           // 小さじ1
+  salad:65,          // 0.5袋
+  yogurt:100,        // 1杯100g
+  milk:206,          // 200ml
+  bread:60,          // 6枚切り1枚
+  cereal:100,        // 乾燥30g → 調理後の見当
+  chicken:115,       // 1パック
+  egg:50,            // 1個の可食部
+  saba:190, saba_aji:190, saba_miso:190,   // 1缶（固形＋汁）
+  tuna:70,           // 1缶（油を切った見当）
+  rice:165,          // 0.5合＝米75g → 炊きあがり
+  natto:50, natto_plain:50
+};
+FOODS.forEach(f => { if(GRAM[f.id] !== undefined) f.gram = GRAM[f.id]; });
+// プロテイン1杯ぶんの重さ＝粉＋水。水は1回分（PER_SERVE杯）に対する量なので割る。
+const GRAM_PER_SPOON = r1(PROTEIN.scoopG + PROTEIN.waterMl / PER_SERVE);
+
 const todayIdx = () => new Date().getDay();
 
 /* ------------------------------------------------------------
