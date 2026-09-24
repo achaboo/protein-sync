@@ -808,7 +808,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.173';
+const APP_VERSION = '2026-09-01.174';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -1423,10 +1423,23 @@ const clearCustomFoods = () => customFoods().forEach(f => removeCustomFood(f.id)
 /* 保存データ・設定リンクから品目を復元する。
    品目そのもの（名前・栄養成分・価格）は日付をまたいでも残し、
    数量だけ当日の入力として扱う（values を渡さなければ 0 から始まる）。 */
-function restoreCustomFoods(list, values){
-  clearCustomFoods();
+function restoreCustomFoods(list, values, keepExisting){
+  /* **`keepExisting` のときは、手元の品目を消さない**（v.174）。
+     設定リンクを適用するとここを通るので、以前は
+     **リンクに無い品目が全部消えていた**。
+     ホーム画面のアイコンに古い `#s=` が残っていると、
+     「入力をリセット」の直後にそれで開いただけで品目が全滅する（実測で再現）。
+     **品目を消せるのは行の「削除」だけ**という規則にそろえる。
+     同じ id があれば定義を入れ替え、無ければ足すだけ。
+     代償は「端末Aで削除しても端末Bには残る」こと。
+     保存からの復元（`load`）は保存内容が真なので、これを使わない。 */
+  if(!keepExisting) clearCustomFoods();
   (list || []).forEach(o => {
     if(!o || !o.name) return;
+    if(keepExisting){
+      const old = FOODS.find(x => x.custom && x.id === o.id);
+      if(old) removeCustomFood(old.id);
+    }
     const f = addCustomFood(o, 0);
     const v = values && values['f_' + f.id];
     $('f_' + f.id).value = v === undefined ? 0 : v;
@@ -5088,7 +5101,7 @@ function applySettingsFromHash(hash){
     // 日付を持たない古いリンクは設定のみ。当日のリンクなら食事・距離・種目も反映する
     const sameDay = d.date === todayKey();
     // 品目は設定と同じ扱いで持ち込む。数量は当日のリンクのときだけ
-    restoreCustomFoods(d.cf, sameDay ? d.v : null);
+    restoreCustomFoods(d.cf, sameDay ? d.v : null, true);   // リンクでは手元の品目を消さない
     if(!sameDay){
       applyDailyDefaults();        // 食事は受け取った端末の「その日の型」に戻す
       appliedLink = m[1];
@@ -5401,10 +5414,16 @@ $('reset').addEventListener('click', () => {
      栄養成分を手で書き写して作ったものなので、再入力の手間が大きい。
      **品目を消すのは行の「削除」だけ**という規則にそろえる。
      書き戻すのは `cf` だけなので、数量も設定も初期状態に戻る。 */
+  /* **`lk`（適用済みリンクの印）も残す**（v.174）。
+     v.172では `cf` だけを書き戻していたので、リセット後に
+     `appliedLink` が空になり、**ホーム画面のアイコンに残っている
+     古い `#s=` がもう一度適用された**。v.161 で止めたはずの穴が
+     リセット経由で開いていた。 */
   const keep = customData();
   try{
     localStorage.removeItem(KEY);
-    if(keep.length) localStorage.setItem(KEY, JSON.stringify({v:{}, c:{}, cf:keep}));
+    if(keep.length || appliedLink)
+      localStorage.setItem(KEY, JSON.stringify({v:{}, c:{}, cf:keep, lk:appliedLink}));
   }catch(err){}
   location.reload();
 });
