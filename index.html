@@ -478,7 +478,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
     <p class="hint" id="twoNote" style="margin-top:6px"></p>
 
     <div class="ex-head" style="margin-top:12px">
-      <input type="checkbox" id="restSavas">
+      <input type="checkbox" id="restSavas" checked>
       <label for="restSavas">運動しなかった日も<span class="pname">Bpro</span>を摂る</label>
     </div>
     <p class="hint" id="restNote" style="margin-top:6px"></p>
@@ -810,7 +810,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.178';
+const APP_VERSION = '2026-09-01.179';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -4592,7 +4592,7 @@ const storageOk = (() => {
 })();
 // 入力欄の既定値を変更したら上げる。番号が違う保存データでは、
 // 下記の欄だけ復元せず新しい既定値に戻す（体重や食事回数などの他の設定は保持）。
-const DEFAULTS_VER = 16;
+const DEFAULTS_VER = 17;
 // v6：体重の初期値を 75kg → 74kg に変更。
 // 次に既定値を変えるときは、実際に変えた欄だけをこの一覧に残すこと
 // （体重を入れたままにすると、以後の更新で入力済みの体重まで戻ってしまう）。
@@ -4616,6 +4616,13 @@ const DEFAULTS_VER = 16;
 // v15：サイドレイズ・リアレイズの初期重量 5.75 → 8.5kg、チェストプレスのセット数 3 → 6。
 //      変えたのは筋トレの3欄だけなので、v14 の4つは一覧から外している。
 //      総負荷量が 5,658.75 → 6,682.5kg に増え、筋トレの正味消費は 181 → 214kcal になる。
+// v17：「運動しなかった日も Bpro を摂る」の初期値を オフ → オン に変更。
+//      休養日に粉0杯だと目標の全量を食事だけで背負うため、昼53.2g・夕52.3g（体重×0.70）と
+//      1食の目安帯（×0.30〜0.60）を超えていた。オンにすると 20.4g／43.7g に収まり、
+//      飽和14.3→12.6g・食塩7.3→6.3g・食費1,277→1,019円・重さ2,956→2,661g と全部良くなる。
+//      チェックなので RESET_IDS では扱えず、load() の staleEx で初期値へ戻す。
+//      **`weight` は一覧に残してある** — v16 を開かないまま v17 に来た端末にも
+//      75.0kg を届けるため。v18 では必ず外すこと。
 // v16：体重の初期値 72.5 → 75.0kg（目標たんぱく質 119.6 → 123.8g）。
 //      **体重は利用者が毎朝測り直している値**なので、いったんは上げずに済ませたが、
 //      「使っている端末でも 75.0 にしたい」という指示で上げた。
@@ -5058,8 +5065,9 @@ function load(){
     // 既定値を変えた版では、チェックの状態も新しい初期値（全部オフ）に合わせる
     if(!staleEx) EXERCISES.forEach(e => { if($('c_' + e.id)) $('c_' + e.id).checked = !!d.c[e.id]; });
     if(d.exd !== undefined) exDate = d.exd;      // ②の運動を最後に確定した日
-    if(d.rest !== undefined) $('restSavas').checked = !!d.rest;
     // 既定値を変えた版では、チェックの状態も新しい初期値に合わせる
+    // （`restSavas` は v.179 で初期値をオンにしたので、ここも `staleEx` を見る）
+    if(d.rest !== undefined && !staleEx) $('restSavas').checked = !!d.rest;
     if(d.two  !== undefined && !staleEx) $('twoDoses').checked = !!d.two;
     if(d.sd   !== undefined) $('schedDetail').checked = !!d.sd;
     // 手入力への切り替えはその日限り
