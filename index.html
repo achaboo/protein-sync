@@ -810,7 +810,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.179';
+const APP_VERSION = '2026-09-01.180';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -1018,8 +1018,8 @@ const FOODS = [
      **飽和脂肪酸1.0gも公表値**なので推定を使っていない。
      炭水化物28.1g＝糖質24.0g＋食物繊維4.1g。食塩0.7gは候補のなかでは納豆と同じ重さ。 */
   {id:'bread',   name:'全粒パン',              short:'全粒パン',     weekShort:'全粒パン', note:'1枚 約5.8g',
-   ruleNote:'全粒粉入り食パン（6枚切り）<br>1日3枚まで',
-   price:47, p:5.8, unit:'枚', sat:1.0, salt:0.7, carbG:28.1, fiber:4.1, kcal:154, fat:3.0,
+   ruleNote:'全粒粉入り食パン（3枚入り）<br>1日3枚まで',
+   price:50, p:5.8, unit:'枚', sat:1.0, salt:0.7, carbG:28.1, fiber:4.1, kcal:154, fat:3.0,
    slots:['s'], lock:true, home:true, autoFill:true, fillMax:3},
 
   /* 西友 みなさまのお墨付き オートミール 340g 398円。1食30gあたりの公表値。
@@ -2765,6 +2765,7 @@ function render(opts){
        **表のセルの中には置かない** — 375px では4列目が130pxしかなく、
        候補の行とボタンが崩れる（v.163で実際に踏んだ）。
        「エネルギーが足りないときの追加候補」と同じ、表の外の `.advice` に出す。 */
+    microAdvice(st, sv) +
     restDoseAdvice(st, sv) +
     `<div class="advice"><b>食べる量が多くて食べきれないときは、` +
     `どれを減らすと実際に軽くなるかを計算できます。</b>` +
@@ -4713,6 +4714,114 @@ const GRAM = {
 FOODS.forEach(f => { if(GRAM[f.id] !== undefined) f.gram = GRAM[f.id]; });
 // プロテイン1杯ぶんの重さ＝粉＋水。水は1回分（PER_SERVE杯）に対する量なので割る。
 const GRAM_PER_SPOON = r1(PROTEIN.scoopG + PROTEIN.waterMl / PER_SERVE);
+
+/* ------------------------------------------------------------
+   微量栄養素（v.180）。**表示だけ。合否にも探索の点数にも入れない。**
+
+   外部レビューの指摘（2026-09-26）で足した。
+   「P・脂質・飽和・食塩・食物繊維だけを満たして『栄養バランスがよい』と判断するのは不十分」。
+
+   **二層で出す** — 値が分かる自宅の食品だけを合計し、
+   **外食とプロテインは合計に入れず『未計上』と名指しする**。
+   推定で埋めない。レビュアーの指示どおり。
+
+   値の出どころは3層ある。画面にもそう書く。
+     ① 商品の表示値 … 低脂肪牛乳のCa・ヨーグルトのCa・全粒パンのFe・シリアルの各値
+     ② 日本食品標準成分表（八訂）増補2023年の代表値 … それ以外
+        **買っている商品そのものの実測ではない。**
+     ③ 未計上 … 外食・粉・自由入力の品目・ミックスサラダ以外で値を持たないもの
+
+   当てはめで気をつけた点（README に詳しく書いた）：
+     - **シリアルは乾燥30gで当てる**。`GRAM` の100gは調理後の見当なので使わない
+     - **サラダチキン2品はたんぱく質の比で縮める**。商品は水分と食塩を含むので、
+       製品100gを鶏むね100gとして数えると2〜3割の過大になる
+     - **加熱による水溶性ビタミンの損失は見込んでいない**ので、B群はやや高めに出る
+     - ミックスサラダは キャベツ8：にんじん1：紫キャベツ1 と**仮定**した構成比
+   ------------------------------------------------------------ */
+const MICRO_KEYS = ['ca','fe','zn','mg','vd','ve','b1','b2','b6','b12','fol'];
+// 日本人の食事摂取基準（2025年版）・50〜64歳男性
+const MICRO_DRI = {
+  ca : {name:'カルシウム',   unit:'mg', goal:750,  kind:'推奨量', ul:2500},
+  fe : {name:'鉄',           unit:'mg', goal:7.0,  kind:'推奨量'},
+  zn : {name:'亜鉛',         unit:'mg', goal:9.5,  kind:'推奨量', ul:45},
+  mg : {name:'マグネシウム', unit:'mg', goal:370,  kind:'推奨量'},
+  vd : {name:'ビタミンD',    unit:'μg', goal:9.0, kind:'目安量', ul:100},
+  ve : {name:'ビタミンE',    unit:'mg', goal:6.5,  kind:'目安量', ul:800},
+  b1 : {name:'ビタミンB1',   unit:'mg', goal:1.1,  kind:'推奨量'},
+  b2 : {name:'ビタミンB2',   unit:'mg', goal:1.6,  kind:'推奨量'},
+  b6 : {name:'ビタミンB6',   unit:'mg', goal:1.5,  kind:'推奨量', ul:60},
+  b12: {name:'ビタミンB12',  unit:'μg', goal:4.0, kind:'目安量'},
+  fol: {name:'葉酸',         unit:'μg', goal:240, kind:'推奨量'}
+};
+// 1単位あたり。Tr と (0) は 0 として扱う
+const MICRO = {
+  rice: {ca:4.95, fe:0.165, zn:0.99, mg:11.6, b1:0.033, b2:0.017, b6:0.033, fol:4.95},
+  saba: {ca:494, fe:3.04, zn:3.23, mg:58.9, vd:20.9, ve:6.08, b1:0.285, b2:0.76, b6:0.684, b12:22.8, fol:22.8},
+  saba_miso: {ca:399, fe:3.8, zn:2.28, mg:55.1, vd:9.5, ve:3.61, b1:0.076, b2:0.703, b6:0.57, b12:18.2, fol:39.9},
+  saba_aji: {ca:342, fe:3.8, zn:2.47, mg:66.5, vd:9.5, ve:4.56, b1:0.057, b2:0.513, b6:0.627, b12:20.9, fol:45.6},
+  cereal: {ca:15, fe:1.3, zn:0.63, mg:30.0, ve:0.2, b1:0.08, b2:0.024, b6:0.04, fol:9.0},
+  natto: {ca:45.0, fe:1.65, zn:0.95, mg:50.0, ve:0.25, b1:0.035, b2:0.28, b6:0.12, fol:60.0},
+  natto_plain: {ca:45.0, fe:1.65, zn:0.95, mg:50.0, ve:0.25, b1:0.035, b2:0.28, b6:0.12, fol:60.0},
+  egg: {ca:23.0, fe:0.75, zn:0.55, mg:5.0, vd:1.9, ve:0.65, b1:0.03, b2:0.185, b6:0.045, b12:0.55, fol:24.5},
+  banana: {ca:6.0, fe:0.3, zn:0.2, mg:32.0, ve:0.5, b1:0.05, b2:0.04, b6:0.38, fol:26.0},
+  milk: {ca:240, fe:0.206, zn:0.824, mg:28.8, b1:0.082, b2:0.371, b6:0.082, b12:0.824},
+  yogurt: {ca:130, zn:0.4, mg:13.0, b1:0.04, b2:0.17, b6:0.04, b12:0.2, fol:16.0},
+  soymilk: {ca:63.2, fe:2.45, zn:0.816, mg:38.8, ve:4.49, b1:0.143, b2:0.041, b6:0.102, fol:63.2},
+  amaguri: {ca:36.0, fe:2.4, zn:1.08, mg:85.2, ve:0.12, b1:0.24, b2:0.216, b6:0.444, fol:120},
+  olive: {ve:0.296},
+  almond: {ca:2.6, fe:0.037, zn:0.037, mg:3.1, ve:0.29, b2:0.01, b6:0.001, fol:0.48},
+  tomato: {ca:12.4, fe:0.618, zn:0.206, mg:18.5, ve:1.44, b1:0.082, b2:0.082, b6:0.185, fol:35.0},
+  tuna: {ca:2.8, fe:0.35, zn:0.21, mg:17.5, vd:1.4, ve:1.96, b1:0.007, b2:0.021, b6:0.182, b12:0.77, fol:2.1},
+  bread: {ca:8.4, fe:0.7, zn:0.24, mg:30.6, ve:0.48, b1:0.102, b2:0.042, b6:0.078, fol:29.4},
+  dressing: {ca:1.5, fe:0.045, zn:0.03, mg:5.1, b1:0.003, b2:0.004, b6:0.006, fol:0.9},
+  salad: {ca:26.0, fe:0.201, zn:0.085, mg:8.71, ve:0.091, b1:0.028, b2:0.019, b6:0.07, fol:39.6},
+  chicken: {ca:3.59, fe:0.269, zn:0.628, mg:26.0, vd:0.09, ve:0.269, b1:0.09, b2:0.099, b6:0.574, b12:0.179, fol:11.7},
+  chicken_hogushi: {ca:3.38, fe:0.254, zn:0.592, mg:24.5, vd:0.085, ve:0.254, b1:0.085, b2:0.093, b6:0.541, b12:0.169, fol:11.0},
+};
+FOODS.forEach(f => { if(MICRO[f.id]) f.micro = MICRO[f.id]; });
+
+/* 自宅の食品だけを合計し、値を持たない品目は名前を集めて返す。 */
+function calcMicro(st, sv){
+  const sum = {}; MICRO_KEYS.forEach(k => sum[k] = 0);
+  const missing = [];
+  FOODS.forEach(f => {
+    const q = Math.round(st.foods[f.id] || 0);
+    if(!(q > 0)) return;
+    if(!f.micro){ missing.push(f.short || f.name); return; }
+    MICRO_KEYS.forEach(k => sum[k] += (f.micro[k] || 0) * q);
+  });
+  if(sv && sv.spoons > 0) missing.push(PROTEIN.name);
+  if(st.otherP > 0) missing.push('その他（自由入力）');
+  return {sum, missing};
+}
+
+function microAdvice(st, sv){
+  const m = calcMicro(st, sv);
+  const rows = MICRO_KEYS.map(k => {
+    const d = MICRO_DRI[k], v = m.sum[k];
+    const pct = Math.round(v / d.goal * 100);
+    const show = v >= 100 ? Math.round(v) : v >= 10 ? r1(v) : r2(v);
+    const over = d.ul && v > d.ul;
+    return `<tr><td>${d.name}</td><td class="num">${show} ${d.unit}</td>` +
+           `<td class="num">${d.goal} ${d.unit}<br><small>${d.kind}</small></td>` +
+           `<td class="num${pct < 100 ? ' warn-inline' : ''}">${pct}%</td>` +
+           `<td>${over ? '<b class="warn-inline">耐容上限量を超えています</b>' : ''}</td></tr>`;
+  }).join('');
+  const miss = [...new Set(m.missing)];
+  return `<div class="advice"><b>微量栄養素（自宅の食品だけの参考値）</b>` +
+    `<table class="mini"><thead><tr><th>栄養素</th><th>自宅の食品から</th>` +
+    `<th>目標<br><small>50〜64歳男性</small></th><th>充足率</th><th></th></tr></thead>` +
+    `<tbody>${rows}</tbody></table>` +
+    (miss.length
+      ? `<b class="warn-inline">${miss.length}品目は未計上です</b>（${miss.join('・')}）。` +
+        `外食チェーンとプロテインは微量栄養素を公表していないので、推定では埋めていません。` +
+        `<b>上の合計はそのぶん少なく出ます。充足率が100%に届かなくても、不足とは限りません。</b>`
+      : '') +
+    `<br><small>目標は「日本人の食事摂取基準（2025年版）」50〜64歳男性の推奨量／目安量です。` +
+    `食品の値は商品の表示があるものはその値、無いものは<b>日本食品標準成分表（八訂）増補2023年の代表値</b>で、` +
+    `買っている商品そのものの実測ではありません。` +
+    `<b>この表は合否の判定にも、③の数量を決める計算にも入れていません。</b></small></div>`;
+}
 
 const todayIdx = () => new Date().getDay();
 
