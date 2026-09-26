@@ -573,11 +573,13 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
 
     <h3>設定の持ち運び（別の端末で同じ設定を使う）</h3>
     <p class="hint" style="margin-top:0">
-      <b>画面の入力をすべて</b> URL に埋め込みます（体重・基本係数・食事回数・<span class="pname">Bpro</span>で賄う上限・
-      筋トレの重量／回数／セット数・実施した種目のチェック・有酸素の距離・今日の食事の数量）。
-      できたリンクを別の端末で開くと同じ内容で立ち上がり、その端末にも保存されます。<br>
-      <b>ボタンを押した時点のスナップショットです。</b>そのあとこの端末で値を変えてもリンク側は変わりません。
-      変更を反映したいときは、もう一度ボタンを押して新しいリンクを配ってください。<br>
+      <b>画面の入力は、つねにこのページのURLに埋め込まれています</b>（体重・基本係数・食事回数・<span class="pname">Bpro</span>で賄う上限・
+      筋トレの重量／回数／セット数・実施した種目のチェック・有酸素の距離・今日の食事の数量・
+      <b>自由入力で足した品目</b>・品目ごとの「使う／使わない」）。
+      入力するたびURLも書き替わるので、<b>いつブックマークしても・いつ「ホーム画面に追加」しても、
+      そのとき画面にある内容がそのまま入ります。</b>下のボタンは、そのURLをコピーするだけのものです。<br>
+      できたリンクを別の端末で開くと同じ内容で立ち上がり、その端末にも保存されます。
+      <b>同じ端末で開き直したときは読み込まない</b>ので、入力が巻き戻ることはありません。<br>
       <b>食事・距離・実施種目は「リンクを作った日と同じ日」に開いた場合だけ反映されます。</b>
       日付が変わってから開いたときは設定だけを反映し、食事はその日の型に戻します
       （食事は毎日入力し直す前提のため）。
@@ -808,7 +810,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.175';
+const APP_VERSION = '2026-09-01.176';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -4930,6 +4932,12 @@ const todayKey  = () => { const d = new Date(); return `${d.getFullYear()}-${d.g
 let appliedLink = '';
 
 function save(){
+  writeStore();
+  scheduleHashSync();     // URL の `#s=` も最新に保つ（v.176）
+}
+
+/* 保存だけを行い、URL には触らない。`syncHash` が `lk` を書き直すのにも使う。 */
+function writeStore(){
   const d = {v:{}, c:{}, date:todayKey(), dv:DEFAULTS_VER, exd:exDate, rest:$('restSavas').checked, two:$('twoDoses').checked, sd:$('schedDetail').checked, ao:autoOverride, calc:calculated, cf:customData(), ov:foodOverride, off:foodOff, lk:appliedLink};
   ALL_IDS().forEach(id => d.v[id] = $(id).value);
   EXERCISES.forEach(e => d.c[e.id] = $('c_' + e.id).checked);
@@ -5060,7 +5068,7 @@ const b64enc = obj => {
 const b64dec = str =>
   JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(str), c => c.charCodeAt(0))));
 
-function buildSettingsLink(){
+function settingsPayload(){
   const d = {v:{}, c:{}, date:todayKey(), rest:$('restSavas').checked, two:$('twoDoses').checked, sd:$('schedDetail').checked};
   d.cf = customData();
   d.ov = foodOverride;
@@ -5071,8 +5079,45 @@ function buildSettingsLink(){
   d.off = foodOff;
   SETTING_IDS().concat(LINK_DAILY_IDS()).forEach(id => { if($(id)) d.v[id] = $(id).value; });
   EXERCISES.forEach(e => d.c[e.id] = $('c_' + e.id).checked);
-  // クエリ（キャッシュ回避用の ?v= など）は引き継がず、素のURLに設定だけを付ける
-  return location.href.split(/[?#]/)[0] + '#s=' + b64enc(d);
+  return b64enc(d);
+}
+
+// クエリ（キャッシュ回避用の ?v= など）は引き継がず、素のURLに設定だけを付ける
+function buildSettingsLink(){
+  return location.href.split(/[?#]/)[0] + '#s=' + settingsPayload();
+}
+
+/* **URL の `#s=` を、入力のたび最新の内容に書き替える**（v.176）。
+
+   v.175 までは「設定リンクをコピー」を押した時点のスナップショットしか
+   URL に載らなかった。そのため利用者が素の公開URLをブックマーク／ホーム画面に
+   追加していると、そこには**品目も設定も入っていない**。
+   別の端末や、iOS の7日ルール（ITPが `localStorage` を消す）のあとに開くと
+   品目ゼロで始まる。「公開URLに品目も残してほしい」という要望はここ。
+
+   **`appliedLink` を同時に進めるのが肝**。これをしないと、次に開いたときに
+   自分で書いたハッシュを「新しいリンク」として読み込んでしまう。
+   自分の端末では二度と読まず、**他の端末で開いたときだけ適用される**という形になる。
+   （v.161 で踏んだ「開くたび設定が巻き戻る」の再発を防ぐのはこの1行）
+
+   **500ms の待ちは必須**。`save()` は入力のたびに走るので、そのまま
+   `history.replaceState` を呼ぶと Safari の回数制限（30秒で100回）に当たる。 */
+let hashReady = false;      // 起動時の読み込みが済むまで書かない
+let hashTimer = 0;
+function scheduleHashSync(){
+  if(!hashReady) return;
+  clearTimeout(hashTimer);
+  hashTimer = setTimeout(syncHash, 500);
+}
+function syncHash(){
+  if(!hashReady) return;
+  try{
+    const payload = settingsPayload();
+    if(payload === appliedLink) return;
+    appliedLink = payload;
+    history.replaceState(null, '', location.pathname + location.search + '#s=' + payload);
+    writeStore();          // `lk` を新しいハッシュに合わせておく
+  }catch(err){}
 }
 
 // 戻り値: false（リンクなし・壊れている）／'all'（当日分も反映）／'settings'（設定のみ）
@@ -5128,7 +5173,9 @@ function copySettingsLink(){
   if(navigator.clipboard && navigator.clipboard.writeText){
     navigator.clipboard.writeText(url)
       .then(() => show('<b>コピーしました。</b>このリンクを別の端末で開くと、今この画面にある内容がそのまま再現されます' +
-                       '（食事・距離・実施種目は今日中に開いた場合のみ）。'))
+                       '（食事・距離・実施種目は今日中に開いた場合のみ）。' +
+                       '<br>アドレス欄のURLと同じものです。<b>URLはつねに最新の内容を持つ</b>ので、' +
+                       'ブックマークや「ホーム画面に追加」から作り直す必要はありません。'))
       .catch(() => show('<b>自動コピーできませんでした。</b>下の欄を選択してコピーしてください。'));
   }else{
     show('<b>下の欄を選択してコピーしてください。</b>');
@@ -5473,11 +5520,15 @@ if(fromLink){
     : '<b>リンクの設定を読み込みました。</b>リンクが作られた日と今日が違うため、' +
       '食事の入力は今日の型に戻しています（設定・筋トレの重量などは反映済みです）。') +
     'この端末にも保存しました。' +
-    '<br><b>このURLにはリンクが付いたままです。</b>' +
+    '<br><b>このURLはつねに最新の内容を持ちます。</b>' +
     'ここから「ホーム画面に追加」すると、そのアプリでも同じ品目・設定で始められます' +
     '<small>（<b>ホーム画面のアプリはブラウザと別に保存される</b>ため、最初の1回だけリンクが要ります。' +
     '同じリンクを二度読むことは無いので、開くたびに巻き戻ることはありません）</small>';
 }
+/* ここから先は URL を書き替えてよい。**読み込みより先に書くと、
+   受け取ったリンクを適用する前に消してしまう**ので順番を変えないこと。 */
+hashReady = true;
+syncHash();
 updateLive();
 // 前回すでに計算していたなら結果も出しておく（スリープ復帰で消えたように見えるのを防ぐ）
 if(wasCalculated) render({restore:true});
