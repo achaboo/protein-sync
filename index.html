@@ -845,7 +845,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.183';
+const APP_VERSION = '2026-09-01.184';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -946,6 +946,24 @@ const FOODS = [
    note:'1杯 約1.8g', ruleNote:'1杯で食塩1.5g。型には入れていません',
    price:0, p:1.8, unit:'杯', sat:0.2, salt:1.5, carbG:3.7, fiber:0.8, kcal:35, fat:1.3,
    slots:['d'], lock:true, slot:'d', fixedMenu:true},
+  /* 松のや 玉子丼（並盛）。**公表値はみそ汁込みなので、みそ汁のぶんを引いてある**
+     （利用者の計算）：572−28=544kcal／21.1−1.4=19.7g／11.1−0.7=10.4g／
+     96.9−3.7=93.2g／4.6−1.6=3.0g。
+     **飽和脂肪酸3.0gと食物繊維2.3gは推定値**（公表が無い）。
+     **みそ汁はこの品目に含めない。**系列の松屋のみそ汁と同じとみて、
+     飲む日は「松屋 みそ汁」にチェックを入れて数える（利用者の指定）。
+
+     `eggs` は提示値に無いので、**松屋ライス（並盛）を引いた残りから出した見当**：
+     P 19.7−5.1=14.6g・脂質 10.4−0.6=9.8g。卵1個（可食部50g）が P6.1g・脂質5.1g なので
+     脂質から1.9個ぶん＝2個とした。**多めに見ておくと自動計算が卵を足さない**ので、
+     飽和脂肪酸は増える側に振れない。実際の個数が分かったら直すこと。 */
+  {id:'mn_tamagodon', shop:'松のや',  name:'玉子丼（並盛）',       short:'玉子丼',
+   weekName:'松のや<br>玉子丼', note:'1食 約19.7g（卵2個ぶん）',
+   ruleNote:'1週間の型からは外しています<br>（食べる日は手で1を入れてください）<br>' +
+            'みそ汁は含みません（飲む日は松屋のみそ汁にチェック）<br>' +
+            '飽和脂肪酸・食物繊維・微量栄養素は推定値',
+   price:330, p:19.7, unit:'食', sat:3.0, salt:3.0, carbG:93.2, fiber:2.3, kcal:544, fat:10.4,
+   slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true, eggs:2},
   {id:'ys_hamegg',    shop:'吉野家',  name:'ハムエッグ納豆定食',   short:'ハムエッグ納豆定食',
    weekName:'吉野家<br>ﾊﾑｴｯｸﾞ納豆定食', note:'1食 約24.1g（卵1個ぶん）',
    price:468, p:24.1, unit:'食', sat:4.2, salt:2.6, carbG:94.2, fiber:7.6, kcal:581, fat:13.0, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1, teishoku:true},
@@ -4725,8 +4743,14 @@ const WEEKLY_PLAN = {
    ============================================================ */
 const GRAM = {
   // --- 外食（器の中身の総量。みそ汁・つゆ込みの見当） ---
-  sk_mazenokke:550, sk_gyudon:430, mt_teishoku:500, mt_rice:250, mt_gyumeshi:400, mt_miso:180,
-  ys_hamegg:520, ys_shiosaba:560, ys_rice:250, ys_butadon:400, nk_oyako:430, katsuju:450,
+  /* **`mt_teishoku` と `ys_shiosaba` は FOODS に無い鍵だった**（v.184で修正）。
+     正しくは `mt_gyuzara`（得朝牛皿定食）と `ys_saba`（塩さば得朝定食）で、
+     そのため**この2品は「食べる量」に1gも乗っていなかった**。
+     どちらも1週間の型には入らないので、型の実測値は変わらない。
+     **`GRAM` の鍵は id で、`FOODS` と綴りが合っているかを確かめること。** */
+  sk_mazenokke:550, sk_gyudon:430, mt_gyuzara:500, mt_rice:250, mt_gyumeshi:400, mt_miso:180,
+  mn_tamagodon:430,                                 // 親子丼と同じ見当（丼の器1杯・みそ汁は別）
+  ys_hamegg:520, ys_saba:560, ys_rice:250, ys_butadon:400, nk_oyako:430, katsuju:450,
   // --- 自宅の食材 ---
   banana:100,        // 1本の可食部
   almond:1,          // 1粒
@@ -4814,22 +4838,34 @@ const MICRO = {
   salad: {ca:26.0, fe:0.201, zn:0.085, mg:8.71, ve:0.091, b1:0.028, b2:0.019, b6:0.07, fol:39.6},
   chicken: {ca:3.59, fe:0.269, zn:0.628, mg:26.0, vd:0.09, ve:0.269, b1:0.09, b2:0.099, b6:0.574, b12:0.179, fol:11.7},
   chicken_hogushi: {ca:3.38, fe:0.254, zn:0.592, mg:24.5, vd:0.085, ve:0.254, b1:0.085, b2:0.093, b6:0.541, b12:0.169, fol:11.0},
+  /* **ここだけ外食**（v.184・利用者の提示値）。
+     ほかの外食は公表が無いので「未計上」と名指ししているが、この品目は
+     利用者が概算を出したので参考値として入れる。
+     **公式の食材配合・使用量が不明なので分析値ではない。**みそ汁は除いてある。
+     `MICRO_EST` に入れて、④で**推定値と名指しする**。 */
+  mn_tamagodon: {ca:50, fe:2.1, zn:2.7, mg:35, vd:3.8, ve:1.3, b1:0.12, b2:0.40, b6:0.18, b12:1.0, fol:60},
 };
-FOODS.forEach(f => { if(MICRO[f.id]) f.micro = MICRO[f.id]; });
+/* 微量栄養素が「推定値」の品目。④でそう書くためだけに持つ。 */
+const MICRO_EST = ['mn_tamagodon'];
+FOODS.forEach(f => {
+  if(MICRO[f.id]) f.micro = MICRO[f.id];
+  if(MICRO_EST.includes(f.id)) f.microEst = true;
+});
 
 /* 自宅の食品だけを合計し、値を持たない品目は名前を集めて返す。 */
 function calcMicro(st, sv){
   const sum = {}; MICRO_KEYS.forEach(k => sum[k] = 0);
-  const missing = [];
+  const missing = [], est = [];
   FOODS.forEach(f => {
     const q = Math.round(st.foods[f.id] || 0);
     if(!(q > 0)) return;
     if(!f.micro){ missing.push(f.short || f.name); return; }
+    if(f.microEst) est.push(f.short || f.name);
     MICRO_KEYS.forEach(k => sum[k] += (f.micro[k] || 0) * q);
   });
   if(sv && sv.spoons > 0) missing.push(PROTEIN.name);
   if(st.otherP > 0) missing.push('その他（自由入力）');
-  return {sum, missing};
+  return {sum, missing, est};
 }
 
 /* ------------------------------------------------------------
@@ -5062,6 +5098,7 @@ function microAdvice(st, sv){
            `<td>${over ? '<b class="warn-inline">耐容上限量を超えています</b>' : ''}</td></tr>`;
   }).join('');
   const miss = [...new Set(m.missing)];
+  const est  = [...new Set(m.est)];
   return `<div class="advice"><b>微量栄養素（自宅の食品だけの参考値）</b>` +
     `<table class="mini"><thead><tr><th>栄養素</th><th>自宅の食品から</th>` +
     `<th>目標<br><small>50〜64歳男性</small></th><th>充足率</th><th></th></tr></thead>` +
@@ -5070,6 +5107,10 @@ function microAdvice(st, sv){
       ? `<b class="warn-inline">${miss.length}品目は未計上です</b>（${miss.join('・')}）。` +
         `外食チェーンとプロテインは微量栄養素を公表していないので、推定では埋めていません。` +
         `<b>上の合計はそのぶん少なく出ます。充足率が100%に届かなくても、不足とは限りません。</b>`
+      : '') +
+    (est.length
+      ? `<br><b>${est.join('・')} の微量栄養素は推定値です。</b>` +
+        `公式の食材配合・使用量が分かっていないので、食材構成から出した概算で、分析値ではありません。`
       : '') +
     `<br><small>目標は「日本人の食事摂取基準（2025年版）」50〜64歳男性の推奨量／目安量です。` +
     `食品の値は商品の表示があるものはその値、無いものは<b>日本食品標準成分表（八訂）増補2023年の代表値</b>で、` +
