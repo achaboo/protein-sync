@@ -330,11 +330,19 @@ table.mini{font-size:.82rem}
 .radar-vl{font-size:9px;fill:#6b7890}
 .trial-row{display:flex;align-items:center;gap:6px;margin:4px 0;flex-wrap:wrap}
 .trial-row .nm{flex:1 1 9em;min-width:9em;font-size:.84rem}
-.trial-row .qt{min-width:4.2em;text-align:right;font-size:.84rem}
+.trial-row .qt{min-width:5.6em;text-align:right;font-size:.84rem;white-space:nowrap}
+/* **−／数量／＋／消す は1つの箱にまとめる。**ばらのままだと375pxで
+   「−」と「＋」が別の行に割れて、どちらがどの行のボタンか分からなくなる。
+   折るときは品目名だけが上の行へ回る。 */
+.trial-row .ctl{display:flex;align-items:center;gap:6px;flex:0 0 auto}
+.trial-row .ctl .mini-btn{margin:0}
 .bar-row{display:flex;align-items:center;gap:6px;margin:3px 0;font-size:.8rem}
 .bar-row .nm{flex:0 0 8.4em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.bar-row .tr{flex:1 1 auto;background:#eef2f8;border-radius:3px;height:14px;position:relative}
-.bar-row .fl{background:#0371E0;height:100%;border-radius:3px}
+/* **`span` のままでは width も height も効かない**（inline のため）。
+   v.181 はそれで棒が1本も描かれず、灰色の溝だけが並んでいた（利用者から指摘）。
+   フレックスの子である `.tr` は blockify されるので溝だけは見えていた。 */
+.bar-row .tr{flex:1 1 auto;display:block;background:#eef2f8;border-radius:3px;height:14px;min-width:3.5em;overflow:hidden;position:relative}
+.bar-row .fl{display:block;background:#0371E0;height:100%;border-radius:3px;min-width:2px}
 .bar-row .fl.has{background:#1f8a4c}
 .bar-row .vl{flex:0 0 5.4em;text-align:right;color:var(--sub)}
 @media (max-width:420px){
@@ -682,7 +690,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
     <p class="hint" style="margin-top:0">
       <b>数量の欄に出ている数字が、その条件での最適解です。</b>自動計算の品目は、
       <b>チェックを入れたものだけ</b>を対象に<b>全部を同時に見て</b>選んだ組み合わせが入ります
-      （食塩・飽和の線 ＞ たんぱく質 ＞ ほかの帯 ＞ エネルギーの近さ ＞ 余裕 ＞ 食べる量 ＞ 食費 の順）。
+      （食塩・飽和脂肪酸の線 ＞ たんぱく質 ＞ ほかの帯 ＞ エネルギーの近さ ＞ 余裕 ＞ 食べる量 ＞ 食費 の順）。
       <b>自分で数量を探す必要はありません。</b>手で打ち替えるのは、在庫が無い・食べきれないなど
       <b>この解が現実に合わないとき</b>だけです
       （その品目だけ手入力に切り替わり、残りはその値に合わせて組み直します）。
@@ -837,7 +845,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.181';
+const APP_VERSION = '2026-09-01.182';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -2357,7 +2365,7 @@ function energyAdvice(st, gap, satTotal, saltTotal){
     const n    = Math.min(cap, Math.ceil(gap / net));
     const left = gap - n * net;
     const add  = [];
-    if(f.sat)  add.push(`飽和+${r1(n * f.sat)}g`);
+    if(f.sat)  add.push(`飽和脂肪酸+${r1(n * f.sat)}g`);
     if(f.salt) add.push(`食塩+${r1(n * f.salt)}g`);
     return `<li><b>${f.short} ${r1(n)}${f.unit}</b>（+${(n * net).toLocaleString()}kcal` +
            `／${f.price ? (n * f.price).toLocaleString() + '円' : '無料'}${add.length ? '／' + add.join('・') : ''}）` +
@@ -2539,7 +2547,7 @@ function cutAdvice(st0){
     return `<li><b>${c.f.short} ${c.now}${c.f.unit} → ${c.now - 1}${c.f.unit}</b>` +
            `（<b>−${c.cut.toLocaleString()}g</b>${money(d)}／` +
            `${c.r.kcal < base.kcal ? '−' : '+'}${Math.abs(c.r.kcal - base.kcal).toLocaleString()}kcal）` +
-           `<br><small>食塩 ${base.salt}→${c.r.salt}g・飽和 ${base.sat}→${c.r.sat}g・` +
+           `<br><small>食塩 ${base.salt}→${c.r.salt}g・飽和脂肪酸 ${base.sat}→${c.r.sat}g・` +
            `たんぱく質 ${base.p}→${c.r.p}g` +
            (c.r.spoons !== base.spoons ? `・${PROTEIN.name} ${base.spoons}→${c.r.spoons}杯` : '') +
            `</small> ` +
@@ -4850,23 +4858,28 @@ const RADAR_AXES = [
   {key:'carb',  name:'炭水化物',   unit:'g'},
   {key:'fiber', name:'食物繊維',   unit:'g'},
   {key:'kcal',  name:'エネルギー', unit:'kcal'},
-  {key:'sat',   name:'飽和',       unit:'g',    keepIn:true},
+  {key:'sat',   name:'飽和脂肪酸', unit:'g',    keepIn:true},
   {key:'salt',  name:'食塩',       unit:'g',    keepIn:true},
   {key:'gram',  name:'食べる量',   unit:'g',    keepIn:true}
 ];
 // 品目の比較グラフで、軸のキーから FOODS の項目名へ
 const RADAR_COL = {p:'p', fat:'fat', carb:'carbG', fiber:'fiber', kcal:'kcal', sat:'sat', salt:'salt', gram:'gram'};
 
-let trialAdd = {};        // お試しで足す数量（③には書き込まない）
+/* お試しの差分。**符号付き**で持つ（＋が足す・−が減らす。v.182）。
+   減らす側も選べるようにしたのは利用者の要望
+   —「足りない品目を選べるのはありがたいが、摂りすぎているものも選びたい」。
+   減らせるのは③に入っている数量までなので、下限は `-(いまの数量)` でとめる。 */
+let trialAdd = {};        // お試しの差分（③には書き込まない）
 let barKey   = 'fiber';   // 比較グラフでいま見ている項目
 let barsAll  = false;     // 上位15件だけか、全品目か
 
-/* お試しのぶんを足した状態を作る。③の入力は変えない。 */
+/* お試しの差分を当てた状態を作る。③の入力は変えない。
+   **0より下へは行かない**（減らす側が食べていない量まで減らせてしまうため）。 */
 function withTrial(st){
-  const ids = Object.keys(trialAdd).filter(id => trialAdd[id] > 0);
+  const ids = Object.keys(trialAdd).filter(id => trialAdd[id] !== 0);
   if(!ids.length) return st;
   const foods = {...st.foods};
-  ids.forEach(id => { foods[id] = (foods[id] || 0) + trialAdd[id]; });
+  ids.forEach(id => { foods[id] = Math.max(0, (foods[id] || 0) + trialAdd[id]); });
   return {...st, foods};
 }
 
@@ -4940,28 +4953,44 @@ function radarSvg(now, ref){
     `</svg></div>`;
 }
 
-/* お試しで足す品目の行と、選ぶプルダウン。 */
+/* お試しの行と、選ぶプルダウン（足す側／減らす側の2つ）。
+   行には**差分ではなく「いま→こうなる」**を出す。
+   「−2杯」だけでは③に何が入るか分からないため。 */
 function trialPanel(st){
-  const ids = Object.keys(trialAdd).filter(id => trialAdd[id] > 0);
+  const qOf = id => Math.round(st.foods[id] || 0);
+  const ids = Object.keys(trialAdd).filter(id => FOODS.some(f => f.id === id));
   const rows = ids.map(id => {
     const f = FOODS.find(x => x.id === id);
-    if(!f) return '';
+    const now = qOf(id), to = Math.max(0, now + trialAdd[id]);
     return `<div class="trial-row"><span class="nm">${esc(f.short || f.name)}</span>` +
-      `<button type="button" class="mini-btn inline-btn" data-trial-m="${id}">−</button>` +
-      `<span class="qt">${r1(trialAdd[id])}${esc(f.unit)}</span>` +
-      `<button type="button" class="mini-btn inline-btn" data-trial-p="${id}">＋</button>` +
-      `<button type="button" class="mini-btn inline-btn" data-trial-x="${id}">消す</button></div>`;
+      `<span class="ctl">` +
+      `<button type="button" class="mini-btn" data-trial-m="${id}">−</button>` +
+      `<span class="qt">${r1(now)} → <b>${r1(to)}</b>${esc(f.unit)}</span>` +
+      `<button type="button" class="mini-btn" data-trial-p="${id}">＋</button>` +
+      `<button type="button" class="mini-btn" data-trial-x="${id}">消す</button>` +
+      `</span></div>`;
   }).join('');
-  const opts = FOODS.filter(f => !f.custom && foodUse(f.id) && !ids.includes(f.id))
-    .map(f => `<option value="${f.id}">${esc((f.shop ? f.shop + ' ' : '') + f.name)}</option>`).join('');
+  const label = f => esc((f.shop ? f.shop + ' ' : '') + f.name);
+  const addOpts = FOODS.filter(f => !f.custom && foodUse(f.id) && !ids.includes(f.id))
+    .map(f => `<option value="${f.id}">${label(f)}</option>`).join('');
+  /* **減らす側は、いま③に数量が入っている品目だけ**を並べる。0のものは減らせない。 */
+  const cutList = FOODS.filter(f => !ids.includes(f.id) && qOf(f.id) > 0);
+  const cutOpts = cutList
+    .map(f => `<option value="${f.id}">${label(f)}（いま ${r1(qOf(f.id))}${esc(f.unit)}）</option>`).join('');
+  const live = ids.some(id => trialAdd[id] !== 0);
   return `<div style="margin-top:6px">` +
-    (rows || `<div class="hint" style="margin:0">まだ何も足していません。下から品目を選ぶと、上のグラフがその場で変わります。</div>`) +
+    (rows || `<div class="hint" style="margin:0">まだ何も動かしていません。` +
+      `下のプルダウンから品目を選ぶと、上のグラフがその場で変わります。</div>`) +
     `<div class="trial-row" style="margin-top:6px">` +
-    `<select id="trialSel" style="flex:1 1 10em;min-width:10em"><option value="">＋ 足してみる品目を選ぶ…</option>${opts}</select>` +
-    `</div>` +
+    `<select id="trialSel" style="flex:1 1 10em;min-width:10em">` +
+    `<option value="">＋ 足してみる品目を選ぶ…</option>${addOpts}</select></div>` +
+    (cutList.length
+      ? `<div class="trial-row"><select id="trialCut" style="flex:1 1 10em;min-width:10em">` +
+        `<option value="">− 減らしてみる品目を選ぶ…</option>${cutOpts}</select></div>`
+      : '') +
     (ids.length
       ? `<div class="actions" style="margin:6px 0 0">` +
-        `<button type="button" class="mini-btn" data-trial-apply="1">この案を③に入れる</button>` +
+        (live ? `<button type="button" class="mini-btn" data-trial-apply="1">この案を③に入れる</button>` : '') +
         `<button type="button" class="mini-btn" data-trial-clear="1">お試しを消す</button></div>`
       : '') +
     `</div>`;
@@ -4980,7 +5009,7 @@ function radarBlock(st){
     .map(ax => ax.name);
   return `<div class="advice" id="radarBox"><b>栄養バランス（100% ＝ ちょうどよい）</b>` +
     radarSvg(now, ref) +
-    `<small><b>外側に出てよいのは食物繊維だけ</b>です。飽和・食塩・食べる量は内側が安全で、` +
+    `<small><b>外側に出てよいのは食物繊維だけ</b>です。飽和脂肪酸・食塩・食べる量は内側が安全で、` +
     `超えると赤で出ます。脂質と炭水化物の100%は帯の真ん中、エネルギーの100%は必要量です` +
     `（<b>帯の%とは分母が違います</b> — 帯は実際に摂ったエネルギーに対する割合なので、` +
     `ほとんど食べていない日でも100%近くに見えてしまうためです）。</small>` +
@@ -4990,7 +5019,7 @@ function radarBlock(st){
       ? `<br><b>お試しのぶんで ${PROTEIN.name} が ${sp0}杯 → ${spNow}杯 に変わります。</b>` +
         `食事でたんぱく質が増えたぶん、粉が自動で減ります（<b>そのため合計が下がって見えることがあります</b>）。`
       : '') +
-    `<br><b>足してみる</b>（③の入力は変わりません）` +
+    `<br><b>足してみる・減らしてみる</b>（③の入力は変わりません）` +
     trialPanel(st) +
     `</div>`;
 }
@@ -5014,8 +5043,10 @@ function foodBarBlock(st){
     `<div class="trial-row" style="margin:6px 0"><select id="barSel" style="flex:1 1 9em">${opts}</select>` +
     `<button type="button" class="mini-btn" data-bars-all="1">${barsAll ? '上位15件だけ' : `すべて（${list.length}品目）`}</button></div>` +
     rows +
-    `<small><b>緑の棒は今日すでに入っている品目</b>で、右に「×いくつ」と出ます。` +
-    `${esc(ax.name)}を1単位あたり多く含む順です。上の「足してみる」で数量を動かすと、レーダーがその場で変わります。</small></div>`;
+    `<small><b>棒の長さは、いちばん多く含む品目（いちばん上）を目いっぱいとした割合</b>です。` +
+    `<b>緑の棒は今日すでに入っている品目</b>で、右に「×いくつ」と出ます。` +
+    `${esc(ax.name)}を1単位あたり多く含む順です。` +
+    `上の「足してみる・減らしてみる」で数量を動かすと、レーダーがその場で変わります。</small></div>`;
 }
 
 function microAdvice(st, sv){
@@ -5135,7 +5166,7 @@ const weekNgFood = d => {
   const ng = [];
   if(d.p   <  weekPMin(d.target)) ng.push('P');
   if(d.salt >= SALT_LIMIT)  ng.push('食塩');
-  if(d.sat  >  SAT_GOOD)    ng.push('飽和');
+  if(d.sat  >  SAT_GOOD)    ng.push('飽和脂肪酸');
   return ng;
 };
 // エネルギーは運動の前提しだいなので別に見る
@@ -5184,7 +5215,7 @@ function renderWeekNutri(week, st, sc){
     return `<tr${d.idx === todayIdx() ? ' class="today"' : ''}>` +
       `<td class="time">${WEEK_LABEL[d.idx]}</td>` +
       cell(d.p, ng.indexOf('P') >= 0) +
-      cell(d.sat, ng.indexOf('飽和') >= 0) +
+      cell(d.sat, ng.indexOf('飽和脂肪酸') >= 0) +
       cell(d.salt, ng.indexOf('食塩') >= 0) +
       cell(d.fiber, d.fiber < FIBER_TARGET) +
       cell(d.fat, false) +
@@ -5194,7 +5225,8 @@ function renderWeekNutri(week, st, sc){
       `<td${ng.length ? ' class="ng"' : ''}>${ng.length ? '✕' : '◎'}</td></tr>`;
   }).join('');
   $('weekNutri').innerHTML =
-    `<thead><tr><th>曜日</th><th>P<br><small>g</small></th><th>飽和<br><small>g</small></th>` +
+    `<thead><tr><th>曜日</th><th>P<br><small>g</small></th>` +
+    `<th>飽和<br>脂肪酸<br><small>g</small></th>` +
     `<th>食塩<br><small>g</small></th><th>繊維<br><small>g</small></th><th>脂質<br><small>g</small></th>` +
     `<th>エネ<br><small>kcal</small></th><th>自宅の<br><small>ご飯</small></th>` +
     `<th>食費<br><small>円</small></th><th>判定</th></tr></thead><tbody>` +
@@ -5748,7 +5780,12 @@ $('oSatBox').addEventListener('click', e => {
         ta = e.target.closest('[data-trial-apply]'), ba = e.target.closest('[data-bars-all]');
   if(tp || tm || tx || tc || ba){
     if(tp){ const id = tp.getAttribute('data-trial-p'); trialAdd[id] = (trialAdd[id] || 0) + 1; }
-    if(tm){ const id = tm.getAttribute('data-trial-m'); trialAdd[id] = Math.max(0, (trialAdd[id] || 0) - 1); }
+    if(tm){
+      /* **減らせるのは③に入っている数量まで**（結果が0より下には行かない）。 */
+      const id = tm.getAttribute('data-trial-m');
+      const low = -Math.round(readState().foods[id] || 0);
+      trialAdd[id] = Math.max(low, (trialAdd[id] || 0) - 1);
+    }
     if(tx){ delete trialAdd[tx.getAttribute('data-trial-x')]; }
     if(tc){ trialAdd = {}; }
     if(ba){ barsAll = !barsAll; }
@@ -5759,13 +5796,17 @@ $('oSatBox').addEventListener('click', e => {
     /* **ここで初めて③へ書き込む。**手入力に切り替えてから足す
        （そうしないと自動計算が次の再計算で上書きしてしまう）。 */
     Object.keys(trialAdd).forEach(id => {
-      if(!(trialAdd[id] > 0)) return;
+      const d = trialAdd[id];
+      if(!d) return;
       const el = $('f_' + id);
       if(!el) return;
       setAutoOverride(id, true);
-      el.value = r1((+el.value || 0) + trialAdd[id]);
+      el.value = r1(Math.max(0, (+el.value || 0) + d));
+      /* 数量を入れたら「使う」に戻す（v.171と同じ）。
+         **減らして0にした品目は戻さない** — 0なのに「使う」を立てると
+         自動計算の候補に残り、次の再計算で別の数量が入ってしまう。 */
       const cb = $('use_' + id);
-      if(cb && !cb.checked) cb.checked = true;   // 数量を入れたら「使う」に戻す（v.171と同じ）
+      if(cb && !cb.checked && (+el.value || 0) > 0) cb.checked = true;
     });
     trialAdd = {};
     onInputChanged();
@@ -5783,7 +5824,7 @@ $('oSatBox').addEventListener('click', e => {
   }
 });
 
-/* ④の中のプルダウン（足してみる品目／比較する項目）。
+/* ④の中のプルダウン（足してみる品目／減らしてみる品目／比較する項目）。
    **`onInputChanged` まで上らせない** — あちらは ④ を丸ごと描き直すので、
    選んだ値が初期値に戻ってしまう。 */
 $('oSatBox').addEventListener('change', e => {
@@ -5791,6 +5832,13 @@ $('oSatBox').addEventListener('change', e => {
     e.stopPropagation();
     const id = e.target.value;
     if(id) trialAdd[id] = (trialAdd[id] || 0) + 1;
+    redrawRadar();
+    return;
+  }
+  if(e.target.id === 'trialCut'){
+    e.stopPropagation();
+    const id = e.target.value;
+    if(id) trialAdd[id] = (trialAdd[id] || 0) - 1;
     redrawRadar();
     return;
   }
