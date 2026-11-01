@@ -45,6 +45,7 @@
      13 ④の「残りを補う提案」も 食塩7.5g・飽和15g の線を越えないこと
      14 ⑤が中身を隠していないこと（③の数量>0の品目と、④の提案の品目が全部出ている）
      15 エネルギーが必要量を ENERGY_BAD 以上下回る日は、④が「足りない」と出していること
+     16 ④のプルダウン3つが効くこと（input+change で操作して状態が変わるか。v.183）
 
    振っている状態（v.168で追加）
      ・品目の「使う／使わない」を無作為に外す（3割。5%は「すべて外す」に近い状態）
@@ -384,6 +385,46 @@ function checkOne(c, fail){
   if(kcalRow && kcalTotal - needNow <= -ENERGY_BAD && kcalRow.className !== 'under')
     fail(`エネルギーが必要量を ${Math.round(needNow - kcalTotal)}kcal 下回るのに、` +
          `④の札が「足りない」になっていません（class=${kcalRow.className}）`);
+
+  /* 16. ④のプルダウンが3つとも効くこと（v.183）。
+         **`<select>` は `input` → `change` の順に2つイベントを投げる。**
+         document の `onInputChanged` が**先の `input`** で④を丸ごと描き直すと、
+         その時点で select が DOM から外れ、**続く `change` はどこにも届かない**。
+         v.181〜v.182 のプルダウンはこれで「選んでも何も起きない」状態だった。
+         手元の検証が `change` だけを投げていたので素通りし、
+         **利用者が触って見つけた**。以降はここで機械的に見る。
+         **必ず `input` と `change` の両方を投げること**（ブラウザがそうするため）。 */
+  const barKey0 = barKey, trialAdd0 = {...trialAdd};
+  const pickOpt = (id, v) => {
+    const el = $$(id);
+    if(!el) return false;
+    el.value = v;
+    el.dispatchEvent(new Event('input',  {bubbles: true}));
+    el.dispatchEvent(new Event('change', {bubbles: true}));
+    return true;
+  };
+  const barWant = barKey === 'salt' ? 'sat' : 'salt';
+  if(pickOpt('barSel', barWant) && barKey !== barWant)
+    fail(`④の「どの品目が多く含むか」のプルダウンが効いていません（${barKey} のまま）`);
+
+  const addSel = $$('trialSel');
+  const addOpt = addSel && [...addSel.options].map(o => o.value).find(v => v);
+  if(addOpt){
+    pickOpt('trialSel', addOpt);
+    if(!(trialAdd[addOpt] > 0))
+      fail(`④の「足してみる品目を選ぶ」が効いていません（${addOpt}）`);
+  }
+  // 行が増えて描き直されているので、減らす側は取り直してから触る
+  const cutSel = $$('trialCut');
+  const cutOpt = cutSel && [...cutSel.options].map(o => o.value).find(v => v);
+  if(cutOpt){
+    pickOpt('trialCut', cutOpt);
+    if(!(trialAdd[cutOpt] < 0))
+      fail(`④の「減らしてみる品目を選ぶ」が効いていません（${cutOpt}）`);
+  }
+  barKey = barKey0;
+  trialAdd = trialAdd0;
+  redrawRadar();
 
   // 10. 再計算の冪等性
   const a = snapshot();
