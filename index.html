@@ -314,6 +314,33 @@ table.simple td.time small{font-weight:400}
   border-radius:8px;padding:10px 12px;margin:12px 0 0;font-size:.85rem;
 }
 table.mini{font-size:.82rem}
+
+/* レーダーと品目の比較グラフ（v.181）。
+   外部ライブラリは使わない前提なので、レーダーは手描きのSVG、棒は div の幅で出す。 */
+.radar-wrap{text-align:center}
+.radar-wrap svg{width:100%;max-width:360px;height:auto}
+.radar-g{fill:none;stroke:#d7dde7;stroke-width:1}
+.radar-g.base{stroke:#9bb4d8;stroke-width:1.5;stroke-dasharray:3 2}
+.radar-ax{stroke:#d7dde7;stroke-width:1}
+.radar-area{fill:rgba(3,113,224,.18);stroke:#0371E0;stroke-width:2;stroke-linejoin:round}
+.radar-dot{fill:#0371E0}
+.radar-dot.over{fill:#c0392b}
+.radar-lb{font-size:10px;fill:#45506a}
+.radar-lb.over{fill:#c0392b;font-weight:700}
+.radar-vl{font-size:9px;fill:#6b7890}
+.trial-row{display:flex;align-items:center;gap:6px;margin:4px 0;flex-wrap:wrap}
+.trial-row .nm{flex:1 1 9em;min-width:9em;font-size:.84rem}
+.trial-row .qt{min-width:4.2em;text-align:right;font-size:.84rem}
+.bar-row{display:flex;align-items:center;gap:6px;margin:3px 0;font-size:.8rem}
+.bar-row .nm{flex:0 0 8.4em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-row .tr{flex:1 1 auto;background:#eef2f8;border-radius:3px;height:14px;position:relative}
+.bar-row .fl{background:#0371E0;height:100%;border-radius:3px}
+.bar-row .fl.has{background:#1f8a4c}
+.bar-row .vl{flex:0 0 5.4em;text-align:right;color:var(--sub)}
+@media (max-width:420px){
+  .bar-row .nm{flex-basis:7em}
+  .bar-row .vl{flex-basis:4.8em}
+}
 table.mini td.time{width:auto;white-space:nowrap}
 table.mini td.amt{width:auto;text-align:right}
 /* 基本係数の目安表は、両端の列を折り返さない。
@@ -810,7 +837,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.180';
+const APP_VERSION = '2026-09-01.181';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -2765,6 +2792,8 @@ function render(opts){
        **表のセルの中には置かない** — 375px では4列目が130pxしかなく、
        候補の行とボタンが崩れる（v.163で実際に踏んだ）。
        「エネルギーが足りないときの追加候補」と同じ、表の外の `.advice` に出す。 */
+    radarBlock(st) +
+    foodBarBlock(st) +
     microAdvice(st, sv) +
     restDoseAdvice(st, sv) +
     `<div class="advice"><b>食べる量が多くて食べきれないときは、` +
@@ -4795,6 +4824,200 @@ function calcMicro(st, sv){
   return {sum, missing};
 }
 
+/* ------------------------------------------------------------
+   栄養バランスのレーダーと、品目ごとの比較グラフ（v.181）
+
+   利用者の要望：「④で『多い／少ない』と言われても、**38品目のどれがそれに効くのか
+   分からない**。どれをどれだけ足せばよいか見えるようにしたい」。
+
+   **8軸とも「100 ＝ ちょうどよい」に正規化する。**理想が正八角形になるので形で読める。
+   **外側に出てよいのは食物繊維だけ**で、飽和・食塩・食べる量は内側が安全。
+
+   **脂質と炭水化物の基準は『必要エネルギー』で取る。**
+   ④の帯は「実際に摂ったエネルギーに対する%」だが、それを基準にすると
+   **ほとんど食べていない日に脂質が100%に見えてしまう**（摂った量どうしの比なので）。
+   「今日はまだ285kcalしか食べていない」という日にこそ使う画面なので、
+   分母は必要量で固定する。
+
+   お試し（`trialAdd`）は**③に触らない**。③の数量を直に動かす案もあったが、
+   v.164 で整理した「チェック＝前提／手入力＝上書き／自動に戻す」の3役に
+   4つ目を混ぜることになるので、別の入れ物にして
+   **「この案を③に入れる」を押したときだけ**③へ書き込む。
+   ------------------------------------------------------------ */
+const RADAR_AXES = [
+  {key:'p',     name:'たんぱく質', unit:'g'},
+  {key:'fat',   name:'脂質',       unit:'g'},
+  {key:'carb',  name:'炭水化物',   unit:'g'},
+  {key:'fiber', name:'食物繊維',   unit:'g'},
+  {key:'kcal',  name:'エネルギー', unit:'kcal'},
+  {key:'sat',   name:'飽和',       unit:'g',    keepIn:true},
+  {key:'salt',  name:'食塩',       unit:'g',    keepIn:true},
+  {key:'gram',  name:'食べる量',   unit:'g',    keepIn:true}
+];
+// 品目の比較グラフで、軸のキーから FOODS の項目名へ
+const RADAR_COL = {p:'p', fat:'fat', carb:'carbG', fiber:'fiber', kcal:'kcal', sat:'sat', salt:'salt', gram:'gram'};
+
+let trialAdd = {};        // お試しで足す数量（③には書き込まない）
+let barKey   = 'fiber';   // 比較グラフでいま見ている項目
+let barsAll  = false;     // 上位15件だけか、全品目か
+
+/* お試しのぶんを足した状態を作る。③の入力は変えない。 */
+function withTrial(st){
+  const ids = Object.keys(trialAdd).filter(id => trialAdd[id] > 0);
+  if(!ids.length) return st;
+  const foods = {...st.foods};
+  ids.forEach(id => { foods[id] = (foods[id] || 0) + trialAdd[id]; });
+  return {...st, foods};
+}
+
+function radarValues(st0){
+  const st = withTrial(st0);
+  const ex = calcFactor(st), sv = savasOf(st, ex), need = calcNeed(st, ex);
+  return {
+    now: {
+      p:    r1(calcFood(st).total + sv.spoons * perSpoon('p')),
+      fat:  r1(calcFat(st, sv).total),
+      carb: r1(calcCarb(st, sv).total),
+      fiber:r1(calcFiber(st, sv).total),
+      kcal: Math.round(calcKcal(st, sv).total),
+      sat:  r1(calcSat(st, sv).total),
+      salt: r1(calcSalt(st, sv).total),
+      gram: Math.round(calcGram(st, sv).total)
+    },
+    ref: {
+      p:    r1(st.weight * st.baseFactor),
+      fat:  r1(need * (FAT_MIN_E + FAT_MAX_E) / 2 / KCAL_PER_FAT),
+      carb: r1(need * (CARB_MIN_E + CARB_MAX_E) / 2 / KCAL_PER_CARB),
+      fiber:FIBER_TARGET,
+      kcal: need,
+      sat:  SAT_GOOD,
+      salt: SALT_LIMIT,
+      gram: BULK_AIM
+    }
+  };
+}
+
+function radarSvg(now, ref){
+  /* **ラベルの外側は多角形より外**に置く。t=1.33・CAP=1.5 にしていたら、
+     151%の軸（食物繊維）で多角形がラベルの上に乗った。
+     いまは 多角形の最大 1.35・ラベル 1.50 で、必ず内外が分かれる。
+     上下は R×1.50＋文字の高さの余白が要る（詰めると「たんぱく質」と「エネルギー」が切れる）。
+     1.35 を超える値は頭打ちになるが、**実数の%はラベルに出している**ので読み取れる。 */
+  const R = 88, cx = 180, cy = 145, N = RADAR_AXES.length, CAP = 1.35;
+  const pt = (i, t) => {
+    const a = -Math.PI / 2 + i * 2 * Math.PI / N;
+    return [r1(cx + Math.cos(a) * R * t), r1(cy + Math.sin(a) * R * t)];
+  };
+  const ring = t => RADAR_AXES.map((_, i) => pt(i, t).join(',')).join(' ');
+  const axes = RADAR_AXES.map((_, i) => {
+    const [x, y] = pt(i, 1.0);
+    return `<line class="radar-ax" x1="${cx}" y1="${cy}" x2="${x}" y2="${y}"/>`;
+  }).join('');
+  const area = RADAR_AXES.map((ax, i) => {
+    const t = Math.min(CAP, ref[ax.key] ? now[ax.key] / ref[ax.key] : 0);
+    return pt(i, t).join(',');
+  }).join(' ');
+  const dots = RADAR_AXES.map((ax, i) => {
+    const pctRaw = ref[ax.key] ? now[ax.key] / ref[ax.key] : 0;
+    const t = Math.min(CAP, pctRaw);
+    const [x, y] = pt(i, t);
+    const bad = ax.keepIn && pctRaw > 1;
+    return `<circle class="radar-dot${bad ? ' over' : ''}" cx="${x}" cy="${y}" r="3"/>`;
+  }).join('');
+  const labels = RADAR_AXES.map((ax, i) => {
+    const pct = Math.round(ref[ax.key] ? now[ax.key] / ref[ax.key] * 100 : 0);
+    const [x, y] = pt(i, 1.50);
+    const anchor = Math.abs(x - cx) < 6 ? 'middle' : (x > cx ? 'start' : 'end');
+    const bad = ax.keepIn && pct > 100;
+    return `<text class="radar-lb${bad ? ' over' : ''}" x="${x}" y="${y}" text-anchor="${anchor}">${ax.name}</text>` +
+           `<text class="radar-vl" x="${x}" y="${y + 11}" text-anchor="${anchor}">${pct}%</text>`;
+  }).join('');
+  return `<div class="radar-wrap"><svg viewBox="0 0 360 292" role="img" aria-label="栄養バランスのレーダーチャート">` +
+    `<polygon class="radar-g" points="${ring(0.5)}"/>` +
+    `<polygon class="radar-g base" points="${ring(1.0)}"/>` +
+    `<polygon class="radar-g" points="${ring(1.35)}"/>` +
+    axes + `<polygon class="radar-area" points="${area}"/>` + dots + labels +
+    `</svg></div>`;
+}
+
+/* お試しで足す品目の行と、選ぶプルダウン。 */
+function trialPanel(st){
+  const ids = Object.keys(trialAdd).filter(id => trialAdd[id] > 0);
+  const rows = ids.map(id => {
+    const f = FOODS.find(x => x.id === id);
+    if(!f) return '';
+    return `<div class="trial-row"><span class="nm">${esc(f.short || f.name)}</span>` +
+      `<button type="button" class="mini-btn inline-btn" data-trial-m="${id}">−</button>` +
+      `<span class="qt">${r1(trialAdd[id])}${esc(f.unit)}</span>` +
+      `<button type="button" class="mini-btn inline-btn" data-trial-p="${id}">＋</button>` +
+      `<button type="button" class="mini-btn inline-btn" data-trial-x="${id}">消す</button></div>`;
+  }).join('');
+  const opts = FOODS.filter(f => !f.custom && foodUse(f.id) && !ids.includes(f.id))
+    .map(f => `<option value="${f.id}">${esc((f.shop ? f.shop + ' ' : '') + f.name)}</option>`).join('');
+  return `<div style="margin-top:6px">` +
+    (rows || `<div class="hint" style="margin:0">まだ何も足していません。下から品目を選ぶと、上のグラフがその場で変わります。</div>`) +
+    `<div class="trial-row" style="margin-top:6px">` +
+    `<select id="trialSel" style="flex:1 1 10em;min-width:10em"><option value="">＋ 足してみる品目を選ぶ…</option>${opts}</select>` +
+    `</div>` +
+    (ids.length
+      ? `<div class="actions" style="margin:6px 0 0">` +
+        `<button type="button" class="mini-btn" data-trial-apply="1">この案を③に入れる</button>` +
+        `<button type="button" class="mini-btn" data-trial-clear="1">お試しを消す</button></div>`
+      : '') +
+    `</div>`;
+}
+
+function radarBlock(st){
+  const {now, ref} = radarValues(st);
+  /* **お試しで食事を足すと、粉の杯数が自動で減る。**
+     そのため「納豆を足したのにたんぱく質が下がった」ように見える日がある。
+     実際に起きる動きなので値は直さず、理由を1行書く。 */
+  const exNow = calcFactor(withTrial(st)), spNow = savasOf(withTrial(st), exNow).spoons;
+  const ex0   = calcFactor(st),            sp0   = savasOf(st, ex0).spoons;
+  const lacking = RADAR_AXES.filter(ax => !ax.keepIn && ref[ax.key] && now[ax.key] / ref[ax.key] < 0.9)
+    .map(ax => ax.name);
+  const over = RADAR_AXES.filter(ax => ax.keepIn && ref[ax.key] && now[ax.key] / ref[ax.key] > 1)
+    .map(ax => ax.name);
+  return `<div class="advice" id="radarBox"><b>栄養バランス（100% ＝ ちょうどよい）</b>` +
+    radarSvg(now, ref) +
+    `<small><b>外側に出てよいのは食物繊維だけ</b>です。飽和・食塩・食べる量は内側が安全で、` +
+    `超えると赤で出ます。脂質と炭水化物の100%は帯の真ん中、エネルギーの100%は必要量です` +
+    `（<b>帯の%とは分母が違います</b> — 帯は実際に摂ったエネルギーに対する割合なので、` +
+    `ほとんど食べていない日でも100%近くに見えてしまうためです）。</small>` +
+    (lacking.length ? `<br><b>足りていないのは ${lacking.join('・')}</b> です。` : '') +
+    (over.length ? `<br><b class="warn-inline">${over.join('・')} が線を超えています。</b>` : '') +
+    (spNow !== sp0
+      ? `<br><b>お試しのぶんで ${PROTEIN.name} が ${sp0}杯 → ${spNow}杯 に変わります。</b>` +
+        `食事でたんぱく質が増えたぶん、粉が自動で減ります（<b>そのため合計が下がって見えることがあります</b>）。`
+      : '') +
+    `<br><b>足してみる</b>（③の入力は変わりません）` +
+    trialPanel(st) +
+    `</div>`;
+}
+
+function foodBarBlock(st){
+  const col = RADAR_COL[barKey];
+  const ax  = RADAR_AXES.find(a => a.key === barKey);
+  const list = FOODS.filter(f => !f.custom && (f[col] || 0) > 0)
+    .map(f => ({f, v: f[col], q: Math.round(st.foods[f.id] || 0)}))
+    .sort((a, b) => b.v - a.v);
+  const shown = barsAll ? list : list.slice(0, 15);
+  const max = list.length ? list[0].v : 1;
+  const rows = shown.map(o =>
+    `<div class="bar-row"><span class="nm" title="${esc(o.f.name)}">${esc(o.f.short || o.f.name)}</span>` +
+    `<span class="tr"><span class="fl${o.q > 0 ? ' has' : ''}" style="width:${r1(o.v / max * 100)}%"></span></span>` +
+    `<span class="vl">${o.v >= 100 ? Math.round(o.v) : r2(o.v)}${esc(ax.unit)}${o.q > 0 ? ' <b>×' + o.q + '</b>' : ''}</span></div>`
+  ).join('');
+  const opts = RADAR_AXES.map(a =>
+    `<option value="${a.key}"${a.key === barKey ? ' selected' : ''}>${a.name}</option>`).join('');
+  return `<div class="advice" id="barsBox"><b>どの品目が多く含むか</b>（1単位あたり）` +
+    `<div class="trial-row" style="margin:6px 0"><select id="barSel" style="flex:1 1 9em">${opts}</select>` +
+    `<button type="button" class="mini-btn" data-bars-all="1">${barsAll ? '上位15件だけ' : `すべて（${list.length}品目）`}</button></div>` +
+    rows +
+    `<small><b>緑の棒は今日すでに入っている品目</b>で、右に「×いくつ」と出ます。` +
+    `${esc(ax.name)}を1単位あたり多く含む順です。上の「足してみる」で数量を動かすと、レーダーがその場で変わります。</small></div>`;
+}
+
 function microAdvice(st, sv){
   const m = calcMicro(st, sv);
   const rows = MICRO_KEYS.map(k => {
@@ -5517,6 +5740,37 @@ $('oSatBox').addEventListener('click', e => {
     }, 0);
     return;
   }
+  /* レーダーのお試し（v.181）。**③には書き込まない**ので、
+     ④だけを描き直す（`render()` を呼ぶと探索からやり直すうえ、
+     スクロール位置も飛ぶ）。 */
+  const tp = e.target.closest('[data-trial-p]'), tm = e.target.closest('[data-trial-m]'),
+        tx = e.target.closest('[data-trial-x]'), tc = e.target.closest('[data-trial-clear]'),
+        ta = e.target.closest('[data-trial-apply]'), ba = e.target.closest('[data-bars-all]');
+  if(tp || tm || tx || tc || ba){
+    if(tp){ const id = tp.getAttribute('data-trial-p'); trialAdd[id] = (trialAdd[id] || 0) + 1; }
+    if(tm){ const id = tm.getAttribute('data-trial-m'); trialAdd[id] = Math.max(0, (trialAdd[id] || 0) - 1); }
+    if(tx){ delete trialAdd[tx.getAttribute('data-trial-x')]; }
+    if(tc){ trialAdd = {}; }
+    if(ba){ barsAll = !barsAll; }
+    redrawRadar();
+    return;
+  }
+  if(ta){
+    /* **ここで初めて③へ書き込む。**手入力に切り替えてから足す
+       （そうしないと自動計算が次の再計算で上書きしてしまう）。 */
+    Object.keys(trialAdd).forEach(id => {
+      if(!(trialAdd[id] > 0)) return;
+      const el = $('f_' + id);
+      if(!el) return;
+      setAutoOverride(id, true);
+      el.value = r1((+el.value || 0) + trialAdd[id]);
+      const cb = $('use_' + id);
+      if(cb && !cb.checked) cb.checked = true;   // 数量を入れたら「使う」に戻す（v.171と同じ）
+    });
+    trialAdd = {};
+    onInputChanged();
+    return;
+  }
   const ap = e.target.closest('[data-cut-apply]');
   if(ap){
     const [id, v] = ap.getAttribute('data-cut-apply').split(':');
@@ -5528,6 +5782,33 @@ $('oSatBox').addEventListener('click', e => {
     }
   }
 });
+
+/* ④の中のプルダウン（足してみる品目／比較する項目）。
+   **`onInputChanged` まで上らせない** — あちらは ④ を丸ごと描き直すので、
+   選んだ値が初期値に戻ってしまう。 */
+$('oSatBox').addEventListener('change', e => {
+  if(e.target.id === 'trialSel'){
+    e.stopPropagation();
+    const id = e.target.value;
+    if(id) trialAdd[id] = (trialAdd[id] || 0) + 1;
+    redrawRadar();
+    return;
+  }
+  if(e.target.id === 'barSel'){
+    e.stopPropagation();
+    barKey = e.target.value;
+    barsAll = false;
+    redrawRadar();
+  }
+});
+
+/* レーダーと比較グラフだけを描き直す。③の数量は触っていないので探索は走らない。 */
+function redrawRadar(){
+  const st = readState();
+  const rb = $('radarBox'), bb = $('barsBox');
+  if(rb) rb.outerHTML = radarBlock(st);
+  if(bb) $('barsBox').outerHTML = foodBarBlock(st);
+}
 
 /* **数量を入れたら「使う」に戻す**（v.171）。
 
