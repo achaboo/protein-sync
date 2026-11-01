@@ -845,7 +845,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.186';
+const APP_VERSION = '2026-09-01.187';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -968,18 +968,18 @@ const FOODS = [
   {id:'ys_hamegg',    shop:'吉野家',  name:'ハムエッグ納豆定食',   short:'ハムエッグ納豆定食',
    weekName:'吉野家<br>ﾊﾑｴｯｸﾞ納豆定食', note:'1食 約24.1g（卵1個ぶん）',
    price:468, p:24.1, unit:'食', sat:4.2, salt:2.6, carbG:94.2, fiber:7.6, kcal:581, fat:13.0, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1, teishoku:true},
-  /* **v.185 で値を入れ替えた。**利用者が「提出した表が正」と確認したため
-     （たんぱく質 31.9→18.0g・エネルギー 744→570kcal・脂質 27.7→17.8g・食塩 3.4→2.6g）。
-     **飽和脂肪酸5.5gと食物繊維3.0gは推定値**（以前の6.9g/7.9gは入れ替え前の前提で出た値）。
-
-     **ただし引き算が合わない。**P18.0g のうち ご飯（並盛）で5.5g・卵1個で6.2gを使うと、
-     さばに残るのが6.3g（生の塩さばで約30g）しかない。
-     1週間の型には入れていない品目なので型の実測値には響かないが、
-     **公表値を見直す機会があれば確かめること**（利用者には伝えてある）。 */
-  {id:'ys_saba',      shop:'吉野家',  name:'塩さば得朝定食',       short:'塩さば得朝定食',
-   weekName:'吉野家<br>塩さば得朝定食', note:'1食 約18.0g（卵1個ぶん）',
-   ruleNote:'飽和脂肪酸・食物繊維・微量栄養素は推定値',
-   price:630, p:18.0, unit:'食', sat:5.5, salt:2.6, carbG:85.0, fiber:3.0, kcal:570, fat:17.8, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1, teishoku:true},
+  /* **v.185 で別メニューの値を入れてしまい、v.187 で戻した。**
+     利用者が最初に出した表の「塩さば特朝定食」の行は、実は**「塩さば定食」**（朝の
+     特朝セットではないほう）の数字で、P18.0g・570kcal だった。
+     こちらで「ご飯5.5g＋卵6.2gを引くとさばが6.3gしか残らない」と指摘したのが入口で、
+     **行そのものが別メニューだった**と分かった。
+     いまは利用者が出し直した**特朝セットの値**：744kcal・32g・28g・92g（公開値）。
+     **飽和脂肪酸7g・食物繊維3.5g・食塩3.5gは推定値。**
+     **「数字が内訳と合わない」ときは、値ではなく品目そのものを疑うこと。** */
+  {id:'ys_saba',      shop:'吉野家',  name:'塩さば特朝定食',       short:'塩さば特朝定食',
+   weekName:'吉野家<br>塩さば特朝定食', note:'1食 約32g（卵1個ぶん）',
+   ruleNote:'飽和脂肪酸・食物繊維・食塩・微量栄養素は推定値',
+   price:630, p:32, unit:'食', sat:7, salt:3.5, carbG:92, fiber:3.5, kcal:744, fat:28, slots:['b'], lock:true, slot:'b', fixedMenu:true, carb:true, eggs:1, teishoku:true},
   {id:'ys_rice',      shop:'吉野家',  name:'ご飯（並盛）',         short:'吉野家ご飯',     note:'1杯 約5.5g',
    price:0, p:5.5, unit:'杯', sat:0.1, salt:0, carbG:81.6, fiber:3.5, kcal:343, fat:0.7,
    slots:['d'], lock:true, shopSlot:true, fixedMenu:true, carb:true, autoEnergy:true},
@@ -2369,8 +2369,12 @@ function energyAdvice(st, gap, satTotal, saltTotal){
      数え負けするので対象外。枠が1単位も無い品目はここで外し、次の候補を繰り上げる。 */
   const capOfFood = f => {
     let cap = Math.min(roomFor(f, st), autoLeft(f));
+    /* **食塩の線は「未満」なので、ちょうど乗る個数を許してはいけない**（v.187）。
+       `Math.floor` だと割り切れたときに合計がぴったり7.5gになり、
+       ④の判定では「やや多い」側へ入る。`ceil - 1` で必ず内側に止める。
+       飽和脂肪酸の線は「以下」なので `floor` のままでよい。 */
     if(f.sat  >= SAT_PER_UNIT_MIN)  cap = Math.min(cap, Math.floor((SAT_GOOD   - satTotal)  / f.sat));
-    if(f.salt >= SALT_PER_UNIT_MIN) cap = Math.min(cap, Math.floor((SALT_LIMIT - saltTotal) / f.salt));
+    if(f.salt >= SALT_PER_UNIT_MIN) cap = Math.min(cap, Math.ceil((SALT_LIMIT - saltTotal) / f.salt) - 1);
     return cap;
   };
   const cands = FOODS.filter(f => pick(f) && !f.autoFill && f.kcal > 0)
@@ -4271,17 +4275,26 @@ function suggestPlan(g, st, satNow, saltNow){
      その日の飽和が **23.1g**（上限17g）になる献立を出していた。
      利用者は健診でLDLを指摘されているので、ここは越えさせない。
      線に当たって補いきれない場合は、**足りないまま出して理由を書く**。 */
+  /* **合計を丸めながら積まないこと**（v.187で踏んだ）。
+     `r1()` を1単位ごとにかけると、**1回あたり最大0.05gの丸め落ちが積もり、
+     ガードが実際より低い値を見る**。
+     ランダム検証で実測：食塩4.6gの日に 調整豆乳（0.42g/杯）を**7杯**提案し、
+     内部では7.4gのつもりで**実際は7.54g**＝線に達していた。
+     いまは**丸めずに積み、比べるときだけ `r1()` をかける**
+     （画面も検証も丸めた値を見るので、同じ土俵で判定する）。 */
   let sat  = satNow  || 0;
   let salt = saltNow || 0;
+  const satOk  = f => r1(sat  + (f.sat  || 0)) <= SAT_GOOD;
+  const saltOk = f => r1(salt + (f.salt || 0)) <  SALT_LIMIT;
   planCappedBy = '';
 
   while(rest >= 0.05 && guard++ < 30){
     const all = pool.filter(f => room[f.id] > 0 && f.p <= rest + 0.05 && groupAllowed(f));
-    const fit = all.filter(f => sat + (f.sat || 0) <= SAT_GOOD && salt + (f.salt || 0) < SALT_LIMIT);
+    const fit = all.filter(f => satOk(f) && saltOk(f));
     if(!fit.length){
       if(all.length){
-        const overSat  = all.some(f => sat  + (f.sat  || 0) > SAT_GOOD);
-        const overSalt = all.some(f => salt + (f.salt || 0) >= SALT_LIMIT);
+        const overSat  = all.some(f => !satOk(f));
+        const overSalt = all.some(f => !saltOk(f));
         planCappedBy = overSat && overSalt ? '食塩と飽和脂肪酸' : overSat ? '飽和脂肪酸' : '食塩';
       }
       break;
@@ -4292,14 +4305,13 @@ function suggestPlan(g, st, satNow, saltNow){
     room[f.id] -= 1;
     cats.add(FOOD_CAT[f.id]);
     useKind(f);
-    sat  = r1(sat  + (f.sat  || 0));
-    salt = r1(salt + (f.salt || 0));
+    sat  += (f.sat  || 0);          // 丸めない（上のコメント）
+    salt += (f.salt || 0);
     rest = r1(rest - f.p);
   }
   // 端数は最小単位で切り上げて必ず不足を満たす。ここでも線は越えない
   if(rest > 0.05 && !planCappedBy){
-    const last = pool.filter(f => room[f.id] > 0 &&
-      sat + (f.sat || 0) <= SAT_GOOD && salt + (f.salt || 0) < SALT_LIMIT).pop();
+    const last = pool.filter(f => room[f.id] > 0 && satOk(f) && saltOk(f)).pop();
     if(last) picks.push(last.id);
   }
   return picks;                            // 食品idの配列（1単位ごと）
@@ -4754,7 +4766,7 @@ const WEEKLY_PLAN = {
 const GRAM = {
   // --- 外食（器の中身の総量。みそ汁・つゆ込みの見当） ---
   /* **`mt_teishoku` と `ys_shiosaba` は FOODS に無い鍵だった**（v.184で修正）。
-     正しくは `mt_gyuzara`（得朝牛皿定食）と `ys_saba`（塩さば得朝定食）で、
+     正しくは `mt_gyuzara`（得朝牛皿定食）と `ys_saba`（塩さば特朝定食）で、
      そのため**この2品は「食べる量」に1gも乗っていなかった**。
      どちらも1週間の型には入らないので、型の実測値は変わらない。
      **`GRAM` の鍵は id で、`FOODS` と綴りが合っているかを確かめること。** */
@@ -4863,7 +4875,6 @@ const MICRO = {
      引かないと**チェックした日に二重に数える**。
      定食（得朝牛皿・ハムエッグ納豆・塩さば）はみそ汁が定食側に含まれる前提なので引かない。
 
-     **塩さば得朝定食の ビタミンD は「約5〜10」の中間 7.5、B12 は「約5+」の下限 5.0** とした。
 
      **店のご飯2つ（松屋ライス・吉野家ご飯）だけは推定値にしない。**
      ただの白飯なので、自宅のご飯と同じ成分表「めし・精白米」から出せる。
@@ -4878,7 +4889,7 @@ const MICRO = {
   mt_miso:      {ca:25, fe:0.3, zn:0.3, mg:10,           ve:0.1, b1:0.02, b2:0.05, b6:0.05,          fol:5},
   mt_rice:      {ca:6.6, fe:0.22, zn:1.32, mg:15.5, b1:0.044, b2:0.023, b6:0.044, fol:6.6},
   ys_hamegg:    {ca:80, fe:2.0, zn:2.5, mg:50, vd:1.0, ve:1.0, b1:0.20, b2:0.40, b6:0.30, b12:1.5, fol:50},
-  ys_saba:      {ca:50, fe:1.5, zn:1.5, mg:40, vd:7.5, ve:1.0, b1:0.15, b2:0.20, b6:0.30, b12:5.0, fol:20},
+  ys_saba:      {ca:80, fe:2.5, zn:2.5, mg:55, vd:5.0, ve:1.5, b1:0.25, b2:0.45, b6:0.45, b12:6.0, fol:50},
   ys_rice:      {ca:6.6, fe:0.22, zn:1.32, mg:15.5, b1:0.044, b2:0.023, b6:0.044, fol:6.6},
   ys_butadon:   {ca:30, fe:1.5, zn:2.0, mg:35, vd:0.2, ve:0.5, b1:0.30, b2:0.15, b6:0.30, b12:0.5, fol:15},
   nk_oyako:     {ca:50, fe:1.8, zn:2.5, mg:40, vd:1.0, ve:1.0, b1:0.15, b2:0.40, b6:0.40, b12:1.5, fol:40},
@@ -4910,9 +4921,11 @@ function calcMicro(st, sv){
      合計には0として入り、**未計上ではなく推定値のほうに名前を出す**。
 
      **ホエイ由来ならカルシウムは0ではないはず**（ホエイたんぱく濃縮物は
-     100gあたり400〜600mgの桁で、1回分30gなら120〜180mg）。
-     利用者には伝えてあり、商品の表示に載っていれば入れ替える。
-     いまは提示どおり0で置き、**推定値と名指ししている**。 */
+     100gあたり400〜600mgの桁で、1回分30gなら120〜180mg、4杯で240〜360mg＝目標の3〜5割）。
+     **商品の栄養成分表示にカルシウムの行は無いことを利用者が確認済み**（v.187）。
+     カルシウムは表示が任意なので、**無いことは0である証拠にはならない。**
+     数字が無い以上は0で置くしかないが、**④の充足率は低めに出ている可能性がある**。
+     推定値として名指ししているのはそのため。 */
   if(sv && sv.spoons > 0) est.push(PROTEIN.name);
   if(st.otherP > 0) missing.push('その他（自由入力）');
   return {sum, missing, est};
