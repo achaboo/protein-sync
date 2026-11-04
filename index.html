@@ -352,7 +352,7 @@ table.mini{font-size:.82rem}
 table.mini td.time{width:auto;white-space:nowrap}
 table.mini td.amt{width:auto;text-align:right}
 /* 基本係数の目安表は、両端の列を折り返さない。
-   「1.65（初期値）」は <br> で入れた2行のまま、「110.3 g」は1行で見せる。 */
+   「1.4（初期値）」は <br> で入れた2行のまま、「110.3 g」は1行で見せる。 */
 #bfTable th:first-child{width:5.4em}
 #bfTable th:last-child{width:4.8em}
 #bfTable td.time,#bfTable td.amt{white-space:nowrap}
@@ -469,7 +469,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
       </div>
       <div>
         <label for="baseFactor">基本係数（たんぱく質 g/kg・運動量にかかわらず同じ）</label>
-        <input type="number" inputmode="decimal" id="baseFactor" value="1.65" step="0.05" min="1" max="2.5">
+        <input type="number" inputmode="decimal" id="baseFactor" value="1.4" step="0.05" min="1" max="2.5">
       </div>
     </div>
     <!-- 体重は「その日の値」ではなく7日平均を入れてもらう（v.160）。
@@ -564,7 +564,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
             <td class="amt" id="bf12">-</td>
           </tr>
           <tr>
-            <td class="time">1.4</td>
+            <td class="time">1.4<br><small>（初期値）</small></td>
             <td>今の体重・筋肉量を維持できれば十分な時期。食が細く、食事量が落ちている日が続くとき。</td>
             <td class="amt" id="bf14">-</td>
           </tr>
@@ -574,13 +574,13 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
             <td class="amt" id="bf15">-</td>
           </tr>
           <tr>
-            <td class="time">1.65<br><small>（初期値）</small></td>
-            <td>筋肥大を積極的に狙う時期の標準値。メタ解析で追加効果が頭打ちになる 1.6g/kg を少し上回る設定です。迷ったらこの値のままで構いません。</td>
+            <td class="time">1.65</td>
+            <td>筋肥大を積極的に狙う時期の標準値。メタ解析で追加効果が頭打ちになる 1.6g/kg を少し上回る設定です。</td>
             <td class="amt" id="bf165">-</td>
           </tr>
           <tr>
             <td class="time">1.8</td>
-            <td>減量しながら筋肉を落としたくない時期。<b>減量期は 1.65 のままでは足りません</b>
+            <td>減量しながら筋肉を落としたくない時期。<b>減量期は 1.4 のままでは足りません</b>
               （目安は 1.8〜2.4g/kg）。たんぱく質が増えるぶん、水分を多めに摂ってください。</td>
             <td class="amt" id="bf18">-</td>
           </tr>
@@ -639,7 +639,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
     </p>
     <div class="row">
       <div class="name"><b>朝食の時刻</b><small>1日の起点。⑤の表に実時刻を出します</small></div>
-      <div class="qty"><input type="time" id="breakfastTime" value="07:00" step="300"></div>
+      <div class="qty"><input type="time" id="breakfastTime" value="08:30" step="300"></div>
       <div class="unit">時刻</div>
     </div>
     <div class="row">
@@ -845,7 +845,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.187';
+const APP_VERSION = '2026-09-01.188';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -1568,7 +1568,7 @@ function readState(){
     weight: num('weight') || 72.5,
     height: num('height') || 177.4,
     age:    num('age')    || 55,
-    baseFactor: num('baseFactor') || 1.65,
+    baseFactor: num('baseFactor') || 1.4,
     walk: num('walk'), cycle: num('cycle'), otherP: num('otherP'),
     // 必要エネルギーの手動補正（マイナスもあるので numS で読み、上限で切り詰める）
     kcalAdj: Math.max(-KCAL_ADJ_CAP, Math.min(KCAL_ADJ_CAP, numS('kcalAdj'))),
@@ -4670,7 +4670,7 @@ const storageOk = (() => {
 })();
 // 入力欄の既定値を変更したら上げる。番号が違う保存データでは、
 // 下記の欄だけ復元せず新しい既定値に戻す（体重や食事回数などの他の設定は保持）。
-const DEFAULTS_VER = 17;
+const DEFAULTS_VER = 18;
 // v6：体重の初期値を 75kg → 74kg に変更。
 // 次に既定値を変えるときは、実際に変えた欄だけをこの一覧に残すこと
 // （体重を入れたままにすると、以後の更新で入力済みの体重まで戻ってしまう）。
@@ -4707,7 +4707,14 @@ const DEFAULTS_VER = 17;
 //      副作用として、`staleEx` が立つ版では筋トレのチェックが全部オフに戻り、
 //      `twoDoses` も初期値（オン）に戻る（重量・回数・セット数は残る）。
 //      v15 の3欄は一覧から外すこと（残すと入力済みの重量まで初期値へ戻る）。
-const RESET_IDS = () => ['weight'];
+// v18：基本係数 1.65 → 1.4、朝食の時刻 07:00 → 08:30（どちらも利用者の指示）。
+//      **`weight` は一覧から外した** — v17 の注記どおり。
+//      残したままだと、毎朝入れ直している7日平均が 75.0kg へ巻き戻る。
+//      基本係数が下がると目標たんぱく質も下がる（75.0kg で 123.8g → 105.0g）ので、
+//      週の型の献立・粉の杯数・食費がまとめて変わる。README の実測表は
+//      **測ったときの係数を見出しに書いてある**ので、1.65 のものはそのまま残してある。
+//      朝食 08:30 にすると、空欄の昼食は 11:30・夕食は 15:30 になる（基本の間隔のまま）。
+const RESET_IDS = () => ['baseFactor', 'breakfastTime'];
 const ALL_IDS = () => ['weight','height','age','baseFactor','meals','savasShare','walk','cycle',
    'kcalAdj','weekExSel',
    'otherP','otherNote','otherFat','otherSat','otherSalt','otherCarb','otherFiber','otherKcal','otherPrice',
@@ -5091,6 +5098,18 @@ function trialPanel(st){
       ? `<div class="actions" style="margin:6px 0 0">` +
         (live ? `<button type="button" class="mini-btn" data-trial-apply="1">この案を③に入れる</button>` : '') +
         `<button type="button" class="mini-btn" data-trial-clear="1">お試しを消す</button></div>`
+      : '') +
+    /* **お試しの絵と、③に入れたあとの結果は同じにならない**（v.188で明記）。
+       お試しは「いまの献立にこれを足し引きしたら」をそのまま描くだけだが、
+       ③に入れると `setAutoOverride` でその品目が手入力に変わり、
+       **残りを自動計算が組み直す**。
+       実測：納豆を2P入れると シリアル2→0食・バナナ2→1本・アーモンド10→3粒 が動き、
+       たんぱく質の割合が お試し115% → 入れたあと105% になった。
+       黙っていると「押したら数字が変わった＝不具合」に見えるので、先に書いておく。 */
+    (live
+      ? `<div class="hint" style="margin:6px 0 0">③に入れると、<b>その品目は手入力に変わり、` +
+        `残りの品目は自動計算が組み直します</b>。そのため<b>上のグラフとぴったり同じにはなりません</b>` +
+        `（入れたあとの④とグラフが、実際の数字です）。</div>`
       : '') +
     `</div>`;
 }
