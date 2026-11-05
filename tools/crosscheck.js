@@ -303,12 +303,13 @@ const eq = (a, b) => Math.abs(a - b) < 1e-6;
   if(!readme.includes(`週${sabaDays}缶`))
     bad('週の型', `サバ缶は週${sabaDays}缶だが README に「週${sabaDays}缶」の記述がありません`);
   const dressDays = Object.values(WEEKLY_PLAN).filter(p => p.dressing).length;
-  if(dressDays !== 6) bad('週の型', `ドレッシングの日数が ${dressDays} 日です（README は木曜以外＝6日）`);
+  if(dressDays !== 7) bad('週の型', `ドレッシングの日数が ${dressDays} 日です（README は7日すべて）`);
   // 外食の日
   const eatOut = Object.keys(WEEKLY_PLAN).filter(i =>
     Object.keys(WEEKLY_PLAN[i]).some(id => (byId(id) || {}).shop && byId(id).slot === 'd'));
-  if(eatOut.length !== 1 || eatOut[0] !== '4')
-    bad('週の型', `外食の夕食がある曜日：${eatOut.map(i => LABEL[i]).join('・')}（README は木曜だけ）`);
+  /* v.189 で木曜の外食をやめたので、型のなかに外食の夕食は1日も無い。 */
+  if(eatOut.length !== 0)
+    bad('週の型', `外食の夕食がある曜日：${eatOut.map(i => LABEL[i]).join('・')}（README は「型に外食は無い」）`);
 })();
 
 /* ============================================================
