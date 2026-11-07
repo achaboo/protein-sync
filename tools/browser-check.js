@@ -318,10 +318,12 @@ function checkOne(c, fail){
   const rows = [...$$('schedule').querySelectorAll('tr')];
   if(rows.length){
     const head0 = rows[0].querySelector('td.time').textContent;
-    /* 運動もしておらず「休養日も摂る」もオフの日は、粉を1杯も摂らないので
-       プロテインの行そのものが出ない（v.151）。そういう日は1行目が朝食になる。 */
-    const ex0      = calcFactor(readState());
-    const noPowder = !(ex0.done > 0 || ex0.cardio > 0) && !$$('restSavas').checked;
+    /* 運動していない日に粉が0杯なら、プロテインの行そのものが出ない（v.151。
+       v.196 で「休養日も摂る」がオンでも0杯なら出さないようにした）。そういう日は1行目が朝食になる。 */
+    const st0      = readState(), ex0 = calcFactor(st0);
+    const noPowder = !(ex0.done > 0 || ex0.cardio > 0) && !(savasOf(st0, ex0).spoons > 0);
+    if(noPowder && head0.indexOf('起床後') >= 0)
+      fail(`⑤に粉0杯の空のプロテイン行が出ています：${head0.trim().slice(0, 20)}`);
     const isPowder = head0.indexOf(PROTEIN.name) >= 0 || head0.indexOf('起床後') >= 0;
     if(!isPowder && !noPowder)
       fail(`⑤の1行目がプロテインの行ではありません：${head0.trim().slice(0, 20)}`);
