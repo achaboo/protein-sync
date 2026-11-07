@@ -98,6 +98,7 @@ function makeCase(rnd, i){
     two:      rnd() < 0.7,
     rest:     rnd() < 0.3,
     mochi:    rnd() < 0.5,      // ご飯にもち麦を混ぜるか（v.192）
+    perish:   rnd() < 0.5,      // 賞味期限が近い品目を優先するか（v.195）
     detail:   rnd() < 0.5,
     kcalAdj:  pick([0, 0, 0, 200, -200, 600, -600]),   // ①の必要エネルギーの補正
     walk:     pick([0, 0, 5, 10, 12, 20, 25]),
@@ -155,6 +156,8 @@ function applyCase(c){
   setChk('twoDoses', c.two); setChk('restSavas', c.rest); setChk('schedDetail', c.detail);
   // ご飯の中身を入れ替える（v.192）。チェックを書き替えただけでは FOODS が変わらない
   setChk('riceMochi', c.mochi); if(typeof applyRiceMix === 'function') applyRiceMix();
+  // 期限優先（v.195）。切り替えの後始末（自動で入れた数の0戻し・手入力の引き継ぎ）も通す
+  setChk('perishFirst', c.perish); if(typeof onPerishToggle === 'function') onPerishToggle();
   setVal('kcalAdj', c.kcalAdj);
   setVal('walk', c.walk); setVal('cycle', c.cycle);
   setVal('breakfastTime', c.times[0]); setVal('lunchTime', c.times[1]); setVal('dinnerTime', c.times[2]);

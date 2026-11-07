@@ -710,6 +710,16 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
       <br><small>使う品目のほうが少ないときは、<b>いちど「すべて外す」を押してから</b>
       使うものにチェックを入れると速く済みます。</small>
     </p>
+    <p class="hint" style="margin-top:0">
+      <!-- 賞味期限が近い品目を優先する（v.195）。設定なので翌日も続き、リンクでも運ぶ -->
+      <label class="use"><input type="checkbox" id="perishFirst"><b>賞味期限が近い品目を優先する</b></label>
+      <br><small>オンにすると、チェックの付いた品目のうち、<b>店のメニューと日持ちする品目</b>
+      （ご飯・もち麦・シリアル・ツナ缶・サバ缶・オリーブオイル・ノンオイルドレッシング・アーモンド）<b>以外</b>を、
+      自動計算が優先して使います。ふだんは自動で選ばない むき甘栗・調整豆乳・ほぐしサラダチキン・
+      ロースかつ重・納豆（たれなし）・自由入力で足した品目も、この日は候補になります。
+      <b>食塩7.5g・飽和脂肪酸15gの線と、たんぱく質・エネルギーの帯は守ります</b>（その内側で、余裕よりも期限を優先します）。
+      在庫が無い品目はチェックを外してください。「1週間の型の栄養」には効かせません。この設定は翌日も続きます。</small>
+    </p>
     <p class="hint" id="useNote" style="margin-top:0"></p>
     <div id="foods"></div>
     <div class="row">
@@ -845,7 +855,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.194';
+const APP_VERSION = '2026-09-01.195';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -990,7 +1000,7 @@ const FOODS = [
    ruleNote:'木曜の夕食（外食の日）', price:450, p:30, unit:'食', sat:4.8, salt:3.0, carbG:99.7, fiber:4.4, kcal:673, fat:16.5, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true, eggs:1},
   {id:'katsuju',  name:'ロースかつ重',          short:'ロースかつ重', note:'1食 約24.7g（卵1個ぶん）',
    price:299, p:24.7, unit:'食', sat:9.5, salt:3.4, carbG:82, fiber:3.5, kcal:723, fat:32,
-   slots:['s'], lock:true, home:true, carb:true, eggs:1},
+   slots:['s'], lock:true, home:true, carb:true, eggs:1, perishMax:1},
 
   // --- 運動直後 ---
   {id:'banana',  name:'バナナ',              short:'バナナ',       note:'1本 約1g',
@@ -1138,9 +1148,9 @@ const FOODS = [
      含んだままなので、炭水化物とエネルギーは1パックあたり数kcal多めに出る）。
      自動計算の候補にはしない（たれをかけて食べるのが基本、という利用者の判断）。 */
   {id:'natto_plain', name:'納豆（たれなし）', short:'納豆（たれなし）', weekShort:'納豆たれなし',
-   note:'1パック 約8.3g', ruleNote:'食塩を削りたい日の切り替え先<br>自動計算では選びません',
+   note:'1パック 約8.3g', ruleNote:'食塩を削りたい日の切り替え先<br>ふだんは自動計算では選びません<br>（期限が近い品目を優先する日は候補。納豆と合わせて3Pまで）',
    price:32, p:8.3, unit:'P', sat:0.8, salt:0, carbG:7.3, fiber:3.6, kcal:99, fat:4.9,
-   slots:['s'], lock:true, home:true},
+   slots:['s'], lock:true, home:true, perishMax:3},
 
   /* 以下の3品目は利用者が「その他（自由入力）」で登録していたものを、
      v.177 で標準の品目に移したもの（自由入力の品目は保存とリンクに載るだけで
@@ -1155,17 +1165,17 @@ const FOODS = [
      **自動計算の候補にはしない**（`autoFill` などを付けない）ので、
      手で数量を入れた日だけ献立に入る。 */
   {id:'amaguri', name:'むき甘栗', short:'むき甘栗', weekShort:'甘栗',
-   note:'1袋 約4.3g', ruleNote:'自動計算では選びません<br>（食べる日は手で袋数を入れてください）<br>飽和脂肪酸は推定値',
+   note:'1袋 約4.3g', ruleNote:'ふだんは自動計算では選びません<br>（期限が近い品目を優先する日は1袋まで候補）<br>飽和脂肪酸は推定値',
    price:108, p:4.3, unit:'袋', sat:0.2, salt:0, carbG:50.4, fiber:10, kcal:223, fat:0.5,
-   slots:['s'], lock:true, home:true},
+   slots:['s'], lock:true, home:true, perishMax:1},
   {id:'soymilk', name:'調整豆乳（200ml）', short:'調整豆乳', weekShort:'調整豆乳',
-   note:'1杯 約7.1g', ruleNote:'自動計算では選びません<br>（飲む日は手で杯数を入れてください）<br>飽和脂肪酸は推定値',
+   note:'1杯 約7.1g', ruleNote:'ふだんは自動計算では選びません<br>（期限が近い品目を優先する日は2杯まで候補）<br>飽和脂肪酸は推定値',
    price:46, p:7.1, unit:'杯', sat:0.67, salt:0.42, carbG:4.7, fiber:0.4, kcal:95, fat:5.4,
-   slots:['s'], lock:true, home:true},
+   slots:['s'], lock:true, home:true, perishMax:2},
   {id:'chicken_hogushi', name:'ほぐしサラダチキン', short:'ほぐしサラダチキン', weekShort:'ほぐしチキン',
-   note:'1食 約19.7g', ruleNote:'自動計算では選びません<br>（食べる日は手で数量を入れてください）<br>飽和脂肪酸は推定値',
+   note:'1食 約19.7g', ruleNote:'ふだんは自動計算では選びません<br>（期限が近い品目を優先する日は2食まで候補）<br>飽和脂肪酸は推定値',
    price:54, p:19.7, unit:'食', sat:0.4, salt:1.3, carbG:1.3, fiber:0, kcal:103, fat:1.6,
-   slots:['s'], lock:true, home:true}
+   slots:['s'], lock:true, home:true, perishMax:2}
 ];
 
 // 水のみで溶かす（乳類は摂らない前提）。水にたんぱく質は含まれないため加算はない。
@@ -1367,7 +1377,25 @@ const infoHtml = f =>
    autoEnergy … 定食に付く無料のご飯のおかわり
    autoFill   … たんぱく質の残りを埋める候補
    autoBal    … 栄養バランスを整えるために数量を動かす品目（サラダ・卵・バナナ） */
-const isAuto = f => !!(f.autoFill || f.autoEnergy || f.autoFat || f.autoRice || f.autoBal);
+const isAutoStatic = f => !!(f.autoFill || f.autoEnergy || f.autoFat || f.autoRice || f.autoBal);
+/* **賞味期限が近い品目を優先する**（v.195・利用者の要望）。
+   ③の「賞味期限が近い品目を優先する」がオンの日だけ効かせる。
+   対象は店のメニューと日持ちする品目（ご飯〈もち麦〉・シリアル・ツナ缶・サバ缶3種・
+   オリーブオイル・ノンオイルドレッシング・アーモンド）**以外**で、利用者が決めた。
+   自由入力で足した品目も含める。「在庫がある」はチェック（foodUse）で表す。
+   ・自動計算の点数に「期限が近い品目のエネルギーの割合 × PERISH_W」を**引く**形で入れる。
+     重さは利用者の指定で「食塩・飽和の余裕（SLACK_W）より上、エネルギーの近さより下」。
+     割合で持つのは、量そのものに報酬を付けると**食べる総量を増やす方向**へ傾くため
+     （割合なら、日持ちする品目と入れ替える方向に効く）。
+   ・ふだんは手入力だけの品目（perishMax を持つもの）も、この日だけ候補にする。
+   ・「1週間の型の栄養」には効かせない（今日の在庫とは無関係の基準のため）。
+   ・食塩・飽和の線（BAD_BASE）とたんぱく質・帯はそのまま上に置くので、越えない。 */
+const PERISH_IDS = ['katsuju', 'banana', 'tomato', 'salad', 'yogurt', 'chicken', 'egg', 'milk', 'bread',
+                    'tofu', 'natto', 'natto_plain', 'amaguri', 'soymilk', 'chicken_hogushi'];
+const isPerish  = f => !!f && (!!f.custom || PERISH_IDS.includes(f.id));
+const perishOn  = () => !!($('perishFirst') && $('perishFirst').checked);
+const perishOnly = f => !!f.perishMax && !isAutoStatic(f);   // 期限優先の日だけ自動になる品目
+const isAuto = f => isAutoStatic(f) || (!!f.perishMax && perishOn());
 
 // 自動で数量が決まる品目には、共通の注記を付ける
 FOODS.filter(f => f.autoFill).forEach(f => {
@@ -1396,7 +1424,7 @@ const foodRow = f => `
       `${f.custom ? `<button type="button" class="mini-btn del-btn" data-del="${f.id}">削除</button>` : ''}` +
       // 自動計算する品目は、手で書き換えたときに自動へ戻せるようにする。
       // 手入力に切り替えたときだけ出す行なので、まるごと hidden にして空の行を作らない
-      `${isAuto(f)
+      `${(isAutoStatic(f) || f.perishMax)
         ? `<span id="autoWrap_${f.id}" hidden><br><span id="autoNote_${f.id}"></span>` +
           `<button type="button" id="autoBack_${f.id}" class="mini-btn">自動計算に戻す</button></span>`
         : ''}` +
@@ -1422,7 +1450,7 @@ function addCustomFood(o, qty){
     p, price: +o.price || 0,
     fat: +o.fat || 0, sat: +o.sat || 0, salt: +o.salt || 0,
     carbG: +o.carbG || 0, fiber: +o.fiber || 0, kcal: +o.kcal || 0,
-    slots: ['b','l','d'], custom: true
+    slots: ['b','l','d'], custom: true, perishMax: 1
   };
   const n = parseInt(String(f.id).replace(/[^0-9]/g, ''), 10);
   if(n > customSeq) customSeq = n;        // 復元したidと番号がぶつからないようにする
@@ -1980,14 +2008,36 @@ let autoOverride = {};                 // 自動入力を止めている品目 {
 const AUTO_IDS = () => FOODS.filter(isAuto).map(f => f.id);
 const autoOff  = id => !!autoOverride[id];
 function refreshAutoNotes(){
-  AUTO_IDS().forEach(fid => {
+  // 期限優先がオフの日は、その品目は自動ではないので注記も出さない（v.195）
+  FOODS.filter(f => isAutoStatic(f) || f.perishMax).forEach(f => {
+    const fid = f.id, show = isAuto(f) && autoOff(fid);
     const note = $('autoNote_' + fid), btn = $('autoBack_' + fid), wrap = $('autoWrap_' + fid);
-    if(note) note.innerHTML = autoOff(fid)
+    if(note) note.innerHTML = show
       ? `<b>手入力に切り替えています。</b><br>（自動計算は止まっています） `
       : '';
-    if(btn)  btn.hidden  = !autoOff(fid);
-    if(wrap) wrap.hidden = !autoOff(fid);   // 行ごと消して、空の行を残さない
+    if(btn)  btn.hidden  = !show;
+    if(wrap) wrap.hidden = !show;   // 行ごと消して、空の行を残さない
   });
+}
+/* 期限優先を切り替えたとき（v.195）。
+   ・オンにした：ふだん手入力の品目にすでに数量が入っていれば、それは利用者が打った数なので
+     手入力として残す（自動計算に上書きさせない）。0なら自動計算に任せる。
+   ・オフにした：自動計算が入れた数量は0に戻す（**残すと、打っていない数が手入力に見える**）。
+     手入力に切り替えていたものはそのまま残す。
+   チェックボックスは input → change の2つを投げるので、状態が変わったときだけ動かす
+   （2回目で、1回目の再計算が入れた数を「手入力」と読み違えないため）。 */
+let perishPrev = null;
+function onPerishToggle(){
+  const on = perishOn();
+  if(on === perishPrev) return;
+  perishPrev = on;
+  FOODS.filter(perishOnly).forEach(f => {
+    const el = $('f_' + f.id);
+    if(!el) return;
+    if(on){ if(num('f_' + f.id) > 0) autoOverride[f.id] = true; else delete autoOverride[f.id]; }
+    else  { if(!autoOff(f.id)) el.value = 0; delete autoOverride[f.id]; }
+  });
+  refreshAutoNotes();
 }
 function setAutoOverride(id, on){
   if(id === null){ autoOverride = {}; }          // すべて自動へ戻す
@@ -2089,6 +2139,7 @@ const COST_W    = 1 / 5000;   // 最後の同点崩し。余裕より軽く効�
    線を越えてまでおかずを入れることはしない。 */
 const OKAZU_IDS = ['tofu', 'natto', 'natto_plain', 'egg', 'tuna', 'saba', 'saba_aji', 'saba_miso'];   // 豆腐は v.194
 const OKAZU_W   = 1e6;
+const PERISH_W  = 20;    // 期限が近い品目の割合の重み（v.195）。余裕（SLACK_W）より上
 const BAD_BASE  = 1e8;   // 食塩・飽和の線を越えた点の下駄（帯の外れよりさらに重い）
 const CLIMB_MAX = 200;   // 山登りの打ち切り（通常は10回ほどで止まる）
 const CLIMB_SEEDS = 8;   // 決まった6点に加えて散らす初期点の数
@@ -2104,7 +2155,9 @@ function autoRanges(st, ex, keepOff){
     // 「今日は使わない」に外した品目は、上限も下限も0にして探索から外す。
     // 「1週間の型の栄養」は今日の在庫とは無関係の基準なので、そこでは見ない（keepOff）
     const use = keepOff || foodUse(f.id);
-    r[f.id] = {lo:0, hi: use ? Math.max(0, f.autoMax || f.fillMax || 0) : 0};
+    r[f.id] = {lo:0, hi: use ? Math.max(0, f.autoMax || f.fillMax || f.perishMax || 0) : 0};
+    // 期限優先の日だけ自動になる品目は、週の表（今日の在庫と無関係）では選ばない
+    if(keepOff && perishOnly(f)) r[f.id].hi = 0;
   });
   /* **ここで `use` を見落とさないこと**（v.169で直した）。
      上のループが「使わない」品目の hi を0にしても、この2か所が**無条件に上書き**していたため、
@@ -2133,7 +2186,7 @@ function autoRanges(st, ex, keepOff){
 /* 1つの組み合わせを評価する。小さいほどよい。
    初期点をいくつも試すので同じ組み合わせを何度も評価する。1回の探索のあいだだけ
    結果を覚えておく（これが無いと1回の探索が3倍かかる）。 */
-function makeScore(st0, ex, ids, satCap){
+function makeScore(st0, ex, ids, satCap, perish){
   const need   = calcNeed(st0, ex);
   const target = r1(st0.weight * ex.factor);
   const pLo    = r1(target * WEEK_P_RATIO), pHi = r1(target + DEVIATION_OK);
@@ -2146,11 +2199,17 @@ function makeScore(st0, ex, ids, satCap){
   const NG = over => ({ok:false, score:BAD_BASE * (1 + over)});
   // おかずが要る食事の数（ご飯を置ける自宅の食事）。探索の変数には依存させない
   const okazuNeed = foodUse('rice') || Math.round(st0.foods.rice || 0) > 0 ? homeMealsOf(st0).length : 0;
+  const nattoMax = (foodById('natto') || {}).fillMax || 3;   // 納豆とたれなしを合わせた1日の上限
   const memo = new Map();
   const calc1 = q => {
     // サラダのない日は油の置き場所が無い
     if(oil && (q[oil.id] || 0) > 0 && Math.round(q.salad || 0) <= 0) return NG(q[oil.id] / 10);
     const st   = withFoods(st0, q);
+    // 期限優先の日は納豆（たれなし）も候補になるので、納豆と合わせて上限を見る
+    if(perish){
+      const nt = Math.round(st.foods.natto || 0) + Math.round(st.foods.natto_plain || 0);
+      if(nt > nattoMax) return NG((nt - nattoMax) / 10);
+    }
     const sv   = savasOf(st, ex);
     const food = calcFood(st);
     const salt = calcSalt(st, sv).total, sat = calcSat(st, sv).total;
@@ -2184,11 +2243,15 @@ function makeScore(st0, ex, ids, satCap){
     const under = Math.pow(Math.max(0, pLo - P) / DEVIATION_OK, 2);
     const okazuHave = OKAZU_IDS.reduce((a, id) => a + Math.round(st.foods[id] || 0), 0);
     const okazuMiss = Math.max(0, okazuNeed - okazuHave);
+    // 期限が近い品目のエネルギーの割合（v.195）。点数から引く
+    const perishK = perish
+      ? FOODS.reduce((a, f) => a + (isPerish(f) ? (st.foods[f.id] || 0) * (f.kcal || 0) : 0), 0) : 0;
     return {ok:true, pShort: under > 0,
             score: (under > 0 ? PLOW_FIX : 0) + PLOW_W * under + OKAZU_W * okazuMiss + BAND_W * d + ENERGY_W * near
                  + SLACK_W * (salt / SALT_LIMIT + sat / SAT_GOOD)
                  + BULK_W * Math.max(0, calcGram(st, sv).total - BULK_AIM)
-                 + COST_W * food.cost};
+                 + COST_W * food.cost
+                 - PERISH_W * perishK / Math.max(1, kcal)};
   };
   return q => {
     let key = '';
@@ -2244,7 +2307,7 @@ function balanceQuantities(st0, ex, keep, seed, keepOff){
   if(!ids.length) return out;
 
   const run = (range, satCap, seeds, kicks) => {
-    const score = makeScore(st0, ex, ids, satCap);
+    const score = makeScore(st0, ex, ids, satCap, perishOn() && !keepOff);
     const mid = {}, hi = {}, fill = {}, carbs = {}, prot = {};
     ids.forEach(id => {
       const f = foodById(id);
@@ -2325,6 +2388,7 @@ function autoQuantities(st0, keep, keepOff){
                st.otherCarb, st.otherFiber,
                Object.keys(keep).sort().join(','),
                riceMochiOn() ? 'mochi' : 'plain', JSON.stringify(foodOverride),   // 品目の中身が変わる設定（v.192）
+               perishOn() && !keepOff ? 'perish' : '',                           // 期限優先（v.195）
                keepOff ? 'week' : Object.keys(foodOff).sort().join(',')].join('|');
   let got = balCache.get(key);
   if(!got){
@@ -5594,7 +5658,7 @@ function save(){
 
 /* 保存だけを行い、URL には触らない。`syncHash` が `lk` を書き直すのにも使う。 */
 function writeStore(){
-  const d = {v:{}, c:{}, date:todayKey(), dv:DEFAULTS_VER, exd:exDate, rest:$('restSavas').checked, two:$('twoDoses').checked, sd:$('schedDetail').checked, mochi:$('riceMochi').checked, ao:autoOverride, calc:calculated, cf:customData(), ov:foodOverride, off:foodOff, lk:appliedLink};
+  const d = {v:{}, c:{}, date:todayKey(), dv:DEFAULTS_VER, exd:exDate, rest:$('restSavas').checked, two:$('twoDoses').checked, sd:$('schedDetail').checked, mochi:$('riceMochi').checked, perish:$('perishFirst').checked, ao:autoOverride, calc:calculated, cf:customData(), ov:foodOverride, off:foodOff, lk:appliedLink};
   ALL_IDS().forEach(id => d.v[id] = $(id).value);
   EXERCISES.forEach(e => d.c[e.id] = $('c_' + e.id).checked);
   try{ localStorage.setItem(KEY, JSON.stringify(d)); }catch(err){}
@@ -5686,6 +5750,8 @@ function load(){
     if(d.two  !== undefined && !staleEx) $('twoDoses').checked = !!d.two;
     if(d.sd   !== undefined) $('schedDetail').checked = !!d.sd;
     if(d.mochi !== undefined) $('riceMochi').checked = !!d.mochi;   // 設定なので日付に関係なく残す（v.192）
+    if(d.perish !== undefined) $('perishFirst').checked = !!d.perish;   // 期限優先も設定（v.195）
+    perishPrev = perishOn();
     applyRiceMix();
     // 手入力への切り替えはその日限り
     // 旧形式（真偽値）は納豆だけの指定として読む
@@ -5728,7 +5794,7 @@ const b64dec = str =>
   JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(str), c => c.charCodeAt(0))));
 
 function settingsPayload(){
-  const d = {v:{}, c:{}, date:todayKey(), rest:$('restSavas').checked, two:$('twoDoses').checked, sd:$('schedDetail').checked, mochi:$('riceMochi').checked};
+  const d = {v:{}, c:{}, date:todayKey(), rest:$('restSavas').checked, two:$('twoDoses').checked, sd:$('schedDetail').checked, mochi:$('riceMochi').checked, perish:$('perishFirst').checked};
   d.cf = customData();
   d.ov = foodOverride;
   /* 「使う／使わない」も設定として運ぶ（v.165）。
@@ -5802,6 +5868,7 @@ function applySettingsFromHash(hash){
     if(d.two  !== undefined) $('twoDoses').checked  = !!d.two;
     if(d.sd   !== undefined) $('schedDetail').checked = !!d.sd;
     if(d.mochi !== undefined) $('riceMochi').checked = !!d.mochi;
+    if(d.perish !== undefined){ $('perishFirst').checked = !!d.perish; onPerishToggle(); }
     applyRiceMix();   // 品目の値の変更（d.ov）を入れたあとに中身を入れ替える
 
     // 日付を持たない古いリンクは設定のみ。当日のリンクなら食事・距離・種目も反映する
@@ -6144,11 +6211,22 @@ $('foods').addEventListener('input', e => {
   if(!m) return;
   const id = m[1], cb = $('use_' + id);
   if(cb && !cb.checked && num('f_' + id) > 0) cb.checked = true;
+  // 期限優先の日だけ自動になる品目（v.195）。いつも自動の品目は行ごとのリスナで受けている
+  const f = foodById(id);
+  if(f && perishOnly(f) && perishOn()) setAutoOverride(id, true);
 });
+$('foods').addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('button[id^="autoBack_"]');
+  if(!b) return;
+  const f = foodById(b.id.slice('autoBack_'.length));
+  if(f && perishOnly(f)){ setAutoOverride(f.id, false); onInputChanged(); }
+});
+// 期限優先のスイッチ。要素のリスナは document の onInputChanged より先に走る
+['input', 'change'].forEach(ev => $('perishFirst').addEventListener(ev, onPerishToggle));
 
 // 自動計算する品目（ご飯・オリーブオイル・たんぱく質の候補）を手で書き換えたら、
 // その日は手入力を優先する
-FOODS.filter(isAuto).forEach(f => {
+FOODS.filter(isAutoStatic).forEach(f => {
   const el = $('f_' + f.id), btn = $('autoBack_' + f.id);
   if(el) el.addEventListener('input', () => { setAutoOverride(f.id, true); onInputChanged(); });
   if(btn) btn.addEventListener('click', () => { setAutoOverride(f.id, false); onInputChanged(); });
