@@ -845,7 +845,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.192';
+const APP_VERSION = '2026-09-01.194';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -1120,6 +1120,15 @@ const FOODS = [
       エネルギーが「足りない」と出るようになるが、それが型の実際の限界である。 */
    carb:true, group:'staple', slotLimit:2, spread:true,    // spread: 自宅の食事へ配る
    autoRice:true, autoMax:6},
+  /* 豆腐（v.194・利用者の指定）。アサヒコ 職人豆腐 絹 350g、1丁85円。
+     P・脂質・炭水化物・食塩・エネルギーは**商品の表示値を1丁（350g）に換算したもの**。
+     **飽和脂肪酸2.00g・食物繊維3.15gは推定値**（標準的な絹ごし豆腐の成分表の値からの換算・利用者の提示）。
+     おかず（`OKAZU_IDS`）として数え、自動計算の候補にする。
+     **1日1丁まで**（1丁350gと1単位が大きいので、2丁＝700gを1日に積ませない）。 */
+  {id:'tofu',    name:'豆腐',                short:'豆腐',         weekShort:'豆腐', note:'1丁350g 約18.6g',
+   ruleNote:'絹ごし（1丁350g）<br>1日1丁まで<br>飽和脂肪酸・食物繊維・微量栄養素は推定値',
+   price:85, p:18.55, unit:'丁', sat:2.0, salt:0.07, carbG:5.95, fiber:3.15, kcal:203, fat:11.55,
+   slots:['s'], lock:true, home:true, autoFill:true, fillMax:1},
   {id:'natto',   name:'納豆',                short:'納豆',         note:'1パック 約8.3g',
    price:32, p:8.3, unit:'P', sat:0.8, salt:0.7, carbG:7.3, fiber:3.6, kcal:99, fat:4.9,
    slots:['s'], lock:true, home:true, autoFill:true, fillMax:3},
@@ -1218,7 +1227,7 @@ const FIBER_TARGET = 22;
 /* ⑤の1食の中で品目を並べる順。関連するものを隣どうしに置くための順番で、
    栄養計算には影響しない。
    サラダ→ドレッシング→油（サラダ一式）、トマトジュース→乳製品、主菜、主食の順。 */
-const SCHED_ORDER = ['salad','dressing','olive','tomato','yogurt','milk','egg','natto',
+const SCHED_ORDER = ['salad','dressing','olive','tomato','yogurt','milk','egg','tofu','natto',
                      'chicken','tuna','saba','saba_aji','saba_miso','katsuju'];
 const SCHED_RANK = (() => {
   const r = {};
@@ -2068,6 +2077,18 @@ const SLACK_W   = 10;    // 食塩・飽和の余裕を残すことの重み（�
    食費より重く、食塩・飽和の余裕（`SLACK_W`）より軽い。 */
 const BULK_W    = 1 / 200;
 const COST_W    = 1 / 5000;   // 最後の同点崩し。余裕より軽く効かせる
+/* **ご飯の食事には、おかずを最低1品**（v.193・利用者の要望）。
+   計算結果の昼食が「ヨーグルト・アーモンド・もち麦ご飯」のように、
+   ご飯ものだけで食べる気が失せる献立になることがあった。
+   おかずとして数える品目は利用者が決めた（サラダチキンは入れない）。
+   納豆（たれなし）は納豆と同じ食べ物なので数える。
+   **探索では「自宅の食事の数」だけおかずの単位があることを求める。**
+   必要数をご飯の杯数から出さないのは、出すと「おかずを足せない日はご飯を減らす」
+   方向へ点数が傾き、エネルギーが崩れるため（必要数を探索の変数に依存させない）。
+   重みは たんぱく質の合格線の段差（PLOW_FIX）と同じ。食塩・飽和の線（BAD_BASE）よりは軽いので、
+   線を越えてまでおかずを入れることはしない。 */
+const OKAZU_IDS = ['tofu', 'natto', 'natto_plain', 'egg', 'tuna', 'saba', 'saba_aji', 'saba_miso'];   // 豆腐は v.194
+const OKAZU_W   = 1e6;
 const BAD_BASE  = 1e8;   // 食塩・飽和の線を越えた点の下駄（帯の外れよりさらに重い）
 const CLIMB_MAX = 200;   // 山登りの打ち切り（通常は10回ほどで止まる）
 const CLIMB_SEEDS = 8;   // 決まった6点に加えて散らす初期点の数
@@ -2123,6 +2144,8 @@ function makeScore(st0, ex, ids, satCap){
      一律に Infinity を返すと外れた領域が真っ平らになり、山登りが戻る道を
      見失う（初期点が外れていると1歩も動けなくなる）。 */
   const NG = over => ({ok:false, score:BAD_BASE * (1 + over)});
+  // おかずが要る食事の数（ご飯を置ける自宅の食事）。探索の変数には依存させない
+  const okazuNeed = foodUse('rice') || Math.round(st0.foods.rice || 0) > 0 ? homeMealsOf(st0).length : 0;
   const memo = new Map();
   const calc1 = q => {
     // サラダのない日は油の置き場所が無い
@@ -2159,8 +2182,10 @@ function makeScore(st0, ex, ids, satCap){
             + BAND_FIB * Math.pow(outOf(fib,  FIBER_TARGET, Infinity, FIBER_TARGET), 2);
     const near  = Math.pow(Math.max(0, Math.abs(kcal - need) - ENERGY_FREE) / ENERGY_OK, 2);
     const under = Math.pow(Math.max(0, pLo - P) / DEVIATION_OK, 2);
+    const okazuHave = OKAZU_IDS.reduce((a, id) => a + Math.round(st.foods[id] || 0), 0);
+    const okazuMiss = Math.max(0, okazuNeed - okazuHave);
     return {ok:true, pShort: under > 0,
-            score: (under > 0 ? PLOW_FIX : 0) + PLOW_W * under + BAND_W * d + ENERGY_W * near
+            score: (under > 0 ? PLOW_FIX : 0) + PLOW_W * under + OKAZU_W * okazuMiss + BAND_W * d + ENERGY_W * near
                  + SLACK_W * (salt / SALT_LIMIT + sat / SAT_GOOD)
                  + BULK_W * Math.max(0, calcGram(st, sv).total - BULK_AIM)
                  + COST_W * food.cost};
@@ -3261,6 +3286,34 @@ function distributeFoods(st, mealTargets, planIds, trained){
     });
   })();
 
+  /* ご飯のある食事に、おかずが1品も無ければ、ほかの食事から1品移す（v.193）。
+     探索はおかずの数を確保するが、どの食事に置くかは上の貪欲法が決めるので、
+     納豆2Pが同じ食事に重なり、もう一方の食事がご飯だけになることがある。
+     移すのは「おかずが2単位以上ある食事」か「ご飯の無い枠」から、その食事に置ける品目だけ。
+     移せないときは `noOkazu` に残し、⑤で名指す（黙らない）。 */
+  const noOkazu = [];
+  (() => {
+    const isOk = u => OKAZU_IDS.includes(u.key);
+    const hasRice = k => bins[k].items.some(u => u.key === 'rice');
+    ORDER.filter(hasRice).forEach(sl => {
+      if(bins[sl].items.some(isOk) || bins[sl].adds.some(isOk)) return;
+      let moved = false;
+      Object.keys(bins).forEach(k => {
+        if(moved || k === sl) return;
+        const oks = bins[k].items.filter(isOk);
+        if(!oks.length || (hasRice(k) && oks.length < 2)) return;
+        const u = oks.slice().sort((a, b) => a.g - b.g).find(x => x.slots.includes(sl));
+        if(!u) return;
+        bins[k].items = bins[k].items.filter(x => x !== u);
+        bins[k].total = r1(bins[k].total - u.g);
+        bins[sl].items.push(u);
+        bins[sl].total = r1(bins[sl].total + u.g);
+        moved = true;
+      });
+      if(!moved) noOkazu.push(sl);
+    });
+  })();
+
   // すべての移動が終わってから、各食事の重さを確定する（⑤に出す）
   Object.values(bins).forEach(bin => { bin.gram = binGram(bin); });
 
@@ -3289,6 +3342,7 @@ function distributeFoods(st, mealTargets, planIds, trained){
   });
 
   bins.unplaced = unplaced;
+  bins.noOkazu  = noOkazu;
   return bins;
 }
 
@@ -3864,12 +3918,19 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered, dayMet){
   // ご飯ものが1食1つの制限に収まらなかった場合の注意
   const un = bins.unplaced || [];
   const riceF = foodById('rice');
-  $('schedNote').innerHTML = un.length
+  const SLOT_JA = {b:'朝食', l:'昼食', d:'夕食'};
+  const noOk = (bins.noOkazu || []).map(sl => SLOT_JA[sl] || sl);
+  const okazuNote = noOk.length
+    ? `<span class="warnbox"><b>⚠ ${noOk.join('・')}はご飯だけで、おかずがありません。</b>` +
+      `豆腐・納豆・卵・ツナ缶・サバ缶のどれかを③で1つ足すか、「使わない」にしている品目を戻してください` +
+      `（食塩・飽和脂肪酸の線に余裕が無いと、自動計算はおかずを足しません）。</span>`
+    : '';
+  $('schedNote').innerHTML = okazuNote + (un.length
     ? `<span class="warnbox"><b>⚠ ${formatPlan(un.map(u => u.key))} は配分できませんでした。</b>` +
       `ご飯は<b>1食につき${riceF ? riceF.slotLimit : 3}杯まで</b>としているため、入力した数を収める時間帯がありません。` +
       `「③ 今日の食事」の数量を見直すか、この分は別の日に回してください。` +
       `（この分も「食事から摂取」の合計には含まれています）</span>`
-    : '';
+    : '');
 }
 
 /* 上の計算結果どおりプロテインを摂ったうえで、残りを食事で補う場合の早見表 */
@@ -4814,6 +4875,7 @@ const GRAM = {
   saba:190, saba_aji:190, saba_miso:190,   // 1缶（固形＋汁）
   tuna:70,           // 1缶（油を切った見当）
   rice:315,          // 0.5合＝米75g → 165g ＋ もち麦50g（水100mlで炊く）→ 150g（v.191）
+  tofu:350,          // 1丁（v.194）
   natto:50, natto_plain:50,
   /* この3つは利用者の実測・指定による（v.177）。
      **`GRAM` は「食べる量」の表示にしか使わず、栄養の計算には入らない。** */
@@ -4872,6 +4934,8 @@ const MICRO = {
   saba_miso: {ca:399, fe:3.8, zn:2.28, mg:55.1, vd:9.5, ve:3.61, b1:0.076, b2:0.703, b6:0.57, b12:18.2, fol:39.9},
   saba_aji: {ca:342, fe:3.8, zn:2.47, mg:66.5, vd:9.5, ve:4.56, b1:0.057, b2:0.513, b6:0.627, b12:20.9, fol:45.6},
   cereal: {ca:15, fe:1.3, zn:0.63, mg:30.0, ve:0.2, b1:0.08, b2:0.024, b6:0.04, fol:9.0},
+  /* 豆腐1丁350g。利用者の提示値（標準的な絹ごし豆腐からの推定）。MICRO_EST に入れる */
+  tofu: {ca:263, fe:4.2, zn:1.75, mg:175, ve:0.35, b1:0.385, b2:0.14, b6:0.21, fol:42},
   natto: {ca:45.0, fe:1.65, zn:0.95, mg:50.0, ve:0.25, b1:0.035, b2:0.28, b6:0.12, fol:60.0},
   natto_plain: {ca:45.0, fe:1.65, zn:0.95, mg:50.0, ve:0.25, b1:0.035, b2:0.28, b6:0.12, fol:60.0},
   egg: {ca:23.0, fe:0.75, zn:0.55, mg:5.0, vd:1.9, ve:0.65, b1:0.03, b2:0.185, b6:0.045, b12:0.55, fol:24.5},
@@ -4929,7 +4993,7 @@ const MICRO = {
    **店のご飯2つは入れない** — 成分表から出した代表値で、ほかの自宅の食品と同じ層。 */
 const MICRO_EST = ['sk_mazenokke', 'sk_gyudon', 'mt_gyuzara', 'mt_gyumeshi', 'mt_miso',
                    'ys_hamegg', 'ys_saba', 'ys_butadon', 'nk_oyako', 'katsuju', 'mn_tamagodon',
-                   'rice'];
+                   'rice', 'tofu'];
 FOODS.forEach(f => {
   if(MICRO[f.id]) f.micro = MICRO[f.id];
   if(MICRO_EST.includes(f.id)) f.microEst = true;

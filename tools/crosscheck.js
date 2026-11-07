@@ -187,7 +187,7 @@ const eq = (a, b) => Math.abs(a - b) < 1e-6;
       // 「1日の上限」の "1日" は数に数えない
       const got  = num(plain(cellsOf(t, 'fillMax', 2)).replace(/1日/g, ''));
       if(want !== got)
-        bad('定数表', `fillMax：README ${got.join('・')} / コード ` +
+        bad('定数表', `fillMax：README ${got} / コード ` +   // got は文字列（数の並び）。join は無い
           FOODS.filter(f => f.autoFill).map(f => `${f.short}${f.fillMax}`).join('・'));
       return null;
     },

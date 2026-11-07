@@ -46,6 +46,7 @@
      14 ⑤が中身を隠していないこと（③の数量>0の品目と、④の提案の品目が全部出ている）
      15 エネルギーが必要量を ENERGY_BAD 以上下回る日は、④が「足りない」と出していること
      16 ④のプルダウン3つが効くこと（input+change で操作して状態が変わるか。v.183）
+     17 ⑤でご飯のある食事におかずがあること。無いなら⑤がその食事を名指して警告していること（v.193）
 
    振っている状態（v.168で追加）
      ・品目の「使う／使わない」を無作為に外す（3割。5%は「すべて外す」に近い状態）
@@ -388,6 +389,30 @@ function checkOne(c, fail){
   if(kcalRow && kcalTotal - needNow <= -ENERGY_BAD && kcalRow.className !== 'under')
     fail(`エネルギーが必要量を ${Math.round(needNow - kcalTotal)}kcal 下回るのに、` +
          `④の札が「足りない」になっていません（class=${kcalRow.className}）`);
+
+  /* 17. ご飯のある食事には、おかずがあること（v.193）。
+         おかず＝OKAZU_IDS の品目。無い場合は、⑤の注記がその食事を名指していればよい
+         （おかずの品目を全部「使わない」にした日など、置けない日はある）。 */
+  {
+    const riceShort = foodById('rice').short;
+    const okShorts  = OKAZU_IDS.map(id => foodById(id)).filter(Boolean).map(f => f.short);
+    const note      = $('schedNote').textContent;
+    rows.forEach(tr => {
+      const txt  = tr.textContent;
+      const meal = (txt.match(/^\s*(朝食|昼食|夕食)/) || [])[1];
+      /* 品目は「名前 数量単位」の形で出る（例：卵 1個）。名前の直前が区切り
+         （行頭・空白・＋・。・）・g・：）のものだけを品目として拾う。
+         **最初の版は「 ＋ 」で割って先頭を削っていた**ため、助言の文（「…先に食べてください。卵 1個」）や
+         「④の提案：納豆 1P」の直後の品目を拾えず、1,000件中10件を誤って落とした（v.193）。
+         直前の文字を見るので、店の「吉野家ご飯」が自宅の「ご飯」に当たることもない。 */
+      const reEsc = x => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const has = sh => new RegExp('(^|[\\s＋。）g：])' + reEsc(sh) + ' \\d').test(txt);
+      if(!meal || !has(riceShort)) return;
+      if(okShorts.some(has)) return;
+      if(!(note.includes('おかずがありません') && note.includes(meal)))
+        fail(`${meal}がご飯だけでおかずが無いのに、⑤が警告していません：${txt.trim().slice(0, 60)}`);
+    });
+  }
 
   /* 16. ④のプルダウンが3つとも効くこと（v.183）。
          **`<select>` は `input` → `change` の順に2つイベントを投げる。**
