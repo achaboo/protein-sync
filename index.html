@@ -845,7 +845,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.189';
+const APP_VERSION = '2026-09-01.190';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -1046,15 +1046,15 @@ const FOODS = [
    slots:['s'], lock:true, home:true, max:2, autoBal:true, autoMax:2},
   {id:'saba',    name:'サバ缶',                short:'サバ缶',       note:'1缶 約31.7g',
    ruleNote:'（DHA+EPA 約2,850mg）<br>自宅で夕食をとる日の主菜（週6缶）',
-   price:268, p:31.7, unit:'缶', sat:4.2, salt:1.7, carbG:1.5, fiber:0, kcal:268, fat:15.0,
+   price:301, p:31.7, unit:'缶', sat:4.2, salt:1.7, carbG:1.5, fiber:0, kcal:268, fat:15.0,
    slots:['s'], lock:true, slot:'d', home:true, homeMeal:true, fixedMenu:true},
   {id:'saba_aji', name:'サバ缶（味付）',        short:'サバ缶（味付）', note:'1缶 約32.3g',
    ruleNote:'（DHA+EPA 約2,640mg）<br>水煮の代わりに使う日の主菜',
-   price:268, p:32.3, unit:'缶', sat:3.4, salt:3.4, carbG:14.6, fiber:0, kcal:296, fat:12.2,
+   price:301, p:32.3, unit:'缶', sat:3.4, salt:3.4, carbG:14.6, fiber:0, kcal:296, fat:12.2,
    slots:['s'], lock:true, slot:'d', home:true, homeMeal:true},
   {id:'saba_miso', name:'サバ缶（みそ煮）',     short:'サバ缶（みそ煮）', note:'1缶 約31.4g',
    ruleNote:'（DHA+EPA 約3,030mg）<br>水煮の代わりに使う日の主菜',
-   price:264, p:31.4, unit:'缶', sat:4.5, salt:2.3, carbG:14.8, fiber:0, kcal:329, fat:16.0,
+   price:301, p:31.4, unit:'缶', sat:4.5, salt:2.3, carbG:14.8, fiber:0, kcal:329, fat:16.0,
    slots:['s'], lock:true, slot:'d', home:true, homeMeal:true},
   {id:'tuna',    name:'ツナ缶',                short:'ツナ缶',       note:'1缶 約12.7g',
    price:133, p:12.7, unit:'缶', sat:3.8, salt:0.6, carbG:0.1, fiber:0, kcal:184, fat:14.8,
@@ -1082,7 +1082,7 @@ const FOODS = [
      炭水化物28.1g＝糖質24.0g＋食物繊維4.1g。食塩0.7gは候補のなかでは納豆と同じ重さ。 */
   {id:'bread',   name:'全粒パン',              short:'全粒パン',     weekShort:'全粒パン', note:'1枚 約5.8g',
    ruleNote:'全粒粉入り食パン（3枚入り）<br>1日3枚まで',
-   price:50, p:5.8, unit:'枚', sat:1.0, salt:0.7, carbG:28.1, fiber:4.1, kcal:154, fat:3.0,
+   price:52, p:5.8, unit:'枚', sat:1.0, salt:0.7, carbG:28.1, fiber:4.1, kcal:154, fat:3.0,
    slots:['s'], lock:true, home:true, autoFill:true, fillMax:3},
 
   /* 西友 みなさまのお墨付き オートミール 340g 398円。1食30gあたりの公表値。
@@ -1147,6 +1147,17 @@ const FOODS = [
   {id:'chicken_hogushi', name:'ほぐしサラダチキン', short:'ほぐしサラダチキン', weekShort:'ほぐしチキン',
    note:'1食 約19.7g', ruleNote:'自動計算では選びません<br>（食べる日は手で数量を入れてください）<br>飽和脂肪酸は推定値',
    price:54, p:19.7, unit:'食', sat:0.4, salt:1.3, carbG:1.3, fiber:0, kcal:103, fat:1.6,
+   slots:['s'], lock:true, home:true},
+  /* もち麦（v.190・利用者の指定）。**1食＝乾燥100g**（利用者の「1食 約9.5g」は
+     100gあたりのたんぱく質と一致するので、100gを1食と読んだ）。78円。
+     P・脂質・炭水化物・食物繊維・エネルギーは 100gあたりの表示値。
+     **食塩は表示が「0〜0.05g」なので高いほうの0.05gを採った**（低いほうへ寄せない）。
+     **飽和脂肪酸0.3gは推定値**（類似商品と成分表からの推定・利用者の提示）。
+     水溶性7.1g・β-グルカン約5.0g はこのツールに項目が無いので、食物繊維は総量12.9gだけを数える。
+     **自動計算の候補にはしない**（むき甘栗などと同じ扱い）ので、1週間の型の栄養は変わらない。 */
+  {id:'mochimugi', name:'もち麦', short:'もち麦', weekShort:'もち麦',
+   note:'1食100g 約9.5g', ruleNote:'乾燥100g（炊く前）<br>自動計算では選びません<br>（食べる日は手で数量を入れてください）<br>飽和脂肪酸・微量栄養素は推定値',
+   price:78, p:9.5, unit:'食', sat:0.3, salt:0.05, carbG:78.1, fiber:12.9, kcal:339, fat:1.6,
    slots:['s'], lock:true, home:true}
 ];
 
@@ -1214,7 +1225,7 @@ const SCHED_ORDER = ['salad','dressing','olive','tomato','yogurt','milk','egg','
 const SCHED_RANK = (() => {
   const r = {};
   SCHED_ORDER.forEach((id, i) => r[id] = i);
-  r.rice = 30; r.bread = 31; r.cereal = 32; r.banana = 40;   // 主食と果物は最後
+  r.rice = 30; r.mochimugi = 30; r.bread = 31; r.cereal = 32; r.banana = 40;   // 主食と果物は最後
   return key => (r[key] !== undefined ? r[key] : 20);   // 指定のないもの（店のメニュー）は主菜のあと
 })();
 
@@ -4805,7 +4816,8 @@ const GRAM = {
   natto:50, natto_plain:50,
   /* この3つは利用者の実測・指定による（v.177）。
      **`GRAM` は「食べる量」の表示にしか使わず、栄養の計算には入らない。** */
-  amaguri:120, soymilk:204, chicken_hogushi:100
+  amaguri:120, soymilk:204, chicken_hogushi:100,
+  mochimugi:250      // 乾燥100g → 炊きあがりの見当（v.190）
 };
 FOODS.forEach(f => { if(GRAM[f.id] !== undefined) f.gram = GRAM[f.id]; });
 // プロテイン1杯ぶんの重さ＝粉＋水。水は1回分（PER_SERVE杯）に対する量なので割る。
@@ -4872,6 +4884,8 @@ const MICRO = {
   dressing: {ca:1.5, fe:0.045, zn:0.03, mg:5.1, b1:0.003, b2:0.004, b6:0.006, fol:0.9},
   salad: {ca:26.0, fe:0.201, zn:0.085, mg:8.71, ve:0.091, b1:0.028, b2:0.019, b6:0.07, fol:39.6},
   chicken: {ca:3.59, fe:0.269, zn:0.628, mg:26.0, vd:0.09, ve:0.269, b1:0.09, b2:0.099, b6:0.574, b12:0.179, fol:11.7},
+  /* もち麦（乾燥100g）は利用者の提示値＝類似商品と大麦の成分値からの推定。MICRO_EST に入れる */
+  mochimugi: {ca:37, fe:1.7, zn:1.1, mg:40, ve:0.3, b1:0.14, b2:0.03, b6:0.13, fol:10},
   chicken_hogushi: {ca:3.38, fe:0.254, zn:0.592, mg:24.5, vd:0.085, ve:0.254, b1:0.085, b2:0.093, b6:0.541, b12:0.169, fol:11.0},
   /* ------------------------------------------------------------
      外食（v.184 で玉子丼、v.185 で残り）。**すべて利用者の提示値＝推定値**で、
@@ -4912,7 +4926,8 @@ const MICRO = {
 /* 微量栄養素が「推定値」の品目。④でそう書くためだけに持つ。
    **店のご飯2つは入れない** — 成分表から出した代表値で、ほかの自宅の食品と同じ層。 */
 const MICRO_EST = ['sk_mazenokke', 'sk_gyudon', 'mt_gyuzara', 'mt_gyumeshi', 'mt_miso',
-                   'ys_hamegg', 'ys_saba', 'ys_butadon', 'nk_oyako', 'katsuju', 'mn_tamagodon'];
+                   'ys_hamegg', 'ys_saba', 'ys_butadon', 'nk_oyako', 'katsuju', 'mn_tamagodon',
+                   'mochimugi'];
 FOODS.forEach(f => {
   if(MICRO[f.id]) f.micro = MICRO[f.id];
   if(MICRO_EST.includes(f.id)) f.microEst = true;
@@ -5198,7 +5213,7 @@ function microAdvice(st, sv){
       : '') +
     (est.length
       ? `<br><b>${est.join('・')} の微量栄養素は推定値です。</b>` +
-        `公式の食材配合・使用量が分かっていないので、食材構成から出した概算で、分析値ではありません。`
+        `食材構成や類似の原料から出した概算で、その商品の分析値ではありません。`
       : '') +
     `<br><small>目標は「日本人の食事摂取基準（2025年版）」50〜64歳男性の推奨量／目安量です。` +
     `食品の値は商品の表示があるものはその値、無いものは<b>日本食品標準成分表（八訂）増補2023年の代表値</b>で、` +
