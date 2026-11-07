@@ -96,6 +96,7 @@ function makeCase(rnd, i){
     fix:      pick(['', '', '', 1, 2, 3, 99]),              // 空欄＝自動計算。99は上限超えの入力
     two:      rnd() < 0.7,
     rest:     rnd() < 0.3,
+    mochi:    rnd() < 0.5,      // ご飯にもち麦を混ぜるか（v.192）
     detail:   rnd() < 0.5,
     kcalAdj:  pick([0, 0, 0, 200, -200, 600, -600]),   // ①の必要エネルギーの補正
     walk:     pick([0, 0, 5, 10, 12, 20, 25]),
@@ -151,6 +152,8 @@ function applyCase(c){
   setVal('baseFactor', c.factor);   setVal('meals', c.meals);
   setVal('savasShare', c.share);    setVal('fixSpoons', c.fix);
   setChk('twoDoses', c.two); setChk('restSavas', c.rest); setChk('schedDetail', c.detail);
+  // ご飯の中身を入れ替える（v.192）。チェックを書き替えただけでは FOODS が変わらない
+  setChk('riceMochi', c.mochi); if(typeof applyRiceMix === 'function') applyRiceMix();
   setVal('kcalAdj', c.kcalAdj);
   setVal('walk', c.walk); setVal('cycle', c.cycle);
   setVal('breakfastTime', c.times[0]); setVal('lunchTime', c.times[1]); setVal('dinnerTime', c.times[2]);

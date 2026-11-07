@@ -845,7 +845,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.191';
+const APP_VERSION = '2026-09-01.192';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -1375,10 +1375,12 @@ const foodRow = f => `
          （店名は見出しなので、そこに付けると店ごと外すように見える）。 */
       `${f.shop ? `<span class="shop">${esc(f.shop)}</span>` : ''}` +
       `<label class="use"><input type="checkbox" id="use_${f.id}" checked>` +
-      `<b>${esc(f.name)}</b></label>` +
+      `<b id="nm_${f.id}">${esc(f.name)}</b></label>` +
       // 全角の「）」で終わる注記は、そのあとに半角スペースを足すと空きすぎて見える
       `<small><span id="info_${f.id}">${infoHtml(f)}</span>` +
-      `${f.ruleNote ? `<br>${f.ruleNote}` : ''}${f.limitNote ? `<br><b>${f.limitNote}</b>` : ''}` +
+      `${f.ruleNote ? `<br><span id="rn_${f.id}">${f.ruleNote}</span>` : ''}${f.limitNote ? `<br><b>${f.limitNote}</b>` : ''}` +
+      /* もち麦を混ぜるかどうか（v.192）。ご飯の行にだけ置く。**設定**なので日付をまたいでも残り、リンクでも運ぶ */
+      `${f.id === 'rice' ? `<br><label class="use"><input type="checkbox" id="riceMochi" checked>もち麦50gを混ぜて炊く</label>` : ''}` +
       // どの品目も値を直せる。自由入力から足した品目は消すこともできる
       `<br><button type="button" class="mini-btn del-btn" data-edit="${f.id}">` +
         `${f.custom ? '品目名・価格・栄養成分を変更' : '価格・栄養成分を変更'}</button>` +
@@ -2297,6 +2299,7 @@ function autoQuantities(st0, keep, keepOff){
                st.otherP, st.otherKcal, st.otherFat, st.otherSat, st.otherSalt,
                st.otherCarb, st.otherFiber,
                Object.keys(keep).sort().join(','),
+               riceMochiOn() ? 'mochi' : 'plain', JSON.stringify(foodOverride),   // 品目の中身が変わる設定（v.192）
                keepOff ? 'week' : Object.keys(foodOff).sort().join(',')].join('|');
   let got = balCache.get(key);
   if(!got){
@@ -4863,6 +4866,8 @@ const MICRO = {
   /* ご飯0.5合（成分表「めし・精白米」）＋もち麦50g（利用者の提示値＝推定・100gあたりの半分：
      Ca37・Fe1.7・Zn1.1・Mg40・E0.3・B1 0.14・B2 0.03・B6 0.13・葉酸10）。もち麦ぶんが推定なので MICRO_EST に入れる */
   rice: {ca:23.45, fe:1.015, zn:1.54, mg:31.6, ve:0.15, b1:0.103, b2:0.032, b6:0.098, fol:9.95},
+  // もち麦を混ぜない日のご飯（成分表「めし・精白米」0.5合）。`applyRiceMix` が入れ替える
+  rice_plain: {ca:4.95, fe:0.165, zn:0.99, mg:11.6, b1:0.033, b2:0.017, b6:0.033, fol:4.95},
   saba: {ca:494, fe:3.04, zn:3.23, mg:58.9, vd:20.9, ve:6.08, b1:0.285, b2:0.76, b6:0.684, b12:22.8, fol:22.8},
   saba_miso: {ca:399, fe:3.8, zn:2.28, mg:55.1, vd:9.5, ve:3.61, b1:0.076, b2:0.703, b6:0.57, b12:18.2, fol:39.9},
   saba_aji: {ca:342, fe:3.8, zn:2.47, mg:66.5, vd:9.5, ve:4.56, b1:0.057, b2:0.513, b6:0.627, b12:20.9, fol:45.6},
@@ -4929,6 +4934,47 @@ FOODS.forEach(f => {
   if(MICRO[f.id]) f.micro = MICRO[f.id];
   if(MICRO_EST.includes(f.id)) f.microEst = true;
 });
+
+/* ------------------------------------------------------------
+   ご飯に「もち麦50g」を混ぜるかどうか（v.192・利用者の要望）。
+   v.191 で「ご飯0.5合＋もち麦50g」を1品目にまとめたが、混ぜない日も選べるようにした。
+   **品目は分けない** — 分けると自動計算が「ご飯2杯・もち麦0」のような組を選べてしまい、
+   混ぜる日にセットであることを保証できない。**1つの品目の中身を切り替える。**
+   切り替えるのは FOOD_BASE（価格・栄養成分の変更の土台）なので、
+   利用者が「価格・栄養成分を変更」で直した値はそのまま上に乗る。
+   `balCache` の鍵にもこの設定を入れる（入れないと切り替えても前の結果が返る）。
+   ------------------------------------------------------------ */
+/* ご飯の注記。もち麦を混ぜるかどうか（`riceMochi`・v.192）で入れ替える */
+const RICE_RULE_PLAIN = 'エネルギーの不足から自動計算<br>（0〜6杯＝0〜3合）';
+const RICE_RULE_MOCHI = '1杯＝ご飯0.5合にもち麦50gを加えて炊いたもの<br>エネルギーの不足から自動計算<br>' +
+                        '（0〜6杯＝0〜3合＋もち麦300g）<br>もち麦の飽和脂肪酸・微量栄養素は推定値';
+const RICE_MIX = {
+  plain: {name:'ご飯（0.5合）', short:'ご飯', weekName:'ご飯', note:'0.5合 約4.5g', ruleNote:RICE_RULE_PLAIN,
+          p:4.5, fat:0.7, sat:0.1, salt:0, carbG:58.0, fiber:2.5, kcal:257, price:33,
+          gram:165, micro:MICRO.rice_plain, microEst:false},
+  mochi: {name:'ご飯（0.5合）＋もち麦50g', short:'もち麦ご飯', weekName:'もち麦ご飯', note:'1杯 約9.3g', ruleNote:RICE_RULE_MOCHI,
+          p:9.25, fat:1.5, sat:0.25, salt:0.03, carbG:97.1, fiber:8.9, kcal:427, price:72,
+          gram:315, micro:MICRO.rice, microEst:true}
+};
+const riceMochiOn = () => { const c = $('riceMochi'); return !c || c.checked; };
+function applyRiceMix(){
+  const f = foodById('rice'), v = RICE_MIX[riceMochiOn() ? 'mochi' : 'plain'];
+  if(!f) return;
+  ['name','short','weekName','ruleNote','gram','micro','microEst'].forEach(k => f[k] = v[k]);
+  const base = FOOD_BASE.rice;
+  base.note = v.note;
+  EDIT_KEYS.forEach(([k]) => base[k] = v[k]);
+  const nm = $('nm_rice'), rn = $('rn_rice');
+  if(nm) nm.textContent = v.name;
+  if(rn) rn.innerHTML = v.ruleNote;
+  applyFoodOverrides();          // FOOD_BASE から FOODS へ写し、行の注記と価格も書き直す
+}
+/* ③の再計算より先に中身を入れ替える。**チェックボックスは input → change の順に2つ投げる**ので、
+   両方で受ける。change だけだと、先の input で document の onInputChanged が
+   古い中身のまま「混ぜない」の鍵で balCache に結果を入れてしまい、
+   change のあとの再計算がその誤った結果を拾う（v.192 の確認で踏んだ） */
+$('riceMochi').addEventListener('input',  applyRiceMix);
+$('riceMochi').addEventListener('change', applyRiceMix);
 
 /* 自宅の食品だけを合計し、値を持たない品目は名前を集めて返す。 */
 function calcMicro(st, sv){
@@ -5484,7 +5530,7 @@ function save(){
 
 /* 保存だけを行い、URL には触らない。`syncHash` が `lk` を書き直すのにも使う。 */
 function writeStore(){
-  const d = {v:{}, c:{}, date:todayKey(), dv:DEFAULTS_VER, exd:exDate, rest:$('restSavas').checked, two:$('twoDoses').checked, sd:$('schedDetail').checked, ao:autoOverride, calc:calculated, cf:customData(), ov:foodOverride, off:foodOff, lk:appliedLink};
+  const d = {v:{}, c:{}, date:todayKey(), dv:DEFAULTS_VER, exd:exDate, rest:$('restSavas').checked, two:$('twoDoses').checked, sd:$('schedDetail').checked, mochi:$('riceMochi').checked, ao:autoOverride, calc:calculated, cf:customData(), ov:foodOverride, off:foodOff, lk:appliedLink};
   ALL_IDS().forEach(id => d.v[id] = $(id).value);
   EXERCISES.forEach(e => d.c[e.id] = $('c_' + e.id).checked);
   try{ localStorage.setItem(KEY, JSON.stringify(d)); }catch(err){}
@@ -5575,6 +5621,8 @@ function load(){
     if(d.rest !== undefined && !staleEx) $('restSavas').checked = !!d.rest;
     if(d.two  !== undefined && !staleEx) $('twoDoses').checked = !!d.two;
     if(d.sd   !== undefined) $('schedDetail').checked = !!d.sd;
+    if(d.mochi !== undefined) $('riceMochi').checked = !!d.mochi;   // 設定なので日付に関係なく残す（v.192）
+    applyRiceMix();
     // 手入力への切り替えはその日限り
     // 旧形式（真偽値）は納豆だけの指定として読む
     autoOverride = !sameDay || !d.ao ? {}
@@ -5616,7 +5664,7 @@ const b64dec = str =>
   JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(str), c => c.charCodeAt(0))));
 
 function settingsPayload(){
-  const d = {v:{}, c:{}, date:todayKey(), rest:$('restSavas').checked, two:$('twoDoses').checked, sd:$('schedDetail').checked};
+  const d = {v:{}, c:{}, date:todayKey(), rest:$('restSavas').checked, two:$('twoDoses').checked, sd:$('schedDetail').checked, mochi:$('riceMochi').checked};
   d.cf = customData();
   d.ov = foodOverride;
   /* 「使う／使わない」も設定として運ぶ（v.165）。
@@ -5689,6 +5737,8 @@ function applySettingsFromHash(hash){
     if(d.rest !== undefined) $('restSavas').checked = !!d.rest;   // 設定なので日付に関係なく反映
     if(d.two  !== undefined) $('twoDoses').checked  = !!d.two;
     if(d.sd   !== undefined) $('schedDetail').checked = !!d.sd;
+    if(d.mochi !== undefined) $('riceMochi').checked = !!d.mochi;
+    applyRiceMix();   // 品目の値の変更（d.ov）を入れたあとに中身を入れ替える
 
     // 日付を持たない古いリンクは設定のみ。当日のリンクなら食事・距離・種目も反映する
     const sameDay = d.date === todayKey();
