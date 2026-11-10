@@ -8,7 +8,7 @@
   【使い方】
    1. このファイル (index.html) をダブルクリックしてブラウザで開くだけで動きます。
       （サーバー不要・通信不要・スマホにコピーしても動作します）
-   2. 「① 基本設定」で体重を確認します（初期値 75.0kg）。
+   2. 「① 基本設定」で体重を確認します（初期値 73.0kg）。
    3. 「② 今日の運動・食事の時刻」で、その日に実際にやった運動を入れます。
       有酸素はウォーキング / サイクリングの距離を直接入力します。
       筋トレはその日にやった種目だけチェックを残します。
@@ -451,7 +451,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
     <div class="grid2">
       <div>
         <label for="weight">体重の7日平均 (kg)</label>
-        <input type="number" inputmode="decimal" id="weight" value="75.0" step="0.1" min="30" max="200">
+        <input type="number" inputmode="decimal" id="weight" value="73.0" step="0.1" min="30" max="200">
       </div>
       <div>
         <label for="height">身長 (cm)</label>
@@ -641,7 +641,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
     </p>
     <div class="row">
       <div class="name"><b>朝食の時刻</b><small>1日の起点。⑤の表に実時刻を出します</small></div>
-      <div class="qty"><input type="time" id="breakfastTime" value="08:30" step="300"></div>
+      <div class="qty"><input type="time" id="breakfastTime" value="11:00" step="300"></div>
       <div class="unit">時刻</div>
     </div>
     <div class="row">
@@ -699,11 +699,11 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
     </p>
     <p class="hint" style="margin-top:0">
       <b>品目名の左のチェックは「この品目を使ってよい」</b>という意味です
-      （「今日これを食べる」ではありません）。初期値は全部オンです。
+      （「今日これを食べる」ではありません）。初期値では、いちばん下に並べた6品目（ロースかつ重〜むき甘栗）だけが外れています。
       <b>買わない品目・食べない品目は外してください。</b>
       外した品目は数量を0として扱い、自動計算の組み立てからも除きます。
       <b>この設定は翌日も続きます</b>（v.165で変更）。一度整えれば毎朝やり直す必要はありません。
-      全部オンに戻すのは「すべて戻す」と「食事をリセット」です。
+      全部オンに戻すのは「すべて戻す」です（「食事をリセット」は初期値に戻します）。
     </p>
     <p class="hint" style="margin-top:0">
       <!-- 外す品目のほうが多い人向け。1つずつ外すより「全部外してから要るものを入れる」ほうが速い -->
@@ -714,7 +714,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
     </p>
     <p class="hint" style="margin-top:0">
       <!-- 賞味期限が近い品目を優先する（v.195）。設定なので翌日も続き、リンクでも運ぶ -->
-      <label class="use"><input type="checkbox" id="perishFirst"><b>賞味期限が近い品目を優先する</b></label>
+      <label class="use"><input type="checkbox" id="perishFirst" checked><b>賞味期限が近い品目を優先する</b></label>
       <br><small>オンにすると、チェックの付いた品目のうち、<b>店のメニューと日持ちする品目</b>
       （ご飯・もち麦・シリアル・ツナ缶・サバ缶・オリーブオイル・ノンオイルドレッシング・アーモンド）<b>以外</b>を、
       自動計算が優先して使います。ふだんは自動で選ばない むき甘栗・調整豆乳・ほぐしサラダチキン・
@@ -857,7 +857,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.197';
+const APP_VERSION = '2026-09-01.198';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -1392,6 +1392,11 @@ const isAutoStatic = f => !!(f.autoFill || f.autoEnergy || f.autoFat || f.autoRi
    ・ふだんは手入力だけの品目（perishMax を持つもの）も、この日だけ候補にする。
    ・「1週間の型の栄養」には効かせない（今日の在庫とは無関係の基準のため）。
    ・食塩・飽和の線（BAD_BASE）とたんぱく質・帯はそのまま上に置くので、越えない。 */
+/* **初期値で外す品目**（v.198・利用者の指定）。③では「使う」品目の下に、この順で並べる。
+   並べ替えるのは画面の行だけで、`FOODS` の順は変えない（探索や配分の結果を動かさないため）。
+   「入力をリセット」「食事をリセット」はこの状態に戻す。全部オンにするのは「すべて戻す」だけ。 */
+const DEFAULT_OFF_IDS = ['katsuju', 'chicken_hogushi', 'soymilk', 'saba_aji', 'saba_miso', 'amaguri'];
+const defaultOff = () => Object.fromEntries(DEFAULT_OFF_IDS.map(id => [id, true]));
 const PERISH_IDS = ['katsuju', 'banana', 'tomato', 'salad', 'yogurt', 'chicken', 'egg', 'milk', 'bread',
                     'tofu', 'natto', 'natto_plain', 'amaguri', 'soymilk', 'chicken_hogushi'];
 const isPerish  = f => !!f && (!!f.custom || PERISH_IDS.includes(f.id));
@@ -1434,7 +1439,10 @@ const foodRow = f => `
     <div class="qty"><input type="number" inputmode="numeric" id="f_${f.id}" value="0" min="0" step="1"${f.max ? ` max="${f.max}"` : ''}></div>
     <div class="unit">${esc(f.unit)}</div>
   </div>`;
-$('foods').innerHTML = FOODS.map(foodRow).join('');
+$('foods').innerHTML = FOODS.filter(f => !DEFAULT_OFF_IDS.includes(f.id))
+  .concat(DEFAULT_OFF_IDS.map(id => FOODS.find(f => f.id === id)).filter(Boolean))
+  .map(foodRow).join('');
+DEFAULT_OFF_IDS.forEach(id => { const el = $('use_' + id); if(el) el.checked = false; });
 
 /* 「その他（自由入力）」を品目として③の末尾に足す。
    入力した栄養成分は「1つぶん」として持ち、個数は足した行の数量欄で変える。
@@ -1457,7 +1465,10 @@ function addCustomFood(o, qty){
   const n = parseInt(String(f.id).replace(/[^0-9]/g, ''), 10);
   if(n > customSeq) customSeq = n;        // 復元したidと番号がぶつからないようにする
   FOODS.push(f);
-  $('foods').insertAdjacentHTML('beforeend', foodRow(f));
+  // 自由入力の品目は「初期値で外す品目」より上に置く（v.198）
+  const tail = $('row_' + DEFAULT_OFF_IDS[0]);
+  if(tail) tail.insertAdjacentHTML('beforebegin', foodRow(f));
+  else $('foods').insertAdjacentHTML('beforeend', foodRow(f));
   $('f_' + f.id).value = qty === undefined ? 1 : qty;
   return f;
 }
@@ -1962,10 +1973,10 @@ function savasFor(st, ex, lack, target, lackBase){
    利用者から「毎回チェックを外す工数のほうが多い」と指摘されたので、
    **価格の変更（`foodOverride`）と同じ『設定』の扱いに変えた**（v.165）。
    日付が変わっても保持し、設定リンクでも日付に関係なく運ぶ。
-   全部オンに戻すのは「すべて戻す」と「食事をリセット」。
+   全部オンに戻すのは「すべて戻す」。「食事をリセット」は初期値（`DEFAULT_OFF_IDS` だけ外す）に戻す。
    **黙って持ち越すと「なぜこの品目が入らないのか」が分からなくなる**ので、
    外している品目は `useNote` に必ず一覧で出す。 */
-let foodOff = {};
+let foodOff = defaultOff();
 const foodUse = id => !foodOff[id];
 function readFoodUse(){
   foodOff = {};
@@ -1996,7 +2007,7 @@ function refreshUseNotes(){
     ? `<b class="warn-inline">${off.length}品目を「使わない」にしています</b>` +
       `（${off.map(f => esc(f.short || f.name)).join('・')}）。` +
       `自動計算はこれらを外して組み立てます。<b>この設定は翌日も続きます。</b>` +
-      `チェックを戻すか「すべて戻す」「食事をリセット」で元に戻ります。`
+      `チェックを戻すか「すべて戻す」で使えるようになります（「食事をリセット」は初期値＝${DEFAULT_OFF_IDS.length}品目を外した状態に戻します）。`
     : '') +
     (offQty.length
       ? `<br><b class="warn-inline">数量が入ったまま外れている品目があります</b>` +
@@ -3552,7 +3563,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered, dayMet){
   const empty = !bins.b.items.length && !bins.l.items.length && !bins.d.items.length;
 
   /* ---- 時刻の組み立て ----------------------------------------------------
-     起点は「その日の1食目の時刻」（既定は朝食07:00）。運動は日に何回かある前提なので、
+     起点は「その日の1食目の時刻」（既定は朝食11:00）。運動は日に何回かある前提なので、
      運動の時刻は起点にせず、プロテインの1回目の行には時刻を出さない。
      起点から 昼食+3h / 夕食+4h を基本の間隔として並べる（時刻を入れればそちらを優先）。
      以前は1食が40gを超えると3時間後に「回し分」を置いていたが、いまは分割しない。 */
@@ -4812,7 +4823,7 @@ const storageOk = (() => {
 })();
 // 入力欄の既定値を変更したら上げる。番号が違う保存データでは、
 // 下記の欄だけ復元せず新しい既定値に戻す（体重や食事回数などの他の設定は保持）。
-const DEFAULTS_VER = 18;
+const DEFAULTS_VER = 19;
 // v6：体重の初期値を 75kg → 74kg に変更。
 // 次に既定値を変えるときは、実際に変えた欄だけをこの一覧に残すこと
 // （体重を入れたままにすると、以後の更新で入力済みの体重まで戻ってしまう）。
@@ -4856,7 +4867,12 @@ const DEFAULTS_VER = 18;
 //      週の型の献立・粉の杯数・食費がまとめて変わる。README の実測表は
 //      **測ったときの係数を見出しに書いてある**ので、1.65 のものはそのまま残してある。
 //      朝食 08:30 にすると、空欄の昼食は 11:30・夕食は 15:30 になる（基本の間隔のまま）。
-const RESET_IDS = () => ['baseFactor', 'breakfastTime'];
+// v19：体重 75.0 → 73.0kg・朝食の時刻 08:30 → 11:00（利用者の指示。体重は使っている端末でも
+//      73.0 にするため一覧に入れた）。「賞味期限が近い品目を優先する」を初期値オン、
+//      ロースかつ重・ほぐしサラダチキン・調整豆乳・サバ缶（味付）・サバ缶（みそ煮）・むき甘栗を
+//      初期値で「使わない」にした（どちらも load() の staleEx で初期値へ戻す／重ねる）。
+//      **v20 では `weight` と `breakfastTime` を必ず外すこと**（残すと毎朝の7日平均が巻き戻る）。
+const RESET_IDS = () => ['weight', 'breakfastTime'];
 const ALL_IDS = () => ['weight','height','age','baseFactor','meals','savasShare','walk','cycle',
    'kcalAdj','weekExSel',
    'otherP','otherNote','otherFat','otherSat','otherSalt','otherCarb','otherFiber','otherKcal','otherPrice',
@@ -5721,7 +5737,8 @@ function load(){
   // 当日の入力でなければ食事欄を明示的に 0 に戻す。
   // ブラウザ側のフォーム値復元（リロードや「戻る」操作）で前日の値が残るのを防ぐため。
   if(!sameDay) applyDailyDefaults();
-  if(!d) return;
+  // 保存が無い端末でも、初期値で外す品目を画面と注記に出す（v.198）
+  if(!d){ perishPrev = perishOn(); applyFoodUse(); return; }
 
   // 既定値を更新した欄は、保存済みの値を復元せず新しい既定値を使う
   const staleEx = d.dv !== DEFAULTS_VER;
@@ -5755,7 +5772,9 @@ function load(){
     if(d.two  !== undefined && !staleEx) $('twoDoses').checked = !!d.two;
     if(d.sd   !== undefined) $('schedDetail').checked = !!d.sd;
     if(d.mochi !== undefined) $('riceMochi').checked = !!d.mochi;   // 設定なので日付に関係なく残す（v.192）
-    if(d.perish !== undefined) $('perishFirst').checked = !!d.perish;   // 期限優先も設定（v.195）
+    // 期限優先も設定（v.195）。v.198 で初期値をオンにしたので、既定値を変えた版では初期値へ戻す
+    if(staleEx) $('perishFirst').checked = $('perishFirst').defaultChecked;
+    else if(d.perish !== undefined) $('perishFirst').checked = !!d.perish;
     perishPrev = perishOn();
     applyRiceMix();
     // 手入力への切り替えはその日限り
@@ -5765,7 +5784,9 @@ function load(){
                  : {natto:true};
     refreshAutoNotes();
     // 「使わない」は設定なので、日付が変わっても持ち越す（v.165）
+    // v.198：既定値を変えた版では、初期値で外す品目を保存済みの「使わない」に重ねる
     foodOff = d.off ? {...d.off} : {};
+    if(staleEx) Object.assign(foodOff, defaultOff());
     applyFoodUse();
     wasCalculated = !!d.calc;
     if(d.lk) appliedLink = d.lk;      // 適用済みのリンク（二度目は読まない）
@@ -5920,7 +5941,7 @@ function clearFoods(){
   // 自由入力から足した品目は消さない（数量だけ0に戻る）。消すときは行の「削除」
   $('otherAddNote').innerHTML = '';
   setAutoOverride(null, false);  // 自動計算も元に戻す
-  foodOff = {}; applyFoodUse();  // 「使う／使わない」も全部オンに戻す（設定だが、ここでは戻す）
+  foodOff = defaultOff(); applyFoodUse();  // 「使う／使わない」も初期状態に戻す（設定だが、ここでは戻す。v.198）
   applyDailyDefaults();          // その日の型に戻す
   onInputChanged();
 }
@@ -6271,15 +6292,17 @@ $('copyLink').addEventListener('click', copySettingsLink);
 $('reset').addEventListener('click', () => {
   const msg =
     '入力内容をすべて初期状態に戻します。\n\n' +
-    '・体重 72.5kg / 基本係数 1.65 / 3食\n' +
+    '・体重 73.0kg / 基本係数 1.4 / 3食\n' +
     '・「今日の食事」→ その日の曜日の型に戻ります\n' +
+    '・品目の「使う／使わない」→ ロースかつ重・ほぐしサラダチキン・調整豆乳・サバ缶（味付）・サバ缶（みそ煮）・むき甘栗だけ外す\n' +
+    '・「賞味期限が近い品目を優先する」→ オン\n' +
     '・ウォーキング / サイクリングの距離 → 0\n' +
     '・筋トレのチェック → 全種目オフ（その日にやった種目だけ入れてください）\n' +
-    '・「運動しなかった日もプロテインを摂る」→ オフ\n' +
+    '・「運動しなかった日もプロテインを摂る」→ オン\n' +
     '・「プロテインの杯数を指定」→ 空欄（不足量から自動）\n' +
     '・「プロテインを1日2回まで摂る」→ オン\n' +
     '・「必要エネルギーの補正」→ 0\n' +
-    '・食事の時刻 → 朝食 7:00 ／ 昼食・夕食は空欄（基本の間隔で自動）\n' +
+    '・食事の時刻 → 朝食 11:00 ／ 昼食・夕食は空欄（基本の間隔で自動）\n' +
     '・ブラウザに保存された前回の入力内容も削除されます\n\n' +
     '自由入力から足した品目は残ります（数量だけ 0 に戻ります）。\n' +
     '品目を消すのは、その行の「削除」ボタンだけです。\n\n' +
