@@ -880,7 +880,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.209';
+const APP_VERSION = '2026-09-01.210';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -6201,7 +6201,7 @@ document.addEventListener('change', onInputChanged);
    見出し以降の中身を .acc-body で包んで表示を切り替えるだけなので、
    入力欄の id やイベントはそのまま使える（値も保持される）。
    ------------------------------------------------------------ */
-const ACC_KEY = 'savas-calc-open';   // 最後に開いていたセクションを覚えておく
+const ACC_KEY = 'savas-calc-open';   // 最後に開いていたセクション。v.210 から開くときには使わない（いつも全部畳んで始める）
 const accSections = [];
 
 function setupAccordion(){
@@ -6631,15 +6631,10 @@ updateLive();
 // 前回すでに計算していたなら結果も出しておく（スリープ復帰で消えたように見えるのを防ぐ）
 if(wasCalculated) render({restore:true});
 
-/* 開閉式にして、前回開いていたセクションを復元する（既定は「① 基本設定」） */
+/* 開閉式にする。**開いたときは①〜⑥をすべて畳む**（v.210・利用者の指定）。
+   v.209 までは前回開いていたセクション（既定は「① 基本設定」）を開き直していたので、
+   開くたびに①が展開した状態で始まっていた。「計算する」を押せば④が開くのは変わらない */
 setupAccordion();
-(() => {
-  let idx = 0;
-  try{ const v = parseInt(localStorage.getItem(ACC_KEY), 10); if(!isNaN(v)) idx = v; }catch(err){}
-  // 結果の3セクションは計算前は空なので、その場合は「① 基本設定」を開く
-  if(idx >= 3 && $('result').style.display !== 'block') idx = 0;
-  if(idx >= 0 && accSections[idx]) openSection(accSections[idx]);
-})();
 
 /* 見出しへ移動したときに固定ヘッダーの下へ潜らないよう、実際の高さを渡す */
 (() => {
