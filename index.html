@@ -133,14 +133,14 @@ section.acc.open > .acc-body{display:block}
 h3{font-size:.92rem;margin:16px 0 8px;color:var(--sub)}
 label{font-size:.9rem}
 .hint{font-size:.78rem;color:var(--sub);margin:8px 0 0}
-input[type=number],input[type=text],input[type=time],select{
+input[type=number],input[type=text],input[type=time],input[type=date],select{
   font:inherit; font-size:16px;               /* iOS Safari の自動ズーム防止（16px 未満だと拡大される） */
   padding:7px 8px; border:1px solid var(--line); border-radius:9px;
   background:#fbfcfe; width:100%; min-width:0;
   -webkit-appearance:none; appearance:none;   /* iOS の独自装飾を無効化して見た目を揃える */
   color:var(--ink);
 }
-input[type=number]:focus,input[type=text]:focus,input[type=time]:focus,select:focus{outline:2px solid #bfd7ff;border-color:var(--brand)}
+input[type=number]:focus,input[type=text]:focus,input[type=time]:focus,input[type=date]:focus,select:focus{outline:2px solid #bfd7ff;border-color:var(--brand)}
 select{
   padding-right:30px; background-repeat:no-repeat;
   background-position:right 10px center; background-size:11px 7px;
@@ -177,6 +177,10 @@ input[type=checkbox]:focus-visible{outline:2px solid #bfd7ff;outline-offset:2px}
 .row.off{opacity:.45}
 .row.off .qty input{text-decoration:line-through}
 .row .name small{color:var(--sub);font-size:.76rem}
+/* ③の分類の見出し（v.199） */
+.food-cat{font-size:.82rem;font-weight:700;color:var(--sub);padding:12px 0 2px;border-bottom:1px solid var(--line)}
+.food-cat:first-child{padding-top:2px}
+.exp-past{color:#c0392b;font-weight:600}
 .qty{flex:0 0 92px;display:flex;align-items:center;gap:6px}
 .qty input{text-align:center}
 .unit{font-size:.8rem;color:var(--sub);flex:none;width:2.2em}
@@ -699,7 +703,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
     </p>
     <p class="hint" style="margin-top:0">
       <b>品目名の左のチェックは「この品目を使ってよい」</b>という意味です
-      （「今日これを食べる」ではありません）。初期値では、いちばん下に並べた6品目（ロースかつ重〜むき甘栗）だけが外れています。
+      （「今日これを食べる」ではありません）。初期値では6品目（ロースかつ重・ほぐしサラダチキン・調整豆乳・サバ缶（味付）・サバ缶（みそ煮）・むき甘栗）だけが外れています。
       <b>買わない品目・食べない品目は外してください。</b>
       外した品目は数量を0として扱い、自動計算の組み立てからも除きます。
       <b>この設定は翌日も続きます</b>（v.165で変更）。一度整えれば毎朝やり直す必要はありません。
@@ -715,10 +719,10 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
     <p class="hint" style="margin-top:0">
       <!-- 賞味期限が近い品目を優先する（v.195）。設定なので翌日も続き、リンクでも運ぶ -->
       <label class="use"><input type="checkbox" id="perishFirst" checked><b>賞味期限が近い品目を優先する</b></label>
-      <br><small>オンにすると、チェックの付いた品目のうち、<b>店のメニューと日持ちする品目</b>
-      （ご飯・もち麦・シリアル・ツナ缶・サバ缶・オリーブオイル・ノンオイルドレッシング・アーモンド）<b>以外</b>を、
-      自動計算が優先して使います。ふだんは自動で選ばない むき甘栗・調整豆乳・ほぐしサラダチキン・
-      ロースかつ重・納豆（たれなし）・自由入力で足した品目も、この日は候補になります。
+      <br><small>オンにすると、チェックの付いた品目のうち<b>消費期限のある11品目</b>
+      （ミックスサラダ・無脂肪ヨーグルト・サラダチキン・卵・低脂肪牛乳・全粒パン・シリアル・豆腐・納豆・
+      ほぐしサラダチキン・調整豆乳）を、自動計算が優先して使います。
+      ふだんは自動で選ばない ほぐしサラダチキン・調整豆乳も、この日は候補になります。
       <b>食塩7.5g・飽和脂肪酸15gの線と、たんぱく質・エネルギーの帯は守ります</b>（その内側で、余裕よりも期限を優先します）。
       在庫が無い品目はチェックを外してください。「1週間の型の栄養」には効かせません。この設定は翌日も続きます。</small>
     </p>
@@ -857,7 +861,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.198';
+const APP_VERSION = '2026-09-01.200';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -1002,7 +1006,7 @@ const FOODS = [
    ruleNote:'木曜の夕食（外食の日）', price:450, p:30, unit:'食', sat:4.8, salt:3.0, carbG:99.7, fiber:4.4, kcal:673, fat:16.5, slots:['d'], lock:true, slot:'d', fixedMenu:true, carb:true, eggs:1},
   {id:'katsuju',  name:'ロースかつ重',          short:'ロースかつ重', note:'1食 約24.7g（卵1個ぶん）',
    price:299, p:24.7, unit:'食', sat:9.5, salt:3.4, carbG:82, fiber:3.5, kcal:723, fat:32,
-   slots:['s'], lock:true, home:true, carb:true, eggs:1, perishMax:1},
+   slots:['s'], lock:true, home:true, carb:true, eggs:1},
 
   // --- 運動直後 ---
   {id:'banana',  name:'バナナ',              short:'バナナ',       note:'1本 約1g',
@@ -1150,9 +1154,9 @@ const FOODS = [
      含んだままなので、炭水化物とエネルギーは1パックあたり数kcal多めに出る）。
      自動計算の候補にはしない（たれをかけて食べるのが基本、という利用者の判断）。 */
   {id:'natto_plain', name:'納豆（たれなし）', short:'納豆（たれなし）', weekShort:'納豆たれなし',
-   note:'1パック 約8.3g', ruleNote:'食塩を削りたい日の切り替え先<br>ふだんは自動計算では選びません<br>（期限が近い品目を優先する日は候補。納豆と合わせて3Pまで）',
+   note:'1パック 約8.3g', ruleNote:'食塩を削りたい日の切り替え先<br>自動計算では選びません',
    price:32, p:8.3, unit:'P', sat:0.8, salt:0, carbG:7.3, fiber:3.6, kcal:99, fat:4.9,
-   slots:['s'], lock:true, home:true, perishMax:3},
+   slots:['s'], lock:true, home:true},
 
   /* 以下の3品目は利用者が「その他（自由入力）」で登録していたものを、
      v.177 で標準の品目に移したもの（自由入力の品目は保存とリンクに載るだけで
@@ -1167,9 +1171,9 @@ const FOODS = [
      **自動計算の候補にはしない**（`autoFill` などを付けない）ので、
      手で数量を入れた日だけ献立に入る。 */
   {id:'amaguri', name:'むき甘栗', short:'むき甘栗', weekShort:'甘栗',
-   note:'1袋 約4.3g', ruleNote:'ふだんは自動計算では選びません<br>（期限が近い品目を優先する日は1袋まで候補）<br>飽和脂肪酸は推定値',
+   note:'1袋 約4.3g', ruleNote:'自動計算では選びません<br>飽和脂肪酸は推定値',
    price:108, p:4.3, unit:'袋', sat:0.2, salt:0, carbG:50.4, fiber:10, kcal:223, fat:0.5,
-   slots:['s'], lock:true, home:true, perishMax:1},
+   slots:['s'], lock:true, home:true},
   {id:'soymilk', name:'調整豆乳（200ml）', short:'調整豆乳', weekShort:'調整豆乳',
    note:'1杯 約7.1g', ruleNote:'ふだんは自動計算では選びません<br>（期限が近い品目を優先する日は2杯まで候補）<br>飽和脂肪酸は推定値',
    price:46, p:7.1, unit:'杯', sat:0.67, salt:0.42, carbG:4.7, fiber:0.4, kcal:95, fat:5.4,
@@ -1369,9 +1373,25 @@ FOODS.forEach(f => {
 });
 let foodOverride = {};                       // {id: {price: 300, ...}} 変えた項目だけ
 const isEdited = f => !!foodOverride[f.id];
+/* **品目ごとの消費期限**（v.199・利用者の要望）。「価格・栄養成分を変更」の中で入れる。
+   値は 'YYYY-MM-DD'。設定と同じ扱いで、日付をまたいでも残し、保存とリンクで運ぶ（キー `exp`）。
+   **表示だけ** — 自動計算の「期限が近い品目を優先する」はまだこの日付を見ていない。
+   行を描く前に使うので、ここで宣言する（後ろに置くと TDZ で落ちる。v.198で踏んだ） */
+let foodExp = {};
+const localISO = (d = new Date()) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const expHtml = id => {
+  const v = PERISH_IDS.includes(id) ? foodExp[id] : '';
+  if(!v || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return '';
+  const [y, m, d] = v.split('-');
+  return ` <span class="${v < localISO() ? 'exp-past' : ''}">${y.slice(2)}/${m}/${d}</span>`;
+};
+/* ③の行に出すのは「量・たんぱく質・価格・消費期限」だけ（v.199・利用者の指定）。
+   注記の括弧書き（卵1個ぶん・食塩無添加など）と ruleNote は行に出さない（早見表には残る） */
 const infoHtml = f =>
-  `${f.note}${/）$/.test(f.note) ? '' : ' '}<b>${f.price ? f.price + '円' : '無料'}</b>` +
+  `${String(f.note || '').replace(/（[^）]*）/g, '')} ${f.price ? f.price + '円' : '無料'}${expHtml(f.id)}` +
   (isEdited(f) ? ' <b class="edited">変更済み</b>' : '');
+const refreshInfo = () => FOODS.forEach(f => { const el = $('info_' + f.id); if(el) el.innerHTML = infoHtml(f); });
 
 /* 自動で数量が決まる品目。
    autoFat    … 脂質の不足から決める（オリーブオイル）
@@ -1382,9 +1402,7 @@ const infoHtml = f =>
 const isAutoStatic = f => !!(f.autoFill || f.autoEnergy || f.autoFat || f.autoRice || f.autoBal);
 /* **賞味期限が近い品目を優先する**（v.195・利用者の要望）。
    ③の「賞味期限が近い品目を優先する」がオンの日だけ効かせる。
-   対象は店のメニューと日持ちする品目（ご飯〈もち麦〉・シリアル・ツナ缶・サバ缶3種・
-   オリーブオイル・ノンオイルドレッシング・アーモンド）**以外**で、利用者が決めた。
-   自由入力で足した品目も含める。「在庫がある」はチェック（foodUse）で表す。
+   対象は利用者が決めた11品目（`PERISH_IDS`。v.200 で決め直した）。「在庫がある」はチェック（foodUse）で表す。
    ・自動計算の点数に「期限が近い品目のエネルギーの割合 × PERISH_W」を**引く**形で入れる。
      重さは利用者の指定で「食塩・飽和の余裕（SLACK_W）より上、エネルギーの近さより下」。
      割合で持つのは、量そのものに報酬を付けると**食べる総量を増やす方向**へ傾くため
@@ -1397,9 +1415,12 @@ const isAutoStatic = f => !!(f.autoFill || f.autoEnergy || f.autoFat || f.autoRi
    「入力をリセット」「食事をリセット」はこの状態に戻す。全部オンにするのは「すべて戻す」だけ。 */
 const DEFAULT_OFF_IDS = ['katsuju', 'chicken_hogushi', 'soymilk', 'saba_aji', 'saba_miso', 'amaguri'];
 const defaultOff = () => Object.fromEntries(DEFAULT_OFF_IDS.map(id => [id, true]));
-const PERISH_IDS = ['katsuju', 'banana', 'tomato', 'salad', 'yogurt', 'chicken', 'egg', 'milk', 'bread',
-                    'tofu', 'natto', 'natto_plain', 'amaguri', 'soymilk', 'chicken_hogushi'];
-const isPerish  = f => !!f && (!!f.custom || PERISH_IDS.includes(f.id));
+/* **期限のある品目は利用者が決めた11品目だけ**（v.200）。v.195〜v.199 の「店と日持ちする品目以外すべて＋自由入力」から
+   ロースかつ重・バナナ・トマトジュース・納豆（たれなし）・むき甘栗・自由入力の品目を外し、シリアルを足した。
+   消費期限の欄（`foodExp`）もこの11品目にだけ出る */
+const PERISH_IDS = ['salad', 'yogurt', 'chicken', 'egg', 'milk', 'bread', 'cereal',
+                    'tofu', 'natto', 'chicken_hogushi', 'soymilk'];
+const isPerish  = f => !!f && PERISH_IDS.includes(f.id);
 const perishOn  = () => !!($('perishFirst') && $('perishFirst').checked);
 const perishOnly = f => !!f.perishMax && !isAutoStatic(f);   // 期限優先の日だけ自動になる品目
 const isAuto = f => isAutoStatic(f) || (!!f.perishMax && perishOn());
@@ -1417,12 +1438,10 @@ const foodRow = f => `
     <div class="name">` +
       /* 使う／使わない。店のメニューは店名の左ではなく**品目名の左**に置く
          （店名は見出しなので、そこに付けると店ごと外すように見える）。 */
-      `${f.shop ? `<span class="shop">${esc(f.shop)}</span>` : ''}` +
       `<label class="use"><input type="checkbox" id="use_${f.id}" checked>` +
-      `<b id="nm_${f.id}">${esc(f.name)}</b></label>` +
+      `<b>${f.shop ? esc(f.shop) + '：' : ''}<span id="nm_${f.id}">${esc(f.name)}</span></b></label>` +
       // 全角の「）」で終わる注記は、そのあとに半角スペースを足すと空きすぎて見える
       `<small><span id="info_${f.id}">${infoHtml(f)}</span>` +
-      `${f.ruleNote ? `<br><span id="rn_${f.id}">${f.ruleNote}</span>` : ''}${f.limitNote ? `<br><b>${f.limitNote}</b>` : ''}` +
       /* もち麦を混ぜるかどうか（v.192）。ご飯の行にだけ置く。**設定**なので日付をまたいでも残り、リンクでも運ぶ */
       `${f.id === 'rice' ? `<br><label class="use"><input type="checkbox" id="riceMochi" checked>もち麦50gを混ぜて炊く</label>` : ''}` +
       // どの品目も値を直せる。自由入力から足した品目は消すこともできる
@@ -1439,9 +1458,31 @@ const foodRow = f => `
     <div class="qty"><input type="number" inputmode="numeric" id="f_${f.id}" value="0" min="0" step="1"${f.max ? ` max="${f.max}"` : ''}></div>
     <div class="unit">${esc(f.unit)}</div>
   </div>`;
-$('foods').innerHTML = FOODS.filter(f => !DEFAULT_OFF_IDS.includes(f.id))
-  .concat(DEFAULT_OFF_IDS.map(id => FOODS.find(f => f.id === id)).filter(Boolean))
-  .map(foodRow).join('');
+/* **③は種類ごとに分けて並べる**（v.199・利用者の指定。分類と順番も利用者が決めた）。
+   並べ替えるのは画面の行だけで、`FOODS` の順は変えない（探索や⑤の配分の結果を動かさないため）。
+   どの分類にも入っていない品目は「その他」に出す（品目を足して分類を忘れても消えない）。
+   自由入力で足した品目は、いちばん下の「自由入力で足した品目」に入る。 */
+const FOOD_CATS = [
+  ['チェーン店の定食・丼物', ['sk_mazenokke', 'sk_gyudon', 'mt_gyuzara', 'mt_gyumeshi', 'mn_tamagodon',
+                           'ys_hamegg', 'ys_saba', 'ys_butadon', 'nk_oyako', 'katsuju']],
+  ['チェーン店の単品・サイド', ['mt_rice', 'mt_miso', 'ys_rice']],
+  ['主食・穀物類', ['rice', 'bread', 'cereal']],
+  ['タンパク質（肉・魚・卵・大豆）', ['egg', 'chicken', 'chicken_hogushi', 'saba', 'saba_aji', 'saba_miso',
+                                  'tuna', 'tofu', 'natto', 'natto_plain']],
+  ['乳製品・飲料', ['milk', 'yogurt', 'soymilk', 'tomato']],
+  ['野菜・果物・ナッツ', ['banana', 'salad', 'amaguri', 'almond']],
+  ['調味料・油類', ['olive', 'dressing']]
+];
+(() => {
+  const used = new Set(FOOD_CATS.flatMap(([, ids]) => ids));
+  const rest = FOODS.filter(f => !f.custom && !used.has(f.id)).map(f => f.id);
+  const cats = rest.length ? FOOD_CATS.concat([['その他', rest]]) : FOOD_CATS;
+  $('foods').innerHTML = cats.map(([label, ids]) =>
+    `<div class="food-cat">${esc(label)}</div>` +
+    ids.map(id => FOODS.find(f => f.id === id)).filter(Boolean).map(foodRow).join('')).join('') +
+    `<div class="food-cat" id="catCustom" hidden>自由入力で足した品目</div>`;
+})();
+const refreshCustomCat = () => { const h = $('catCustom'); if(h) h.hidden = !FOODS.some(f => f.custom); };
 DEFAULT_OFF_IDS.forEach(id => { const el = $('use_' + id); if(el) el.checked = false; });
 
 /* 「その他（自由入力）」を品目として③の末尾に足す。
@@ -1460,15 +1501,14 @@ function addCustomFood(o, qty){
     p, price: +o.price || 0,
     fat: +o.fat || 0, sat: +o.sat || 0, salt: +o.salt || 0,
     carbG: +o.carbG || 0, fiber: +o.fiber || 0, kcal: +o.kcal || 0,
-    slots: ['b','l','d'], custom: true, perishMax: 1
+    slots: ['b','l','d'], custom: true
   };
   const n = parseInt(String(f.id).replace(/[^0-9]/g, ''), 10);
   if(n > customSeq) customSeq = n;        // 復元したidと番号がぶつからないようにする
   FOODS.push(f);
-  // 自由入力の品目は「初期値で外す品目」より上に置く（v.198）
-  const tail = $('row_' + DEFAULT_OFF_IDS[0]);
-  if(tail) tail.insertAdjacentHTML('beforebegin', foodRow(f));
-  else $('foods').insertAdjacentHTML('beforeend', foodRow(f));
+  // 自由入力の品目は③のいちばん下の「自由入力で足した品目」に入る（v.199）
+  $('foods').insertAdjacentHTML('beforeend', foodRow(f));
+  refreshCustomCat();
   $('f_' + f.id).value = qty === undefined ? 1 : qty;
   return f;
 }
@@ -1478,6 +1518,8 @@ function removeCustomFood(id){
   FOODS.splice(i, 1);
   const row = $('row_' + id);
   if(row) row.remove();
+  delete foodExp[id];
+  refreshCustomCat();
 }
 /* 変更を FOODS へ反映し、行の表示も書き直す。
    注記の「約○g」はたんぱく質量に合わせて書き換える（1食あたりの表示のため）。 */
@@ -1530,6 +1572,10 @@ function openEditor(id){
     EDIT_KEYS.map(([k, label, step]) =>
       `<div><span>${label}</span>` +
       `<input type="number" inputmode="decimal" id="ed_${k}" value="${f[k] || 0}" min="0" step="${step}"></div>`).join('') +
+    // 期限のある品目だけ消費期限を入れられる（v.199）。空にすると表示も消える
+    (isPerish(f)
+      ? `<div><span>消費期限</span><input type="date" id="ed_exp" value="${esc(foodExp[id] || '')}"></div>`
+      : '') +
     `</div><div class="edit-actions">` +
       `<button type="button" class="mini-btn" data-edit-save="${id}">保存</button>` +
       `<button type="button" class="mini-btn" data-edit-cancel="1">取消</button>` +
@@ -1540,6 +1586,8 @@ function openEditor(id){
 }
 function saveEditor(id){
   const f = foodById(id);
+  const ex = $('ed_exp');
+  if(ex){ if(/^\d{4}-\d{2}-\d{2}$/.test(ex.value)) foodExp[id] = ex.value; else delete foodExp[id]; }
   if(f && f.custom){
     const name = String($('ed_name').value || '').replace(/[<>]/g, '').trim() || f.name;
     const unit = String($('ed_unit').value || '').replace(/[<>]/g, '').trim() || f.unit;
@@ -5679,7 +5727,7 @@ function save(){
 
 /* 保存だけを行い、URL には触らない。`syncHash` が `lk` を書き直すのにも使う。 */
 function writeStore(){
-  const d = {v:{}, c:{}, date:todayKey(), dv:DEFAULTS_VER, exd:exDate, rest:$('restSavas').checked, two:$('twoDoses').checked, sd:$('schedDetail').checked, mochi:$('riceMochi').checked, perish:$('perishFirst').checked, ao:autoOverride, calc:calculated, cf:customData(), ov:foodOverride, off:foodOff, lk:appliedLink};
+  const d = {v:{}, c:{}, date:todayKey(), dv:DEFAULTS_VER, exd:exDate, rest:$('restSavas').checked, two:$('twoDoses').checked, sd:$('schedDetail').checked, mochi:$('riceMochi').checked, perish:$('perishFirst').checked, ao:autoOverride, calc:calculated, cf:customData(), ov:foodOverride, off:foodOff, exp:foodExp, pv:200, lk:appliedLink};
   ALL_IDS().forEach(id => d.v[id] = $(id).value);
   EXERCISES.forEach(e => d.c[e.id] = $('c_' + e.id).checked);
   try{ localStorage.setItem(KEY, JSON.stringify(d)); }catch(err){}
@@ -5728,6 +5776,8 @@ function load(){
   try{ d = JSON.parse(localStorage.getItem(KEY) || 'null'); }catch(err){}
 
   const sameDay = !!d && d.date === todayKey();
+  // 消費期限は設定と同じ扱い（v.199）。行を描き直す前に読む
+  if(d && d.exp){ foodExp = {...d.exp}; refreshInfo(); }
   // 品目の値の変更は日付では消さない（値段は翌日も同じもののため）
   if(d && d.ov){ foodOverride = {...d.ov}; applyFoodOverrides(); }
   // 自由入力から足した品目は翌日以降も残す。数量だけ当日のものを戻す
@@ -5782,6 +5832,12 @@ function load(){
     autoOverride = !sameDay || !d.ao ? {}
                  : typeof d.ao === 'object' ? {...d.ao}
                  : {natto:true};
+    /* v.200：期限優先の候補から外した品目に、v.199 以前の自動計算が入れた数が残っていたら0に戻す（1回だけ）。
+       そのままだと手入力の数に見え、今日の献立に乗り続ける。手で打った数は autoOverride に印があるので残す */
+    if(sameDay && !d.pv && d.perish)
+      ['katsuju', 'natto_plain', 'amaguri'].concat((d.cf || []).map(o => o.id)).forEach(id => {
+        if(!autoOverride[id] && $('f_' + id)) $('f_' + id).value = 0;
+      });
     refreshAutoNotes();
     // 「使わない」は設定なので、日付が変わっても持ち越す（v.165）
     // v.198：既定値を変えた版では、初期値で外す品目を保存済みの「使わない」に重ねる
@@ -5828,6 +5884,7 @@ function settingsPayload(){
      「当日のリンクなら運ぶ」というコードがあったのに、送る側が `off` を入れていなかったので
      一度も運べていなかった（READMEとCLAUDE.mdは運ぶと書いていた）。 */
   d.off = foodOff;
+  d.exp = foodExp;   // 消費期限も設定として運ぶ（v.199）
   SETTING_IDS().concat(LINK_DAILY_IDS()).forEach(id => { if($(id)) d.v[id] = $(id).value; });
   EXERCISES.forEach(e => d.c[e.id] = $('c_' + e.id).checked);
   return b64enc(d);
@@ -5887,6 +5944,7 @@ function applySettingsFromHash(hash){
     const put = id => { if(d.v[id] !== undefined && $(id)) $(id).value = d.v[id]; };
     SETTING_IDS().forEach(put);
     // 品目の値の変更と「使う／使わない」は設定と同じ扱い（日付に関係なく反映する）
+    if(d.exp){ foodExp = {...d.exp}; refreshInfo(); }
     if(d.ov){ foodOverride = {...d.ov}; applyFoodOverrides(); }
     foodOff = d.off ? {...d.off} : {};
     applyFoodUse();
