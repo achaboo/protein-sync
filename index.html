@@ -323,7 +323,8 @@ table.simple td.amt{width:16%;white-space:nowrap}
 table.simple td.time small{font-weight:400}
 /* ⑤の表（v.209）：時間帯と目安量を1列に。列は中身の幅だけにして、残りを内容に回す */
 #schedTable{table-layout:fixed}               /* 中身の長さで列幅が広がらないよう固定する */
-#schedTable th:first-child{width:27%}
+#schedTable th:first-child{width:32%}   /* v.212：「夕食（18:00）」が375pxで1行に収まる幅 */
+#schedule td.time .nw{white-space:nowrap}
 #schedTable th{white-space:normal}
 #schedule td.time,table.simple #schedule td.time{width:auto;white-space:normal;padding-left:6px;padding-right:6px}
 #schedule td.time .amt{margin-top:6px;color:var(--brand-d);font-weight:700}
@@ -853,7 +854,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
       <div class="table-wrap">
         <table id="schedTable">
           <thead>
-            <tr><th>時間帯・目安量</th><th id="schedHead">内容・ポイント</th></tr>
+            <tr><th>時間帯<br>目安量</th><th id="schedHead">内容・ポイント</th></tr>
           </thead>
           <tbody id="schedule"></tbody>
         </table>
@@ -880,7 +881,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.211';
+const APP_VERSION = '2026-09-01.212';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -3584,9 +3585,10 @@ function distributeFoods(st, mealTargets, planIds, trained){
       // 「最初に食べる」野菜を先頭に。そのあとは SCHED_RANK の順（関連するものを隣に）
       .sort((a, b) => ((b.first ? 1 : 0) - (a.first ? 1 : 0)) ||
                       (SCHED_RANK(a.key) - SCHED_RANK(b.key)))
-      .map(v => v.isOther ? `その他（${v.g}g）`
-                : v.first ? `<u>${v.short} ${v.n}${v.unit}</u>（${v.g}g）`
-                : `${v.short} ${v.n}${v.unit}（${v.g}g）`)
+      // v.212：⑤の内容の列には品目ごとのたんぱく質のgを出さない（利用者の指定）
+      .map(v => v.isOther ? `その他`
+                : v.first ? `<u>${v.short} ${v.n}${v.unit}</u>`
+                : `${v.short} ${v.n}${v.unit}`)
       .join('<br>＋ ');      // v.209：1行に1品目。2つ目から先頭に「＋」
   });
 
@@ -3637,7 +3639,7 @@ function orderNote(bin, home){
 const shortNote = (bin, target, dayMet) => {
   const d = r1(target - r1(bin.total + bin.addTotal));
   return (!dayMet && d >= 5)
-    ? ` <b class="warn-inline">目安に あと約${d}g</b>` : '';
+    ? ` <b class="warn-inline">目安に あと${d}g</b>` : '';
 };
 
 function mealAdvice(bin, target, st, dayCovered){
@@ -3721,7 +3723,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered, dayMet){
      たんぱく質のgだけでは「1食にどれだけ盛るのか」が分からず、
      1食1.37kg という配分を出していても画面からは読み取れなかった。 */
   const gramLabel = bin => (bin && bin.gram > 0)
-    ? `<br><small>食べる量 約${bin.gram.toLocaleString()}g</small>` : '';
+    ? `<br><small>食べる量 ${bin.gram.toLocaleString()}g</small>` : '';
   const mBreak  = tOf('b');
   const mLunch  = tOf('l');
   const mDinner = tOf('d');
@@ -3732,8 +3734,8 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered, dayMet){
   const cup = sn => {
     if(!sn || sn.spoons <= 0) return '—';
     return detail
-      ? `スプーン ${sn.spoons}杯<br><small>（水で溶かす<br>約${r1(sn.spoons * SPOON_G)}g）</small>`
-      : `${sn.spoons}杯<br><small>約${r1(sn.spoons * SPOON_G)}g</small>`;
+      ? `スプーン ${sn.spoons}杯<br><small>（水で溶かす<br>${r1(sn.spoons * SPOON_G)}g）</small>`
+      : `${sn.spoons}杯<br><small>${r1(sn.spoons * SPOON_G)}g</small>`;
   };
 
   // 「③ 今日の食事」の入力を朝・昼・晩へ自動配分
@@ -3791,7 +3793,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered, dayMet){
       diff: r1(bestDiff),
       units: picked,
       label: [...map.values()]
-        .map(v => v.isOther ? `その他（${v.g}g）` : `${v.short} ${v.n}${v.unit}（${v.g}g）`)
+        .map(v => v.isOther ? `その他` : `${v.short} ${v.n}${v.unit}`)   // v.212：gは出さない
         .join(' ＋ ')
     };
   };
@@ -3900,13 +3902,11 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered, dayMet){
   })();
 
 
+  /* v.212：「朝食（11:00）」を1行で出す。「○時間後」は出さない（利用者の指定）。
+     `gaps` は計算だけ残している */
   const timeLabel = k => {
     const at = times[k];
-    const g  = gaps[k];
-    const parts = [];
-    if(at !== null && at !== undefined) parts.push(hhmm(at));
-    if(g) parts.push(`${g}時間後`);
-    return parts.length ? `<br><small>（${parts.join('・')}）</small>` : '';
+    return (at !== null && at !== undefined) ? `（${hhmm(at)}）` : '';
   };
 
 
@@ -3948,9 +3948,10 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered, dayMet){
     return [...map.values()]
       .sort((a, b) => ((b.first ? 1 : 0) - (a.first ? 1 : 0)) ||
                       (SCHED_RANK(a.key) - SCHED_RANK(b.key)))
-      .map(v => v.isOther ? `その他（${v.g}g）`
-              : v.first ? `<u>${v.short} ${v.n}${v.unit}</u>（${v.g}g）`
-              : `${v.short} ${v.n}${v.unit}（${v.g}g）`)
+      // v.212：内容の列には品目ごとのたんぱく質のgを出さない（利用者の指定）
+      .map(v => v.isOther ? `その他`
+              : v.first ? `<u>${v.short} ${v.n}${v.unit}</u>`
+              : `${v.short} ${v.n}${v.unit}`)
       .join('<br>＋ ');      // v.209：1行に1品目
   };
   const viewOf = (bin, k) => {
@@ -3976,14 +3977,13 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered, dayMet){
     if(!s) return null;
     const at   = (s.at !== null && s.at !== undefined) ? s.at : null;
     const late = at !== null && at >= LATE_HHMM;
-    const head = `${MEAL_NAME[k]}の回し分` +
-      `<br><small>（${(at !== null ? hhmm(at) + '・' : '')}${SPLIT_GAP}時間後）</small>`;
+    const head = `${MEAL_NAME[k]}の回し分${at !== null ? `（${hhmm(at)}）` : ''}`;
     const body = s.move
       ? `<b>${s.move.label}</b>`
       : `<b>回せる品目がありません。</b>${MEAL_NAME[k]}の超過分は` +
         `固定メニュー・その他（自由入力）によるもので、いずれも回し分には出しません。` +
         `品目を減らすか、食事回数を3食にして分散してください。`;
-    return [head, `約&nbsp;${s.move ? s.move.g : s.g}&nbsp;g`,
+    return [head, `${s.move ? s.move.g : s.g}&nbsp;g`,
       body + (late
         ? `<br><span class="warnbox"><b>⚠ この時刻は就寝前にかかります。</b>` +
           (detail ? `運動を早い時間に移すか、品目を減らすほうが確実です。` : '') + `</span>`
@@ -4007,7 +4007,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered, dayMet){
     const late = at !== null && at !== undefined && at >= LATE_HHMM;
     return [
       `間食<br><small>（${(at !== null && at !== undefined ? hhmm(at) + '・' : '')}自宅）</small>`,
-      `約&nbsp;${snack.bin.total}&nbsp;g` + gramLabel(snack.bin),
+      `${snack.bin.total}&nbsp;g` + gramLabel(snack.bin),
       `<b>${snack.bin.label}</b>` +
       (detail
         ? `<br><small>${FOODS.filter(f => inSnack(f, st)).map(f => f.short).join('・')}は外食に持ち込めないため、この時間にまとめて摂ります。` +
@@ -4031,8 +4031,11 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered, dayMet){
   const addNote = bin => {
     if(!(bin.addTotal > 0)) return '';
     // `addLabel` は品目ごとにgを持つので、1品目だけのときに合計を添えると同じ数字が2回出る
-    const many = new Set(bin.adds.map(u => u.key)).size > 1;
-    return `<br>＋ <b>④の提案：${bin.addLabel}</b>${many ? `（合計 +${bin.addTotal}g）` : ''}`;
+    // v.212：品目ごとのgも合計も出さない（内容の列はたんぱく質の量を出さない）
+    const cnt = new Map();
+    bin.adds.forEach(u => cnt.set(u.key, (cnt.get(u.key) || 0) + 1));
+    const names = [...cnt].map(([id, n]) => { const f = foodById(id); return `${f.short} ${n}${f.unit}`; }).join('<br>＋ ');
+    return `<br>＋ <b>④の提案：${names}</b>`;
   };
 
   // 各食事行の「内容・ポイント」：回し分を差し引いた、その時間帯で実際に食べるもの
@@ -4125,8 +4128,8 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered, dayMet){
           `<b>${trained ? '運動直後' : '起床後'}の${PROTEIN.name}が実質的な朝の補給</b>になります。ここは抜かないでください。`
         ]
       : [
-          '朝食' + timeLabel('b'),
-          `約&nbsp;${mBreak}&nbsp;g` + gramLabel(bins.b),
+          `<span class="nw">朝食${timeLabel('b')}</span>`,
+          `${mBreak}&nbsp;g` + gramLabel(bins.b),
           meal(bins.b, mBreak, breakfastOk(), 'b', breakfastWarn())
         ],
     splitRow('b'),
@@ -4142,15 +4145,15 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered, dayMet){
             : `朝食が目安を超えている場合は、上の「朝食の回し分」を昼の時間帯に回してください。`)
         ]
       : [
-          '昼食' + timeLabel('l'),
-          `約&nbsp;${mLunch}&nbsp;g` + gramLabel(bins.l),
+          `<span class="nw">昼食${timeLabel('l')}</span>`,
+          `${mLunch}&nbsp;g` + gramLabel(bins.l),
           meal(bins.l, mLunch, '', 'l')
         ],
     splitRow('l'),
     snackRow('l'),
     [
-      '夕食' + timeLabel('d'),
-      `約&nbsp;${mDinner}&nbsp;g` + gramLabel(bins.d),
+      `<span class="nw">夕食${timeLabel('d')}</span>`,
+      `${mDinner}&nbsp;g` + gramLabel(bins.d),
       meal(bins.d, mDinner, '<br>就寝の3時間前までに済ませると消化と睡眠の質の面で有利です。', 'd')
     ],
     splitRow('d'),
@@ -4161,7 +4164,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered, dayMet){
       const at   = clock(nextFrom + SPLIT_GAP);
       const late = at !== null && at >= LATE_HHMM;
       return [
-        `2回目の${PROTEIN.name}<br><small>（${at !== null ? hhmm(at) + '・' : ''}${SPLIT_GAP}時間後）</small>`,
+        `2回目の${PROTEIN.name}${at !== null ? `（${hhmm(at)}）` : ''}`,
         cup(sEvening),
         !detail
           // プロテインは就寝前でも負担にならないので、簡潔表示では注意も出さない
