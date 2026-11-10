@@ -99,6 +99,9 @@ function makeCase(rnd, i){
     rest:     rnd() < 0.3,
     mochi:    rnd() < 0.5,      // ご飯にもち麦を混ぜるか（v.192）
     perish:   rnd() < 0.5,      // 賞味期限が近い品目を優先するか（v.195）
+    // 消費期限（v.201）。期限の品目ごとに「日付なし／過ぎた／今日／近い／遠い」を振る
+    expDays:  (typeof PERISH_IDS !== 'undefined' ? PERISH_IDS : [])
+                .map(id => [id, pick([null, null, -3, -1, 0, 1, 3, 7, 14])]),
     detail:   rnd() < 0.5,
     kcalAdj:  pick([0, 0, 0, 200, -200, 600, -600]),   // ①の必要エネルギーの補正
     walk:     pick([0, 0, 5, 10, 12, 20, 25]),
@@ -158,6 +161,16 @@ function applyCase(c){
   setChk('riceMochi', c.mochi); if(typeof applyRiceMix === 'function') applyRiceMix();
   // 期限優先（v.195）。切り替えの後始末（自動で入れた数の0戻し・手入力の引き継ぎ）も通す
   setChk('perishFirst', c.perish); if(typeof onPerishToggle === 'function') onPerishToggle();
+  if(typeof foodExp !== 'undefined'){
+    const exp = {};
+    (c.expDays || []).forEach(([id, d]) => {
+      if(d === null) return;
+      const t = new Date(); t.setDate(t.getDate() + d);
+      exp[id] = localISO(t);
+    });
+    foodExp = exp;
+    if(typeof refreshInfo === 'function') refreshInfo();
+  }
   setVal('kcalAdj', c.kcalAdj);
   setVal('walk', c.walk); setVal('cycle', c.cycle);
   setVal('breakfastTime', c.times[0]); setVal('lunchTime', c.times[1]); setVal('dinnerTime', c.times[2]);

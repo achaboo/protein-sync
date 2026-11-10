@@ -181,6 +181,7 @@ input[type=checkbox]:focus-visible{outline:2px solid #bfd7ff;outline-offset:2px}
 .food-cat{font-size:.82rem;font-weight:700;color:var(--sub);padding:12px 0 2px;border-bottom:1px solid var(--line)}
 .food-cat:first-child{padding-top:2px}
 .exp-past{color:#c0392b;font-weight:600}
+.note-line{display:block;margin-bottom:6px}
 .qty{flex:0 0 92px;display:flex;align-items:center;gap:6px}
 .qty input{text-align:center}
 .unit{font-size:.8rem;color:var(--sub);flex:none;width:2.2em}
@@ -861,7 +862,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.200';
+const APP_VERSION = '2026-09-01.202';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -1956,10 +1957,18 @@ function lackBeforeAuto(st, food, target){
      （1回あたりを増やしたのが v.134 の目的なので、そこは最後まで守る）
    ・筋トレをした日の最低杯数（MIN_SPOONS_TRAINED）より下へは削らない
    ・「杯数を指定」で手動指定した日は、指定が最優先なので適用しない */
+/* **期限が過ぎた・今日までの品目は、プロテインより先に使う**（v.202・利用者の指定）。
+   期限優先がオンで、そういう品目が今日の献立に入っているとき、筋トレの日の最低杯数（MIN_SPOONS_TRAINED）を外し、
+   杯数を「食事で足りない分」だけにする。運動直後の2杯（20.8g）だけでたんぱく質が上限（目標＋5g）に届いて、
+   期限の品目を1つも足せなかったため（73.0kg・筋トレの日で実測）。
+   **外すのは最低杯数だけ**で、たんぱく質の合格線・上限、食塩・飽和の線はそのまま */
+const urgentFoods = st => perishOn() && !st.week   // 1週間の型には今日の期限を持ち込まない
+  ? PERISH_IDS.filter(id => (st.foods[id] || 0) > 0 && foodUse(id) && perishDays(id) !== null && perishDays(id) <= 0)
+  : [];
 function capSavasBySat(sv, st, trained){
   if(!sv || sv.spoons <= 0) return sv;
   const satFood = calcSat(st, null).total;                  // 粉を除いた飽和脂肪酸
-  const floor   = trained ? MIN_SPOONS_TRAINED : 0;
+  const floor   = trained && !urgentFoods(st).length ? MIN_SPOONS_TRAINED : 0;
   const cap     = Math.max(floor, Math.floor((SAT_GOOD + 0.05 - satFood) / SAT_PER_SPOON));
   if(sv.spoons <= cap) return sv;
 
@@ -1984,7 +1993,11 @@ function savasFor(st, ex, lack, target, lackBase){
 
   const coverG = Math.min(lack, r1(target * st.savasShare));
   let sv = splitSavas(coverG, st, true);
-  if(trained && sv.spoons < MIN_SPOONS_TRAINED) sv = fixedSavas(MIN_SPOONS_TRAINED);
+  const urgent = urgentFoods(st);
+  if(trained && sv.spoons < MIN_SPOONS_TRAINED){
+    if(urgent.length) sv = Object.assign({}, sv, {urgentCut: urgent});   // v.202：期限の品目を先に使う
+    else sv = fixedSavas(MIN_SPOONS_TRAINED);
+  }
   const autoSpoons = sv.spoons;
 
   if(st.fixSpoons){                       // 手動指定が最優先
@@ -2201,6 +2214,26 @@ const COST_W    = 1 / 5000;   // 最後の同点崩し。余裕より軽く効�
 const OKAZU_IDS = ['tofu', 'natto', 'natto_plain', 'egg', 'tuna', 'saba', 'saba_aji', 'saba_miso'];   // 豆腐は v.194
 const OKAZU_W   = 1e6;
 const PERISH_W  = 20;    // 期限が近い品目の割合の重み（v.195）。余裕（SLACK_W）より上
+/* **入れた消費期限で、その品目を先に使う**（v.201・利用者の指定「案B」）。
+   v.195 の「期限の品目のエネルギーの割合」はそのまま残し（日付を入れない日は v.200 と同じ結果）、
+   **日付を入れた品目にだけ** 別の点を足す：`PERISH_DATE_W` × 緊急度 × (1 − 0.5^数量)。
+   緊急度は 期限が過ぎた品目 1.0／今日 0.95／1日ごとに −0.08（12日先で0）。
+   **エネルギーの割合ではなく数量で数える** — 割合だとヨーグルト・牛乳・サラダのような軽い品目は
+   期限が過ぎていても点がほとんど付かず、入らなかった（v.201 の確認で踏んだ）。
+   1個目で半分・2個目で4分の3…と頭打ちにして、食べる総量を増やす方向へ傾かないようにする。
+   **過ぎた品目を避けるのではなく、先に使い切る**ほうを利用者が選んだ。
+   食塩・飽和脂肪酸の線とたんぱく質・帯はこれより上なので越えない */
+const PERISH_DATE_W = 3;
+const perishDays = id => {
+  const v = foodExp[id];
+  if(!v || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+  return Math.round((Date.parse(v) - Date.parse(localISO())) / 864e5);
+};
+const perishWeight = id => {
+  const d = perishDays(id);
+  if(d === null) return 0;
+  return d < 0 ? 1 : Math.max(0, 0.95 - 0.08 * d);
+};
 const BAD_BASE  = 1e8;   // 食塩・飽和の線を越えた点の下駄（帯の外れよりさらに重い）
 const CLIMB_MAX = 200;   // 山登りの打ち切り（通常は10回ほどで止まる）
 const CLIMB_SEEDS = 8;   // 決まった6点に加えて散らす初期点の数
@@ -2248,6 +2281,8 @@ function autoRanges(st, ex, keepOff){
    初期点をいくつも試すので同じ組み合わせを何度も評価する。1回の探索のあいだだけ
    結果を覚えておく（これが無いと1回の探索が3倍かかる）。 */
 function makeScore(st0, ex, ids, satCap, perish){
+  const perishW = {};
+  if(perish) FOODS.forEach(f => { if(isPerish(f) && perishWeight(f.id) > 0) perishW[f.id] = perishWeight(f.id); });
   const need   = calcNeed(st0, ex);
   const target = r1(st0.weight * ex.factor);
   const pLo    = r1(target * WEEK_P_RATIO), pHi = r1(target + DEVIATION_OK);
@@ -2307,12 +2342,15 @@ function makeScore(st0, ex, ids, satCap, perish){
     // 期限が近い品目のエネルギーの割合（v.195）。点数から引く
     const perishK = perish
       ? FOODS.reduce((a, f) => a + (isPerish(f) ? (st.foods[f.id] || 0) * (f.kcal || 0) : 0), 0) : 0;
+    // v.201：日付を入れた品目は、期限が近いほど使うことに点を付ける（`perishW` は makeScore の頭で1回だけ作る）
+    let perishD = 0;
+    for(const id in perishW) perishD += perishW[id] * (1 - Math.pow(0.5, Math.max(0, st.foods[id] || 0)));
     return {ok:true, pShort: under > 0,
             score: (under > 0 ? PLOW_FIX : 0) + PLOW_W * under + OKAZU_W * okazuMiss + BAND_W * d + ENERGY_W * near
                  + SLACK_W * (salt / SALT_LIMIT + sat / SAT_GOOD)
                  + BULK_W * Math.max(0, calcGram(st, sv).total - BULK_AIM)
                  + COST_W * food.cost
-                 - PERISH_W * perishK / Math.max(1, kcal)};
+                 - PERISH_W * perishK / Math.max(1, kcal) - PERISH_DATE_W * perishD};
   };
   return q => {
     let key = '';
@@ -2449,7 +2487,8 @@ function autoQuantities(st0, keep, keepOff){
                st.otherCarb, st.otherFiber,
                Object.keys(keep).sort().join(','),
                riceMochiOn() ? 'mochi' : 'plain', JSON.stringify(foodOverride),   // 品目の中身が変わる設定（v.192）
-               perishOn() && !keepOff ? 'perish' : '',                           // 期限優先（v.195）
+               perishOn() && !keepOff                                            // 期限優先（v.195）
+                 ? 'perish:' + PERISH_IDS.map(id => perishWeight(id).toFixed(2)).join(',') : '',   // 期限の近さ（v.201）
                keepOff ? 'week' : Object.keys(foodOff).sort().join(',')].join('|');
   let got = balCache.get(key);
   if(!got){
@@ -3085,6 +3124,10 @@ function render(opts){
           ? `<br><small><b>2食の日は不足をまず${PROTEIN.name}で埋める設定のため、上限の ${sv.spoons}杯` +
             `（${r1(sv.spoons * SPOON_G)}g・1回${MAX_PER_SERVE}杯×${sv.sessions.length}回）に固定しています。</b>` +
             `残る不足は自動計算の候補（無脂肪ヨーグルト・納豆など）として「③ 今日の食事」に自動入力されます。</small>`
+          : sv.urgentCut
+            ? `<br><small><b>消費期限が過ぎた・今日までの品目（${sv.urgentCut.map(id => esc(foodById(id).short || foodById(id).name)).join('・')}）を先に使うため、` +
+              `筋トレの日の最低 ${MIN_SPOONS_TRAINED}杯 を外し、${sv.spoons}杯 にしています。</b>` +
+              `（③の「賞味期限が近い品目を優先する」をオフにすると、最低 ${MIN_SPOONS_TRAINED}杯 に戻ります）</small>`
           : sv.forced
             ? `<br><small>筋トレをした日は${PROTEIN.name}を必ず摂る設定のため、` +
               `不足の有無にかかわらず最低 ${MIN_SPOONS_TRAINED}杯（${r1(MIN_SPOONS_TRAINED * SPOON_G)}g）を確保しています。</small>`
@@ -3128,6 +3171,12 @@ function render(opts){
     $('oSavasSub').textContent = over > 0
       ? `食事だけで目標を ${over}g 上回っています。飲む場合は運動直後に1〜2杯に留めましょう。`
       : '食事だけで今日の目標を達成しています。';
+    // v.202：筋トレの日なのに0杯になったのは、期限の品目を先に使ったため
+    if(sv.urgentCut)
+      $('oSavasSub').innerHTML = esc($('oSavasSub').textContent) +
+        `<br><b>消費期限が過ぎた・今日までの品目（${sv.urgentCut.map(id => esc(foodById(id).short || foodById(id).name)).join('・')}）を先に使うため、` +
+        `筋トレの日の最低 ${MIN_SPOONS_TRAINED}杯 を外しています。</b>` +
+        `（③の「賞味期限が近い品目を優先する」をオフにすると、最低 ${MIN_SPOONS_TRAINED}杯 に戻ります）`;
   }
 
   // ---- 算出根拠 ----
@@ -4053,7 +4102,28 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered, dayMet){
       `豆腐・納豆・卵・ツナ缶・サバ缶のどれかを③で1つ足すか、「使わない」にしている品目を戻してください` +
       `（食塩・飽和脂肪酸の線に余裕が無いと、自動計算はおかずを足しません）。</span>`
     : '';
-  $('schedNote').innerHTML = okazuNote + (un.length
+  /* 消費期限（v.201）。今日の献立に入っている期限の品目を、期限の近い順に日付つきで並べる。
+     期限を入れたのに今日は入らなかった品目も名指す（「なぜ入らないのか」が分からなくなるため） */
+  const expFmt = id => { const v = foodExp[id]; const [y, m, d] = v.split('-'); return `${y.slice(2)}/${m}/${d}`; };
+  const dated = PERISH_IDS.filter(id => perishDays(id) !== null && foodUse(id) && foodById(id))
+    .sort((a, b) => perishDays(a) - perishDays(b));
+  const expTag = id => {
+    const d = perishDays(id);
+    return `${esc(foodById(id).short || foodById(id).name)} ${expFmt(id)}` +
+           (d < 0 ? '<b class="exp-past">（過ぎています）</b>' : d === 0 ? '（今日まで）' : '');
+  };
+  const usedExp = dated.filter(id => (st.foods[id] || 0) > 0);
+  const idleExp = dated.filter(id => !((st.foods[id] || 0) > 0));
+  const expNote = !dated.length ? '' :
+    `<span class="note-line">消費期限（近い順）：` +
+    (usedExp.length ? usedExp.map(id => `${expTag(id)} ×${r1(st.foods[id])}${esc(foodById(id).unit)}`).join('・') : '今日の献立には入っていません') +
+    (idleExp.length
+      ? `<br>期限を入れたが今日は入らなかった品目：${idleExp.map(expTag).join('・')}` +
+        (perishOn()
+          ? '（食塩・飽和脂肪酸の線や、たんぱく質・エネルギーの帯を守るほうが優先です。食べる場合は③に数量を入れてください）'
+          : '（③の「賞味期限が近い品目を優先する」がオフです）')
+      : '') + `</span>`;
+  $('schedNote').innerHTML = expNote + okazuNote + (un.length
     ? `<span class="warnbox"><b>⚠ ${formatPlan(un.map(u => u.key))} は配分できませんでした。</b>` +
       `ご飯は<b>1食につき${riceF ? riceF.slotLimit : 3}杯まで</b>としているため、入力した数を収める時間帯がありません。` +
       `「③ 今日の食事」の数量を見直すか、この分は別の日に回してください。` +
@@ -5470,7 +5540,7 @@ const todayIdx = () => new Date().getDay();
    ------------------------------------------------------------ */
 // 「その他（自由入力）」は今日限りの入力なので、週の試算からは外す
 const weekBase = st => Object.assign({}, st,
-  {otherP:0, otherNote:'', otherFat:0, otherSat:0, otherSalt:0,
+  {week:true, otherP:0, otherNote:'', otherFat:0, otherSat:0, otherSalt:0,
    otherCarb:0, otherFiber:0, otherKcal:0, otherPrice:0});
 
 function weekDay(idx, st0){
