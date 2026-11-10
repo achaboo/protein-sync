@@ -867,7 +867,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.204';
+const APP_VERSION = '2026-09-01.205';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -1967,6 +1967,10 @@ function lackBeforeAuto(st, food, target){
    杯数を「食事で足りない分」だけにする。運動直後の2杯（20.8g）だけでたんぱく質が上限（目標＋5g）に届いて、
    期限の品目を1つも足せなかったため（73.0kg・筋トレの日で実測）。
    **外すのは最低杯数だけ**で、たんぱく質の合格線・上限、食塩・飽和の線はそのまま */
+/* 期限が過ぎた・今日までの品目のうち「使う」にチェックがあるもの（v.205）。数量は問わない */
+const urgentIds = () => perishOn()
+  ? PERISH_IDS.filter(id => foodUse(id) && perishDays(id) !== null && perishDays(id) <= 0)
+  : [];
 const urgentFoods = st => perishOn() && !st.week   // 1週間の型には今日の期限を持ち込まない
   ? PERISH_IDS.filter(id => (st.foods[id] || 0) > 0 && foodUse(id) && perishDays(id) !== null && perishDays(id) <= 0)
   : [];
@@ -2279,6 +2283,10 @@ function autoRanges(st, ex, keepOff){
     r.egg.hi = Math.max(0, Math.min(r.egg.hi, (eggF.max === undefined ? 2 : eggF.max) - used));
   }
   if(r.banana && r.banana.hi > 0 && (ex.done > 0 || ex.cardio > 0)) r.banana.lo = Math.min(1, r.banana.hi);
+  /* **期限が過ぎた・今日までの品目は最低1単位を必ず入れる**（v.205・利用者の指定
+     「消費期限が切れているのに計算結果に出ないのはあり得ない」）。期限優先がオンの日・「使う」の品目だけ。
+     週の表（keepOff）には持ち込まない。食塩・飽和の線を越える日は balanceQuantities が1つずつ外す */
+  if(!keepOff) urgentIds().forEach(id => { if(r[id] && r[id].hi >= 1) r[id].lo = Math.max(r[id].lo, 1); });
   return r;
 }
 
@@ -2406,8 +2414,10 @@ function balanceQuantities(st0, ex, keep, seed, keepOff){
   const all = FOODS.filter(isAuto).map(f => f.id).filter(id => range[id] && !keep[id]);
   const out = {};
   all.forEach(id => out[id] = range[id].lo);
+  // v.205：下限1にした期限の品目（線を越えるときに外せるよう、幅が無くても変数に残す）
+  const forced = keepOff ? [] : urgentIds().filter(id => all.includes(id) && range[id].lo >= 1);
   // 幅の無い品目（その日は置き場所が無いご飯など）は探索から外す
-  const ids = all.filter(id => range[id].hi > range[id].lo);
+  const ids = all.filter(id => range[id].hi > range[id].lo || forced.includes(id));
   if(!ids.length) return out;
 
   const run = (range, satCap, seeds, kicks) => {
@@ -2464,11 +2474,32 @@ function balanceQuantities(st0, ex, keep, seed, keepOff){
   /* たんぱく質の合格線を割った答えしか出せなかったときだけ、探索を重くしてやり直す。
      ここを割ると週の表が✕になるので、そのときだけ時間をかける価値がある。
      ふだんは軽いほうで足りるので、①の設定を変えたときの再計算も遅くならない（v.149）。 */
+  /* v.205：下限1にした期限の品目は、ほかの自動品目を全部下限にしても（粉を除いても）
+     食塩・飽和の線を越えるなら、どう組んでも入らない。探索を回す前に線への負担が大きい順に外す
+     （回してから1つずつ外すと、①の再計算が 0.35秒 → 1.8秒 になった） */
+  if(forced.length){
+    const loadOf = id => { const f = foodById(id); return (f.salt || 0) / SALT_LIMIT + (f.sat || 0) / SAT_GOOD; };
+    const lows = () => { const q = {}; ids.forEach(id => q[id] = range[id].lo); return withFoods(st0, q); };
+    const over = () => { const st = lows(); return calcSalt(st, null).total >= SALT_LIMIT - 0.01 || calcSat(st, null).total > SAT_LIMIT + 0.05; };
+    const order = forced.slice().sort((a, b) => loadOf(b) - loadOf(a));
+    for(const id of order){ if(!over()) break; range[id] = {lo:0, hi:range[id].hi}; }
+  }
   let best = run(range, SAT_GOOD, CLIMB_SEEDS, CLIMB_KICKS);
   if(best && best.res.pShort)
     best = run(range, SAT_GOOD, CLIMB_SEEDS * 6, CLIMB_KICKS * 3) || best;
-  if(!best) best = run(range, SAT_LIMIT, CLIMB_SEEDS * 2, CLIMB_KICKS)
-                || run(bare,  SAT_LIMIT, CLIMB_SEEDS * 2, CLIMB_KICKS);
+  if(!best) best = run(range, SAT_LIMIT, CLIMB_SEEDS * 2, CLIMB_KICKS);
+  /* v.205：期限の品目を全部入れると食塩・飽和の線を越える日は、線への負担が大きい順に1つずつ外す。
+     **線のほうを守る**（利用者は健診でLDLの上昇を指摘されている）。外した品目は⑤に名指しで出る */
+  if(!best && forced.length){
+    const load = id => { const f = foodById(id); return (f.salt || 0) / SALT_LIMIT + (f.sat || 0) / SAT_GOOD; };
+    const order = forced.slice().sort((a, b) => load(b) - load(a));
+    for(let k = 1; k <= order.length && !best; k++){
+      const drop = order.slice(0, k), rr = {};
+      ids.forEach(id => rr[id] = {lo: drop.includes(id) ? 0 : range[id].lo, hi: range[id].hi});
+      best = run(rr, SAT_GOOD, CLIMB_SEEDS, CLIMB_KICKS) || run(rr, SAT_LIMIT, CLIMB_SEEDS, CLIMB_KICKS);
+    }
+  }
+  if(!best) best = run(bare,  SAT_LIMIT, CLIMB_SEEDS * 2, CLIMB_KICKS);
   ids.forEach(id => out[id] = best ? best.q[id] : 0);
   return out;
 }
@@ -4132,11 +4163,21 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered, dayMet){
   };
   const usedExp = dated.filter(id => (st.foods[id] || 0) > 0);
   const idleExp = dated.filter(id => !((st.foods[id] || 0) > 0));
+  // v.205：期限が過ぎた・今日までの品目は必ず入れる。入らなかったのは線を越えるか、手で0にしたとき
+  const idleUrgent = idleExp.filter(id => perishOn() && perishDays(id) <= 0);
+  const idleLater  = idleExp.filter(id => !idleUrgent.includes(id));
+  const handZero   = id => !!autoOverride[id];
   const expNote = !dated.length ? '' :
     `<span class="note-line">消費期限（近い順）：` +
     (usedExp.length ? usedExp.map(id => `${expTag(id)} ×${r1(st.foods[id])}${esc(foodById(id).unit)}`).join('・') : '今日の献立には入っていません') +
-    (idleExp.length
-      ? `<br>期限を入れたが今日は入らなかった品目：${idleExp.map(expTag).join('・')}` +
+    (idleUrgent.length
+      ? `<br><b class="exp-past">⚠ 期限が過ぎた・今日までなのに入っていない品目：${idleUrgent.map(expTag).join('・')}</b>` +
+        (idleUrgent.every(handZero)
+          ? '（③で手で0にしています。「自動計算に戻す」を押すと入ります）'
+          : '（入れると食塩7.5g・飽和脂肪酸15gの線を越えるため、外しました。食べる場合は③に数量を入れてください）')
+      : '') +
+    (idleLater.length
+      ? `<br>期限を入れたが今日は入らなかった品目：${idleLater.map(expTag).join('・')}` +
         (perishOn()
           ? '（食塩・飽和脂肪酸の線や、たんぱく質・エネルギーの帯を守るほうが優先です。食べる場合は③に数量を入れてください）'
           : '（③の「賞味期限が近い品目を優先する」がオフです）')
