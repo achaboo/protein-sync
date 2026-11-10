@@ -178,8 +178,13 @@ input[type=checkbox]:focus-visible{outline:2px solid #bfd7ff;outline-offset:2px}
 .row.off .qty input{text-decoration:line-through}
 .row .name small{color:var(--sub);font-size:.76rem}
 /* ③の分類の見出し（v.199） */
-.food-cat{font-size:.82rem;font-weight:700;color:var(--sub);padding:12px 0 2px;border-bottom:1px solid var(--line)}
-.food-cat:first-child{padding-top:2px}
+/* v.204：灰色の小さな文字では境界が見えにくい（利用者の指摘）。色の帯＋左の太線で区切る */
+.food-cat{
+  font-size:.92rem;font-weight:700;color:#fff;letter-spacing:.02em;
+  background:var(--brand);border-left:6px solid var(--brand-d);border-radius:6px;
+  padding:7px 12px;margin:20px 0 4px;
+}
+.food-cat:first-child{margin-top:4px}
 .exp-past{color:#c0392b;font-weight:600}
 .note-line{display:block;margin-bottom:6px}
 .qty{flex:0 0 92px;display:flex;align-items:center;gap:6px}
@@ -862,7 +867,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.203';
+const APP_VERSION = '2026-09-01.204';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
