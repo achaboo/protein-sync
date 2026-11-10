@@ -739,8 +739,8 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
     <p class="hint" style="margin-top:0">
       <!-- 賞味期限が近い品目を優先する（v.195）。設定なので翌日も続き、リンクでも運ぶ -->
       <label class="use"><input type="checkbox" id="perishFirst" checked><b>賞味期限が近い品目を優先する</b></label>
-      <br><small>オンにすると、チェックの付いた品目のうち<b>消費期限のある11品目</b>
-      （ミックスサラダ・無脂肪ヨーグルト・サラダチキン・卵・低脂肪牛乳・全粒パン・シリアル・豆腐・納豆・
+      <br><small>オンにすると、チェックの付いた品目のうち<b>消費期限のある10品目</b>
+      （ミックスサラダ・無脂肪ヨーグルト・サラダチキン・卵・低脂肪牛乳・全粒パン・豆腐・納豆・
       ほぐしサラダチキン・調整豆乳）を、自動計算が優先して使います。
       ふだんは自動で選ばない ほぐしサラダチキン・調整豆乳も、この日は候補になります。
       <b>食塩7.5g・飽和脂肪酸15gの線と、たんぱく質・エネルギーの帯は守ります</b>（その内側で、余裕よりも期限を優先します）。
@@ -881,7 +881,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.213';
+const APP_VERSION = '2026-09-01.214';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -1422,7 +1422,7 @@ const refreshInfo = () => FOODS.forEach(f => { const el = $('info_' + f.id); if(
 const isAutoStatic = f => !!(f.autoFill || f.autoEnergy || f.autoFat || f.autoRice || f.autoBal);
 /* **賞味期限が近い品目を優先する**（v.195・利用者の要望）。
    ③の「賞味期限が近い品目を優先する」がオンの日だけ効かせる。
-   対象は利用者が決めた11品目（`PERISH_IDS`。v.200 で決め直した）。「在庫がある」はチェック（foodUse）で表す。
+   対象は利用者が決めた品目（`PERISH_IDS`。v.200 で決め直し、v.214 でシリアルを外して10品目）。「在庫がある」はチェック（foodUse）で表す。
    ・自動計算の点数に「期限が近い品目のエネルギーの割合 × PERISH_W」を**引く**形で入れる。
      重さは利用者の指定で「食塩・飽和の余裕（SLACK_W）より上、エネルギーの近さより下」。
      割合で持つのは、量そのものに報酬を付けると**食べる総量を増やす方向**へ傾くため
@@ -1436,11 +1436,14 @@ const isAutoStatic = f => !!(f.autoFill || f.autoEnergy || f.autoFat || f.autoRi
 // v.208：サラダチキンを足した（利用者の指定。iPhone だけ入ったままだったので DEFAULTS_VER 20 で重ねる）
 const DEFAULT_OFF_IDS = ['katsuju', 'chicken', 'chicken_hogushi', 'soymilk', 'saba_aji', 'saba_miso', 'amaguri'];
 const defaultOff = () => Object.fromEntries(DEFAULT_OFF_IDS.map(id => [id, true]));
-/* **期限のある品目は利用者が決めた11品目だけ**（v.200）。v.195〜v.199 の「店と日持ちする品目以外すべて＋自由入力」から
+/* **期限のある品目は利用者が決めた品目だけ**（v.200。v.214 でシリアルを外し10品目）。v.195〜v.199 の「店と日持ちする品目以外すべて＋自由入力」から
    ロースかつ重・バナナ・トマトジュース・納豆（たれなし）・むき甘栗・自由入力の品目を外し、シリアルを足した。
-   消費期限の欄（`foodExp`）もこの11品目にだけ出る */
-const PERISH_IDS = ['salad', 'yogurt', 'chicken', 'egg', 'milk', 'bread', 'cereal',
+   消費期限の欄（`foodExp`）もこの品目にだけ出る。
+   **v.214 でシリアルを外して10品目にした**（利用者の指定「消費期限がない」）。 */
+const PERISH_IDS = ['salad', 'yogurt', 'chicken', 'egg', 'milk', 'bread',
                     'tofu', 'natto', 'chicken_hogushi', 'soymilk'];
+/* 保存やリンクに、期限の品目でなくなった品目の日付が残っていたら捨てる（v.214。シリアルの日付など） */
+const keepPerishExp = o => { const r = {}; Object.keys(o || {}).forEach(id => { if(PERISH_IDS.includes(id)) r[id] = o[id]; }); return r; };
 const isPerish  = f => !!f && PERISH_IDS.includes(f.id);
 const perishOn  = () => !!($('perishFirst') && $('perishFirst').checked);
 const perishOnly = f => !!f.perishMax && !isAutoStatic(f);   // 期限優先の日だけ自動になる品目
@@ -5981,7 +5984,7 @@ function load(){
 
   const sameDay = !!d && d.date === todayKey();
   // 消費期限は設定と同じ扱い（v.199）。行を描き直す前に読む
-  if(d && d.exp){ foodExp = {...d.exp}; refreshInfo(); }
+  if(d && d.exp){ foodExp = keepPerishExp(d.exp); refreshInfo(); }
   // 品目の値の変更は日付では消さない（値段は翌日も同じもののため）
   if(d && d.ov){ foodOverride = {...d.ov}; applyFoodOverrides(); }
   // 自由入力から足した品目は翌日以降も残す。数量だけ当日のものを戻す
@@ -6150,7 +6153,7 @@ function applySettingsFromHash(hash){
     const put = id => { if(d.v[id] !== undefined && $(id)) $(id).value = d.v[id]; };
     SETTING_IDS().forEach(put);
     // 品目の値の変更と「使う／使わない」は設定と同じ扱い（日付に関係なく反映する）
-    if(d.exp){ foodExp = {...d.exp}; refreshInfo(); }
+    if(d.exp){ foodExp = keepPerishExp(d.exp); refreshInfo(); }
     if(d.ov){ foodOverride = {...d.ov}; applyFoodOverrides(); }
     foodOff = d.off ? {...d.off} : {};
     applyFoodUse();
