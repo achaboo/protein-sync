@@ -862,7 +862,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.202';
+const APP_VERSION = '2026-09-01.203';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -3982,7 +3982,20 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered, dayMet){
       : `<b>—</b>${always}`;
   };
 
-  const postRow = [
+  /* 筋トレの日に粉が0杯（v.202：期限が過ぎた・今日までの品目を先に使う日）。
+     見出しを「運動のあとの Bpro」のままにすると、中身がバナナだけなのに
+     「Bpro の行に、あわせてバナナ」と読めてしまう（利用者から指摘・v.203）。 */
+  const noPowder = trained && !dosed;
+  const noPowderWhy = sv.urgentCut
+    ? `消費期限が過ぎた・今日までの品目（${sv.urgentCut.map(id => esc(foodById(id).short || foodById(id).name)).join('・')}）を先に使うため、` +
+      `今日は${PROTEIN.name}を飲みません`
+    : `今日は食事だけで目標に届くため、${PROTEIN.name}を飲みません`;
+  const postRow = noPowder ? [
+      `運動のあと<br><small>（${PROTEIN.name}は0杯）</small>`,
+      '—',
+      (postSplit.first.length ? `<b>${labelOf(postSplit.first)}</b>` : `<b>バナナ1本</b>`) +
+      `<br><small>${noPowderWhy}。運動のあとに糖質を補ってください</small>`
+    ] : [
       trained
         ? `運動のあとの${PROTEIN.name}<br><small>（1回目）</small>`
         : '起床後<br><small>（朝食前）</small>',

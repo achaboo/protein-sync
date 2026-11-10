@@ -342,6 +342,11 @@ function checkOne(c, fail){
       fail(`⑤の1行目がプロテインの行ではありません：${head0.trim().slice(0, 20)}`);
     if(isPowder && TIME_RE.test(head0))
       fail(`⑤のプロテイン1回目に時刻が出ています：${head0.trim().slice(0, 20)}`);
+    /* 運動した日に粉が0杯（v.202 の期限の品目を先に使う日）は、「運動のあとの Bpro」に
+       「あわせて バナナ」とだけ出していた（v.203で修正）。見出しに0杯と出し、「あわせて」と書かない */
+    if((ex0.done > 0 || ex0.cardio > 0) && !(savasOf(st0, ex0).spoons > 0) &&
+       (head0.indexOf('0杯') < 0 || /あわせて/.test(rows[0].textContent)))
+      fail(`⑤の運動のあとの行が、粉0杯なのに粉の行のままです：${rows[0].textContent.trim().slice(0, 40)}`);
     let prev = -Infinity, prevTxt = '';
     rows.forEach(tr => {
       const txt = tr.querySelector('td.time').textContent;
