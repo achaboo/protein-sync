@@ -321,6 +321,13 @@ table.simple th,table.simple td{padding:7px 8px;font-size:.84rem;line-height:1.5
 table.simple td.time{width:32%;font-size:.82rem}
 table.simple td.amt{width:16%;white-space:nowrap}
 table.simple td.time small{font-weight:400}
+/* ⑤の表（v.209）：時間帯と目安量を1列に。列は中身の幅だけにして、残りを内容に回す */
+#schedTable{table-layout:fixed}               /* 中身の長さで列幅が広がらないよう固定する */
+#schedTable th:first-child{width:27%}
+#schedTable th{white-space:normal}
+#schedule td.time,table.simple #schedule td.time{width:auto;white-space:normal;padding-left:6px;padding-right:6px}
+#schedule td.time .amt{margin-top:6px;color:var(--brand-d);font-weight:700}
+#schedule td.time .amt small{font-weight:400}
 /* 食べる順番の注意（内容欄の先頭に置く） */
 .order{
   display:block;background:#fff7ed;border-left:3px solid var(--accent);
@@ -844,9 +851,9 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
         <label for="schedDetail">くわしい説明を表示する</label>
       </div>
       <div class="table-wrap">
-        <table>
+        <table id="schedTable">
           <thead>
-            <tr><th>時間帯</th><th>目安量</th><th id="schedHead">内容・ポイント</th></tr>
+            <tr><th>時間帯・目安量</th><th id="schedHead">内容・ポイント</th></tr>
           </thead>
           <tbody id="schedule"></tbody>
         </table>
@@ -873,7 +880,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.208';
+const APP_VERSION = '2026-09-01.209';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -2008,9 +2015,14 @@ const urgentFoods = st => perishOn() && !st.week   // 1週間の型には今日�
   : [];
 function capSavasBySat(sv, st, trained){
   if(!sv || sv.spoons <= 0) return sv;
-  const satFood = calcSat(st, null).total;                  // 粉を除いた飽和脂肪酸
+  /* **丸めずに足し、比べるときだけ r1 をかける**（v.209。v.187 の suggestPlan と同じ型の不具合）。
+     calcSat(st, null).total は r1 済みなので、食品 13.74g が 13.7g に見えて4杯を許し、
+     実際は 13.74＋4×0.333＝15.07g（表示 15.1g）と線を越えた（ランダム検証1,000件中1件で検出） */
+  const satFood = FOODS.reduce((a, f) => a + (st.foods[f.id] || 0) * (f.sat || 0), 0) + (st.otherSat || 0);
   const floor   = trained && !urgentFoods(st).length ? MIN_SPOONS_TRAINED : 0;
-  const cap     = Math.max(floor, Math.floor((SAT_GOOD + 0.05 - satFood) / SAT_PER_SPOON));
+  let cap = Math.floor((SAT_GOOD + 0.05 - satFood) / SAT_PER_SPOON);
+  while(cap > floor && r1(satFood + cap * SAT_PER_SPOON) > SAT_GOOD) cap--;
+  cap = Math.max(floor, cap);
   if(sv.spoons <= cap) return sv;
 
   const maxN = st && st.twoDoses ? 2 : SESSIONS_OFF;
@@ -3575,7 +3587,7 @@ function distributeFoods(st, mealTargets, planIds, trained){
       .map(v => v.isOther ? `その他（${v.g}g）`
                 : v.first ? `<u>${v.short} ${v.n}${v.unit}</u>（${v.g}g）`
                 : `${v.short} ${v.n}${v.unit}（${v.g}g）`)
-      .join(' ＋ ');
+      .join('<br>＋ ');      // v.209：1行に1品目。2つ目から先頭に「＋」
   });
 
   ORDER.forEach(s => {
@@ -3939,7 +3951,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered, dayMet){
       .map(v => v.isOther ? `その他（${v.g}g）`
               : v.first ? `<u>${v.short} ${v.n}${v.unit}</u>（${v.g}g）`
               : `${v.short} ${v.n}${v.unit}（${v.g}g）`)
-      .join(' ＋ ');
+      .join('<br>＋ ');      // v.209：1行に1品目
   };
   const viewOf = (bin, k) => {
     const mv = split[k] && split[k].move;
@@ -4020,7 +4032,7 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered, dayMet){
     if(!(bin.addTotal > 0)) return '';
     // `addLabel` は品目ごとにgを持つので、1品目だけのときに合計を添えると同じ数字が2回出る
     const many = new Set(bin.adds.map(u => u.key)).size > 1;
-    return ` ＋ <b>④の提案：${bin.addLabel}</b>${many ? `（合計 +${bin.addTotal}g）` : ''}`;
+    return `<br>＋ <b>④の提案：${bin.addLabel}</b>${many ? `（合計 +${bin.addTotal}g）` : ''}`;
   };
 
   // 各食事行の「内容・ポイント」：回し分を差し引いた、その時間帯で実際に食べるもの
@@ -4170,8 +4182,9 @@ function renderSchedule(st, ex, target, sv, plan, dayCovered, dayMet){
 
   $('schedule').closest('table').className = detail ? '' : 'simple';
   $('schedHead').textContent = detail ? '内容・ポイント' : '内容';
+  /* v.209：時間帯と目安量を1列にまとめ、内容の列を広くした（利用者の指定。iPhone で内容が細く折り返していた） */
   $('schedule').innerHTML = rows.map(r =>
-    `<tr><td class="time">${r[0]}</td><td class="amt">${r[1]}</td><td>${r[2]}</td></tr>`
+    `<tr><td class="time">${r[0]}${r[1] && r[1] !== '—' ? `<div class="amt">${r[1]}</div>` : ''}</td><td>${r[2]}</td></tr>`
   ).join('');
 
   // ご飯ものが1食1つの制限に収まらなかった場合の注意
