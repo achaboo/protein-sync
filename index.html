@@ -880,7 +880,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.210';
+const APP_VERSION = '2026-09-01.211';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -5899,6 +5899,21 @@ const todayKey  = () => { const d = new Date(); return `${d.getFullYear()}-${d.g
    「体重を入れ直しても、開き直すと元に戻る」という形で表に出た（v.161で修正）。 */
 let appliedLink = '';
 
+/* **リンクと保存に「内容が最後に変わった時刻」を持たせ、保存より古いリンクは読まない**（v.211）。
+   `appliedLink` だけでは足りなかった — v.176 から `syncHash` が URL を最新に書き替えるたび
+   `appliedLink` も最新へ進むので、**iOS のホーム画面アイコンに固定された古い `#s=`** は
+   「まだ読んでいないリンク」に見え、アプリを開き直すたびに適用されていた。
+   利用者からは「iPhone では消費期限の日付が翌日に消える（PC の Chrome では残る）」として報告された
+   （期限が空のときに作ったアイコンなので `exp:{}` で上書きしていた。体重・「使わない」も同じ経路で戻っていた）。
+   `contentTs` は**内容が変わったときだけ**進める（`lk` と `ts` を除いて比べる）。
+   リンクの `ts` もこの値なので、「どちらの端末の内容が新しいか」を比べることになる。
+   時刻の無い古いリンクは、保存が空のとき（ITP で消えたときなど）だけ読む。 */
+let contentTs = 0;      // この端末の内容が最後に変わった時刻
+let storedTs  = 0;      // 開いたときに保存にあった時刻
+let hadStore  = false;  // 開いたときに保存があったか
+let lastBody  = null;
+const bodyOf = o => { const {ts, lk, ...rest} = o; return JSON.stringify(rest); };
+
 function save(){
   writeStore();
   scheduleHashSync();     // URL の `#s=` も最新に保つ（v.176）
@@ -5909,6 +5924,9 @@ function writeStore(){
   const d = {v:{}, c:{}, date:todayKey(), dv:DEFAULTS_VER, exd:exDate, rest:$('restSavas').checked, two:$('twoDoses').checked, sd:$('schedDetail').checked, mochi:$('riceMochi').checked, perish:$('perishFirst').checked, ao:autoOverride, calc:calculated, cf:customData(), ov:foodOverride, off:foodOff, exp:foodExp, pv:200, lk:appliedLink};
   ALL_IDS().forEach(id => d.v[id] = $(id).value);
   EXERCISES.forEach(e => d.c[e.id] = $('c_' + e.id).checked);
+  const body = bodyOf(d);
+  if(body !== lastBody){ lastBody = body; contentTs = Date.now(); }
+  d.ts = contentTs;
   try{ localStorage.setItem(KEY, JSON.stringify(d)); }catch(err){}
 }
 
@@ -5953,6 +5971,10 @@ let wasCalculated = false;
 function load(){
   let d = null;
   try{ d = JSON.parse(localStorage.getItem(KEY) || 'null'); }catch(err){}
+  hadStore  = !!d;
+  storedTs  = (d && d.ts) || 0;
+  contentTs = storedTs || Date.now();   // 時刻を持たない v.210 以前の保存は「いま」とみなす
+  if(d) lastBody = bodyOf(d);
 
   const sameDay = !!d && d.date === todayKey();
   // 消費期限は設定と同じ扱い（v.199）。行を描き直す前に読む
@@ -6055,7 +6077,7 @@ const b64dec = str =>
   JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(str), c => c.charCodeAt(0))));
 
 function settingsPayload(){
-  const d = {v:{}, c:{}, date:todayKey(), rest:$('restSavas').checked, two:$('twoDoses').checked, sd:$('schedDetail').checked, mochi:$('riceMochi').checked, perish:$('perishFirst').checked};
+  const d = {v:{}, c:{}, ts:contentTs, date:todayKey(), rest:$('restSavas').checked, two:$('twoDoses').checked, sd:$('schedDetail').checked, mochi:$('riceMochi').checked, perish:$('perishFirst').checked};
   d.cf = customData();
   d.ov = foodOverride;
   /* 「使う／使わない」も設定として運ぶ（v.165）。
@@ -6120,6 +6142,8 @@ function applySettingsFromHash(hash){
   try{
     const d = b64dec(m[1]);
     if(!d.v) return false;
+    // この端末の保存より古いリンク（ホーム画面のアイコンに固定されたものなど）は読まない（v.211）
+    if(hadStore && !(d.ts > storedTs)){ appliedLink = m[1]; return 'older'; }
     const put = id => { if(d.v[id] !== undefined && $(id)) $(id).value = d.v[id]; };
     SETTING_IDS().forEach(put);
     // 品目の値の変更と「使う／使わない」は設定と同じ扱い（日付に関係なく反映する）
@@ -6567,7 +6591,7 @@ $('reset').addEventListener('click', () => {
   try{
     localStorage.removeItem(KEY);
     if(keep.length || appliedLink)
-      localStorage.setItem(KEY, JSON.stringify({v:{}, c:{}, cf:keep, lk:appliedLink}));
+      localStorage.setItem(KEY, JSON.stringify({v:{}, c:{}, cf:keep, lk:appliedLink, ts:Date.now()}));   // ts：アイコンの古いリンクを読ませない（v.211）
   }catch(err){}
   location.reload();
 });
@@ -6597,7 +6621,10 @@ load();
 refreshCatSums();   // 分類の見出しの「今日 ○品」（v.208）
 // URL に設定が埋め込まれていれば、保存内容より優先して適用しこの端末にも保存する
 const fromLink = applySettingsFromHash();
-if(fromLink){
+if(fromLink === 'older'){
+  $('linkNote').innerHTML = '<small>URLに付いている設定は、この端末に保存されている内容より古いため読み込んでいません' +
+    '（ホーム画面のアイコンやブックマークのURLは、追加したときのまま変わらないためです）。この端末の保存を使っています。</small>';
+}else if(fromLink){
   save();
   /* **URL の `#s=` は消さない**（v.175で外した）。
 
