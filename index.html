@@ -180,11 +180,17 @@ input[type=checkbox]:focus-visible{outline:2px solid #bfd7ff;outline-offset:2px}
 /* ③の分類の見出し（v.199） */
 /* v.204：灰色の小さな文字では境界が見えにくい（利用者の指摘）。色の帯＋左の太線で区切る */
 .food-cat{
-  font-size:.92rem;font-weight:700;color:#fff;letter-spacing:.02em;
-  background:var(--brand);border-left:6px solid var(--brand-d);border-radius:6px;
-  padding:7px 12px;margin:20px 0 4px;
+  display:flex;align-items:center;gap:8px;width:100%;text-align:left;cursor:pointer;
+  font:inherit;font-size:.92rem;font-weight:700;color:#fff;letter-spacing:.02em;
+  background:var(--brand);border:0;border-left:6px solid var(--brand-d);border-radius:6px;
+  padding:9px 12px;margin:8px 0 0;
 }
-.food-cat:first-child{margin-top:4px}
+.food-cat-wrap:first-child .food-cat{margin-top:4px}
+/* v.208：分類は初期値で畳み、開くのは1つだけ（利用者の指定）。右端の ▸ / ▾ で開閉を示す */
+.food-cat::after{content:"▸";margin-left:auto;font-size:.85rem}
+.food-cat[aria-expanded="true"]::after{content:"▾"}
+.food-cat .cat-sum{font-weight:500;font-size:.78rem;opacity:.9;white-space:nowrap;flex:0 0 auto}
+.cat-body{padding-bottom:6px}
 .exp-past{color:#c0392b;font-weight:600}
 .note-line{display:block;margin-bottom:6px}
 .qty{flex:0 0 92px;display:flex;align-items:center;gap:6px}
@@ -709,7 +715,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
     </p>
     <p class="hint" style="margin-top:0">
       <b>品目名の左のチェックは「この品目を使ってよい」</b>という意味です
-      （「今日これを食べる」ではありません）。初期値では6品目（ロースかつ重・ほぐしサラダチキン・調整豆乳・サバ缶（味付）・サバ缶（みそ煮）・むき甘栗）だけが外れています。
+      （「今日これを食べる」ではありません）。初期値では7品目（ロースかつ重・サラダチキン・ほぐしサラダチキン・調整豆乳・サバ缶（味付）・サバ缶（みそ煮）・むき甘栗）だけが外れています。
       <b>買わない品目・食べない品目は外してください。</b>
       外した品目は数量を0として扱い、自動計算の組み立てからも除きます。
       <b>この設定は翌日も続きます</b>（v.165で変更）。一度整えれば毎朝やり直す必要はありません。
@@ -867,7 +873,7 @@ table.mini tr.today td{background:#eef4ff;font-weight:700}
    ============================================================ */
 // 画面下部に表示するバージョン。内容を変えたらここを更新する。
 // 公開ページはブラウザにキャッシュされるため、表示中の版を見分けるための目印。
-const APP_VERSION = '2026-09-01.207';
+const APP_VERSION = '2026-09-01.208';
 
 /* ============================================================
    プロテインの製品情報。**製品を変えるときはこのブロックだけ直す。**
@@ -1419,7 +1425,8 @@ const isAutoStatic = f => !!(f.autoFill || f.autoEnergy || f.autoFat || f.autoRi
 /* **初期値で外す品目**（v.198・利用者の指定）。③では「使う」品目の下に、この順で並べる。
    並べ替えるのは画面の行だけで、`FOODS` の順は変えない（探索や配分の結果を動かさないため）。
    「入力をリセット」「食事をリセット」はこの状態に戻す。全部オンにするのは「すべて戻す」だけ。 */
-const DEFAULT_OFF_IDS = ['katsuju', 'chicken_hogushi', 'soymilk', 'saba_aji', 'saba_miso', 'amaguri'];
+// v.208：サラダチキンを足した（利用者の指定。iPhone だけ入ったままだったので DEFAULTS_VER 20 で重ねる）
+const DEFAULT_OFF_IDS = ['katsuju', 'chicken', 'chicken_hogushi', 'soymilk', 'saba_aji', 'saba_miso', 'amaguri'];
 const defaultOff = () => Object.fromEntries(DEFAULT_OFF_IDS.map(id => [id, true]));
 /* **期限のある品目は利用者が決めた11品目だけ**（v.200）。v.195〜v.199 の「店と日持ちする品目以外すべて＋自由入力」から
    ロースかつ重・バナナ・トマトジュース・納豆（たれなし）・むき甘栗・自由入力の品目を外し、シリアルを足した。
@@ -1483,12 +1490,37 @@ const FOOD_CATS = [
   const used = new Set(FOOD_CATS.flatMap(([, ids]) => ids));
   const rest = FOODS.filter(f => !f.custom && !used.has(f.id)).map(f => f.id);
   const cats = rest.length ? FOOD_CATS.concat([['その他', rest]]) : FOOD_CATS;
+  /* v.208：分類ごとに開閉する箱に入れる。行の id はそのままなので、ほかの処理は今までどおり動く */
+  const box = (label, rows, extra) =>
+    `<div class="food-cat-wrap"${extra || ''}>` +
+    `<button type="button" class="food-cat" aria-expanded="false">${esc(label)}<span class="cat-sum"></span></button>` +
+    `<div class="cat-body" hidden>${rows}</div></div>`;
   $('foods').innerHTML = cats.map(([label, ids]) =>
-    `<div class="food-cat">${esc(label)}</div>` +
-    ids.map(id => FOODS.find(f => f.id === id)).filter(Boolean).map(foodRow).join('')).join('') +
-    `<div class="food-cat" id="catCustom" hidden>自由入力で足した品目</div>`;
+    box(label, ids.map(id => FOODS.find(f => f.id === id)).filter(Boolean).map(foodRow).join(''))).join('') +
+    box('自由入力で足した品目', '', ' id="catCustom" hidden');
 })();
 const refreshCustomCat = () => { const h = $('catCustom'); if(h) h.hidden = !FOODS.some(f => f.custom); };
+/* 畳んでいても分かるよう、見出しに「今日 ○品」（数量が入っていて「使う」の品目の数）を出す */
+function refreshCatSums(){
+  document.querySelectorAll('#foods .food-cat-wrap').forEach(w => {
+    const n = [...w.querySelectorAll('.row')].filter(r => {
+      const id = r.id.slice(4), q = $('f_' + id);
+      return q && num('f_' + id) > 0 && foodUse(id);
+    }).length;
+    const sum = w.querySelector('.cat-sum');
+    if(sum) sum.textContent = n ? `今日 ${n}品` : '';
+  });
+}
+/* 見出しを押すと、その分類だけを開く（ほかは閉じる）。もう一度押すと閉じる */
+function openFoodCat(btn){
+  const willOpen = btn.getAttribute('aria-expanded') !== 'true';
+  document.querySelectorAll('#foods .food-cat').forEach(b => {
+    const open = willOpen && b === btn;
+    b.setAttribute('aria-expanded', open ? 'true' : 'false');
+    b.nextElementSibling.hidden = !open;
+  });
+  if(willOpen) btn.scrollIntoView({block:'nearest'});
+}
 DEFAULT_OFF_IDS.forEach(id => { const el = $('use_' + id); if(el) el.checked = false; });
 
 /* 「その他（自由入力）」を品目として③の末尾に足す。
@@ -1512,8 +1544,8 @@ function addCustomFood(o, qty){
   const n = parseInt(String(f.id).replace(/[^0-9]/g, ''), 10);
   if(n > customSeq) customSeq = n;        // 復元したidと番号がぶつからないようにする
   FOODS.push(f);
-  // 自由入力の品目は③のいちばん下の「自由入力で足した品目」に入る（v.199）
-  $('foods').insertAdjacentHTML('beforeend', foodRow(f));
+  // 自由入力の品目は③のいちばん下の「自由入力で足した品目」に入る（v.199。v.208 から開閉する箱の中）
+  $('catCustom').querySelector('.cat-body').insertAdjacentHTML('beforeend', foodRow(f));
   refreshCustomCat();
   $('f_' + f.id).value = qty === undefined ? 1 : qty;
   return f;
@@ -3246,6 +3278,7 @@ function render(opts){
   // 「計算する」を押したときは「④ 計算結果」を開いてそこへ移動する
   if(scroll) openSection(sectionOf('oTarget'), {scroll:true});
   calculated = true;
+  refreshCatSums();     // 自動計算が数量を書き替えたあとに、分類の見出しの「今日 ○品」を直す（v.208）
 }
 
 /* ------------------------------------------------------------
@@ -5000,7 +5033,7 @@ const storageOk = (() => {
 })();
 // 入力欄の既定値を変更したら上げる。番号が違う保存データでは、
 // 下記の欄だけ復元せず新しい既定値に戻す（体重や食事回数などの他の設定は保持）。
-const DEFAULTS_VER = 19;
+const DEFAULTS_VER = 20;
 // v6：体重の初期値を 75kg → 74kg に変更。
 // 次に既定値を変えるときは、実際に変えた欄だけをこの一覧に残すこと
 // （体重を入れたままにすると、以後の更新で入力済みの体重まで戻ってしまう）。
@@ -5049,7 +5082,11 @@ const DEFAULTS_VER = 19;
 //      ロースかつ重・ほぐしサラダチキン・調整豆乳・サバ缶（味付）・サバ缶（みそ煮）・むき甘栗を
 //      初期値で「使わない」にした（どちらも load() の staleEx で初期値へ戻す／重ねる）。
 //      **v20 では `weight` と `breakfastTime` を必ず外すこと**（残すと毎朝の7日平均が巻き戻る）。
-const RESET_IDS = () => ['weight', 'breakfastTime'];
+// v20：初期値で外す品目にサラダチキンを足した（利用者の指定）。欄の初期値は変えていないので一覧は空。
+//      **v19 の weight・breakfastTime は外した**（残すと毎朝入れ直している7日平均が 73.0kg へ巻き戻る）。
+//      「使わない」は load() の staleEx で保存済みの外し方に DEFAULT_OFF_IDS を重ねる（外していた品目は残る）。
+//      副作用は今までと同じ：筋トレのチェックが全部オフ、twoDoses・restSavas・perishFirst が初期値へ戻る。
+const RESET_IDS = () => [];
 const ALL_IDS = () => ['weight','height','age','baseFactor','meals','savasShare','walk','cycle',
    'kcalAdj','weekExSel',
    'otherP','otherNote','otherFat','otherSat','otherSalt','otherCarb','otherFiber','otherKcal','otherPrice',
@@ -6137,6 +6174,7 @@ function clearFoods(){
 function onInputChanged(){
   readFoodUse();                 // ③の「使う／使わない」を先に読む
   refreshUseNotes();
+  refreshCatSums();
   updateLive();
   save();
   if(calculated) render();          // scroll しない＝編集中に画面が飛ばない
@@ -6256,6 +6294,11 @@ $('otherAdd').addEventListener('click', () => {
   note.innerHTML = `<b>${esc(f.name)} ${r1(f.p)}g（1${esc(f.unit)}・${f.price ? f.price + '円' : '無料'}）</b>を足しました。` +
     `個数は上の一覧の末尾で変えられます。翌日以降もこの品目は残ります。`;
   onInputChanged();
+});
+// 分類の見出し（v.208）
+$('foods').addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('.food-cat');
+  if(b) openFoodCat(b);
 });
 // 行の中のボタン（足した品目を消す／値を直す）
 $('foods').addEventListener('click', e => {
@@ -6481,7 +6524,7 @@ $('reset').addEventListener('click', () => {
     '入力内容をすべて初期状態に戻します。\n\n' +
     '・体重 73.0kg / 基本係数 1.4 / 3食\n' +
     '・「今日の食事」→ その日の曜日の型に戻ります\n' +
-    '・品目の「使う／使わない」→ ロースかつ重・ほぐしサラダチキン・調整豆乳・サバ缶（味付）・サバ缶（みそ煮）・むき甘栗だけ外す\n' +
+    '・品目の「使う／使わない」→ ロースかつ重・サラダチキン・ほぐしサラダチキン・調整豆乳・サバ缶（味付）・サバ缶（みそ煮）・むき甘栗だけ外す\n' +
     '・「賞味期限が近い品目を優先する」→ オン\n' +
     '・ウォーキング / サイクリングの距離 → 0\n' +
     '・筋トレのチェック → 全種目オフ（その日にやった種目だけ入れてください）\n' +
@@ -6538,6 +6581,7 @@ $('weekExSel').innerHTML = WEEK_EX.map(x =>
   `<option value="${x.id}"${x.id === 'today' ? ' selected' : ''}>${esc(x.label)}</option>`).join('');
 
 load();
+refreshCatSums();   // 分類の見出しの「今日 ○品」（v.208）
 // URL に設定が埋め込まれていれば、保存内容より優先して適用しこの端末にも保存する
 const fromLink = applySettingsFromHash();
 if(fromLink){

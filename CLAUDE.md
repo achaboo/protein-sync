@@ -25,7 +25,14 @@
 - 利用者は iPhone Safari（ホーム画面のアイコン）と PC Chrome の両方で開く。**狭い画面での折り返しを必ず確認する**
 - 画面の文言はすべて日本語
 
-## いまの設計（2026-11-10 / v.207）
+## いまの設計（2026-11-10 / v.208）
+
+- **③の分類は開閉式で、初期値はすべて畳む・開くのは1つだけ**（v.208・利用者の指定）。
+  各分類を `.food-cat-wrap`（見出しの `<button class="food-cat">`＋`.cat-body`）に入れた。行の id は変えていない。
+  自由入力の行は `#catCustom .cat-body` に足す。見出しに「今日 ○品」（`refreshCatSums`。onInputChanged・render の末尾・load の直後）。
+- **サラダチキンを初期値で外す**（v.208・`DEFAULT_OFF_IDS` に `chicken`）。iPhone だけ入ったままだったので
+  **`DEFAULTS_VER` 20・`RESET_IDS` は空**（v19 の weight・breakfastTime を外した）。staleEx で「使わない」を重ねる。
+  **v21 で初期値を変えるときも、RESET_IDS には変えた欄だけを入れること**
 
 - **期限が過ぎた・今日までの「使う」品目は下限1単位**（v.205・利用者の指定「必ず入れる」。`autoRanges` の末尾・`urgentIds`）。
   **食塩・飽和の線は越えない** — `balanceQuantities` で、下限だけで線を越える品目を探索前に外し（負担＝食塩/7.5＋飽和/15 の大きい順）、
